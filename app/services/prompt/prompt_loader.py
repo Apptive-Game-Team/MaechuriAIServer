@@ -1,5 +1,8 @@
 class PromptLoader:
     @staticmethod
     def load(path: str) -> str:
-        with open(path, "r", encoding="utf-8") as file:
-            return file.read()
+        try:
+            with open(path, "r", encoding="utf-8") as file:
+                return file.read()
+        except OSError as e:
+            raise RuntimeError(f"Failed to load prompt from '{path}': {e}") from e
