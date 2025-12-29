@@ -4,7 +4,12 @@ import os
 
 class GeminiClient:
     def __init__(self):
-        api_key = os.environ["GEMINI_API_KEY"]
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY environment variable is not set. "
+                "Please configure your Gemini API key before using GeminiClient."
+            )
         self.client = genai.Client(api_key=api_key)
         self.model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
