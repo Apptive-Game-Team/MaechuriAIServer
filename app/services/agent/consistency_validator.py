@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import List
 from pydantic import BaseModel
 
-import app.models.schemas
 from app.models.schemas import SuspectGenerationRequest
 
 
