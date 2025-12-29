@@ -1,8 +1,9 @@
 from google import genai
 from google.genai import types
+from .llm_client import LLMClient
 import os
 
-class GeminiClient:
+class GeminiClient(LLMClient):
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
