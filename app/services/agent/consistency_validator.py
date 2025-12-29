@@ -71,7 +71,7 @@ class ConsistencyValidator:
             )
 
         return ValidationResult(
-            is_valid= len(issues) == 0,
+            is_valid = len(issues) == 0,
             issues = issues,
         )
 
