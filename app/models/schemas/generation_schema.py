@@ -21,5 +21,5 @@ class GenerationConfigSchema(BaseModel):
     @classmethod
     def validate_liar_ratio(cls, v, info):
         if not info.data.get("allow_lying") and v != 0.0:
-            raise ValueError("liar_ratio must 0.0 when allow_lying is False")
+            raise ValueError("liar_ratio must be 0.0 when allow_lying is False")
         return v
