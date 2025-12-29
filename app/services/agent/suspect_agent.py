@@ -1,9 +1,6 @@
 import json
 
 from app.services.prompt.prompt_loader import PromptLoader
-import re
-
-
 class SuspectAgent:
     def __init__(self, llm_client):
         self.llm = llm_client
