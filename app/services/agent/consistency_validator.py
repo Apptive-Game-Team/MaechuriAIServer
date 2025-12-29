@@ -24,7 +24,7 @@ class ConsistencyValidator:
     @staticmethod
     def validate_pre_json(
             request: SuspectGenerationRequest
-    ) -> ValidationResult :
+    ) -> ValidationResult:
         issues: List[ValidationIssue] = []
 
         case = request.case_context
