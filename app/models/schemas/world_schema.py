@@ -5,6 +5,7 @@ class VisibilityRuleSchema(BaseModel):
     from_location: str = Field(alias="from")
     can_see: List[str]
     cannot_see: List[str]
+    evidence_type: Optional[str] = None
 
 
 class AccessRuleSchema(BaseModel):
