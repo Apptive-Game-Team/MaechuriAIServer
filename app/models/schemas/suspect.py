@@ -5,7 +5,6 @@ from app.models.schemas.scenario import (
     TimeRangeSchema,
     WorldContextSchema,
     GroundTruthSchema,
-    GenerationTargetsSchema,
     ConstraintsSchema,
     SuspectGenConfig
 )
