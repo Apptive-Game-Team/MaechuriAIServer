@@ -80,7 +80,6 @@ class GenerationTargetsSchema(BaseModel):
 
 # --- Scenario Main ---
 class ScenarioSkeleton(BaseModel):
-    scenario_id: str
     meta: MetaSchema
     incident: IncidentSchema
     world: WorldSkeletonSchema

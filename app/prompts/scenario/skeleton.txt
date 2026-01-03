@@ -4,7 +4,6 @@ This is the blueprint stage. Focus only on the core facts of the incident.
 
 Output MUST be a valid JSON matching this structure:
 {
-  "scenario_id": "string",
   "meta": {
     "difficulty": "easy" | "mid" | "hard",
     "theme": "string",

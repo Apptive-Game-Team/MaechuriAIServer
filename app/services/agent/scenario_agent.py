@@ -9,6 +9,9 @@ from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion
 class ScenarioAgent:
     def __init__(self, llm_client):
         self.llm = llm_client
+        self.case_prompt = PromptLoader.load(
+            "app/prompts/scenario/case.txt"
+        )
         self.skeleton_prompt = PromptLoader.load(
             "app/prompts/scenario/skeleton.txt"
         )
@@ -16,20 +19,36 @@ class ScenarioAgent:
             "app/prompts/scenario/expansion.txt"
         )
 
+    def generate_case(self,
+                      theme: str = "random") -> str:
+        """
+        평서문 형태로 사건의 대락적인 내용을 서술합니다.
+        :param theme: 사건의 중심이 되는 키워드 또는 원하는 방향성을 제시한 파라미터
+        :return: 평서문 str
+        """
+        user_prompt = self._build_user_prompt(theme)
+        raw_response = self.llm.complete(
+            system=self.case_prompt,
+            user=user_prompt,
+        )
+
+        return raw_response
     def generate_skeleton(self,
-                          theme: str = "random") -> ScenarioSkeleton:
+                          case: str = "random") -> ScenarioSkeleton:
         """
         Generates a scenario skeleton based on the provided theme.
         """
-        user_prompt = self._build_user_prompt(theme)
-
         raw_response = self.llm.complete(
             system=self.skeleton_prompt,
-            user=user_prompt,
+            user=case,
         )
 
         json_text = self._extract_json(raw_response)
         data_dict = self._safe_json_load(json_text)
+
+        # case에 대한 내용 강제 주입
+        if "incident" in data_dict:
+            data_dict["incident"]["summary"] = case
         
         return ScenarioSkeleton.model_validate(data_dict)
 
@@ -74,7 +93,7 @@ class ScenarioAgent:
         return ScenarioExpansion.model_validate(final_data)
 
     def _build_user_prompt(self, theme: str) -> str:
-        return f"Please generate a mystery scenario skeleton. Theme: {theme}"
+        return f"Please generate a highly detailed mystery scenario in plain, descriptive sentences. Theme: {theme}"
 
     def _extract_json(self, text: str) -> str:
         start = text.find("{")
