@@ -22,7 +22,7 @@ class ScenarioAgent:
     def generate_case(self,
                       theme: str = "random") -> str:
         """
-        평서문 형태로 사건의 대락적인 내용을 서술합니다.
+        평서문 형태로 사건의 대략적인 내용을 서술합니다.
         :param theme: 사건의 중심이 되는 키워드 또는 원하는 방향성을 제시한 파라미터
         :return: 평서문 str
         """
