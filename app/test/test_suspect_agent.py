@@ -1,4 +1,4 @@
-from app.services.agent.suspect_service import SuspectService
+from app.services.npc.suspect_service import SuspectService
 
 service = SuspectService()
 

@@ -18,9 +18,6 @@ class SuspectAgent:
             system=self.system_prompt,
             user=prompt,
         )
-        print("===========================================================")
-        print(raw)
-        print("===========================================================\n\n\n\n\n\n")
         json_text = self._extract_json(raw)
 
         return self._safe_json_load(json_text)

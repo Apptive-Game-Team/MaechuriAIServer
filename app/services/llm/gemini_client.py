@@ -1,8 +1,11 @@
 from google import genai
 from google.genai import types
+from google.genai.errors import ClientError
+import time
+from .llm_client import LLMClient
 import os
 
-class GeminiClient:
+class GeminiClient(LLMClient):
     def __init__(self):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -13,7 +16,9 @@ class GeminiClient:
         self.client = genai.Client(api_key=api_key)
         self.model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self,
+                 system: str,
+                 user: str = "") -> str:
         prompt = (
             "=== SYSTEM ===\n"
             f"{system}\n\n"
@@ -21,14 +26,29 @@ class GeminiClient:
             f"{user}"
         )
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                max_output_tokens=4096,
-                response_mime_type="application/json",
-            ),
-        )
+        max_retries = 5
+        base_delay = 2
 
-        return response.text.strip()
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        temperature=0.2,
+                        max_output_tokens=4096,
+                        response_mime_type="application/json",
+                    ),
+                )
+                return response.text.strip()
+            
+            except ClientError as e:
+                # 429 에러(Quota Exceeded)인 경우 지수적 대기 후 재시도
+                if e.code == 429 or 'RESOURCE_EXHAUSTED' in str(e):
+                    if attempt < max_retries:
+                        sleep_time = base_delay * (2 ** attempt)
+                        print(f"Gemini API Quota exceeded. Retrying in {sleep_time}s... (Attempt {attempt + 1}/{max_retries})")
+                        time.sleep(sleep_time)
+                        continue
+                # 다른 에러이거나 재시도 횟수를 초과한 경우 에러 발생
+                raise e
