@@ -14,7 +14,9 @@ class GeminiClient(LLMClient):
         self.client = genai.Client(api_key=api_key)
         self.model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self,
+                 system: str,
+                 user: str = "") -> str:
         prompt = (
             "=== SYSTEM ===\n"
             f"{system}\n\n"
