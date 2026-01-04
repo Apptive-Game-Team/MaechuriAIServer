@@ -1,7 +1,5 @@
 import time
-from typing import Dict, Any
 import time
-
 from app.core.utils import extract_json, safe_json_load
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.schemas.scenario import (
