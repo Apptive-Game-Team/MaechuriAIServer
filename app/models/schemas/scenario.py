@@ -80,7 +80,7 @@ class GenerationTargetsSchema(BaseModel):
 
 # ===============================================================
 
-from .clue import ClueItemSchema, ClueSetSchema
+from .clue import ClueSetSchema
 
 
 # --- Scenario Main ---
