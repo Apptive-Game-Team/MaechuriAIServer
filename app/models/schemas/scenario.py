@@ -24,7 +24,7 @@ class IncidentSchema(BaseModel):
 
 # --- World ---
 class VisibilityRuleSchema(BaseModel):
-    from_location: str = Field(alias="from")
+    from_location: str
     can_see: List[str]
     cannot_see: List[str]
     evidence_type: Optional[str] = None
@@ -71,12 +71,17 @@ class SuspectGenConfig(BaseModel):
     liar_ratio: float = Field(ge=0.0, le=1.0)
 
 class EvidenceGenConfig(BaseModel):
-    count_range: Tuple[int, int]
+    count_range: List[int] = Field(min_length=2, max_length=2)
     ambiguity_level: Literal["low", "medium", "high"]
 
 class GenerationTargetsSchema(BaseModel):
     suspects: SuspectGenConfig
     evidence: EvidenceGenConfig
+
+# ===============================================================
+
+from .clue import ClueItemSchema, ClueSetSchema
+
 
 # --- Scenario Main ---
 class ScenarioSkeleton(BaseModel):
@@ -90,3 +95,22 @@ class ScenarioExpansion(ScenarioSkeleton):
     ground_truth_detail: GroundTruthSchema
     generation_targets: GenerationTargetsSchema
     constraints: ConstraintsSchema
+
+class ScenarioExpansionRequest(BaseModel):
+    world_detail: WorldContextSchema
+    ground_truth_detail: GroundTruthSchema
+    generation_targets: GenerationTargetsSchema
+    constraints: ConstraintsSchema
+
+class ExpansionPart1(BaseModel):
+    world_detail: WorldContextSchema
+    ground_truth_detail: GroundTruthSchema
+
+class ExpansionPart2(BaseModel):
+    generation_targets: GenerationTargetsSchema
+    constraints: ConstraintsSchema
+
+
+class ScenarioResult(ScenarioExpansion):
+    clues: ClueSetSchema
+
