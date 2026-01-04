@@ -1,9 +1,14 @@
-import json
-from asyncio.windows_events import NULL
-from typing import Dict, Any
-
+import time
+import time
+from app.core.utils import extract_json, safe_json_load
 from app.services.prompt.prompt_loader import PromptLoader
-from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion
+from app.models.schemas.scenario import (
+    ScenarioSkeleton, 
+    ScenarioExpansion, 
+    ScenarioExpansionRequest,
+    ExpansionPart1,
+    ExpansionPart2
+)
 
 
 class ScenarioAgent:
@@ -22,98 +27,83 @@ class ScenarioAgent:
     def generate_case(self,
                       theme: str = "random") -> str:
         """
-        평서문 형태로 사건의 대략적인 내용을 서술합니다.
-        :param theme: 사건의 중심이 되는 키워드 또는 원하는 방향성을 제시한 파라미터
-        :return: 평서문 str
+        Generates a narrative case synopsis based on the theme.
         """
-        user_prompt = self._build_user_prompt(theme)
+        user_prompt = f"Please generate a mystery case synopsis. Theme: {theme}"
         raw_response = self.llm.complete(
             system=self.case_prompt,
             user=user_prompt,
         )
-
+        
         return raw_response
+
     def generate_skeleton(self,
-                          case: str = "random") -> ScenarioSkeleton:
+                          case: str) -> ScenarioSkeleton:
         """
-        Generates a scenario skeleton based on the provided theme.
+        Generates a scenario skeleton based on the provided case synopsis.
+        Injects the case synopsis into incident.summary.
         """
         raw_response = self.llm.complete(
             system=self.skeleton_prompt,
             user=case,
+            response_schema=ScenarioSkeleton.model_json_schema()
         )
 
-        json_text = self._extract_json(raw_response)
-        data_dict = self._safe_json_load(json_text)
-
-        # case에 대한 내용 강제 주입
-        if "incident" in data_dict:
-            data_dict["incident"]["summary"] = case
+        json_text = extract_json(raw_response)
+        data_dict = safe_json_load(json_text)
+        
+        # Inject the original case text into the summary
+        if 'incident' in data_dict:
+            data_dict['incident']['summary'] = case
         
         return ScenarioSkeleton.model_validate(data_dict)
 
     def generate_expansion(self,
                           skeleton: ScenarioSkeleton) -> ScenarioExpansion:
         """
-        스켈레톤 파이썬 코드로부터 디테일한 요소를 만들어냅니다.
-        :param skeleton: 스켈레톤 시나리오 객체
-        :return: expansion scenario
+        Generates detailed scenario elements from the skeleton using chunked generation.
         """
-        # 1. LLM에게 스켈레톤 정보를 제공하여 확장을 요청
-        raw_response = self.llm.complete(
-            system=self.expansion_prompt,
-            user=skeleton.model_dump_json(indent=2)
+        skeleton_json = skeleton.model_dump_json(indent=2)
+        
+        # --- Part 1: World & Ground Truth ---
+        raw_response_1 = self.llm.complete(
+            system=self.expansion_prompt + "\n\nFocus on: world_detail, ground_truth_detail",
+            user=skeleton_json,
+            response_schema=ExpansionPart1.model_json_schema()
         )
+        json_text_1 = extract_json(raw_response_1)
+        data_part_1 = safe_json_load(json_text_1)
+        time.sleep(3)
 
-        json_text = self._extract_json(raw_response)
-        new_data = self._safe_json_load(json_text)
+        # --- Part 2: Targets & Constraints ---
+        raw_response_2 = self.llm.complete(
+            system=self.expansion_prompt + "\n\nFocus on: generation_targets, constraints",
+            user=skeleton_json,
+            response_schema=ExpansionPart2.model_json_schema()
+        )
+        json_text_2 = extract_json(raw_response_2)
+        data_part_2 = safe_json_load(json_text_2)
+        time.sleep(3)
 
-        # 2. 스켈레톤 데이터(기존)와 확장 데이터(신규) 병합
+        # --- Merge Logic ---
         skeleton_dict = skeleton.model_dump()
         final_data = skeleton_dict.copy()
 
-        # World: Skeleton의 world 정보를 가져와서 world_detail로 확장
-        # world_detail은 WorldSkeletonSchema를 상속받으므로 locations 정보가 필요함
+        # Merge Part 1 Data
+        # World
         world_detail = skeleton_dict['world'].copy()
-        if 'world_detail' in new_data:
-            world_detail.update(new_data['world_detail'])
+        if 'world_detail' in data_part_1:
+            world_detail.update(data_part_1['world_detail'])
         final_data['world_detail'] = world_detail
 
-        # Ground Truth: Skeleton의 ground_truth 정보를 가져와서 ground_truth_detail로 확장
-        # ground_truth_detail은 GroundTruthSkeletonSchema를 상속받으므로 culprit_count 등이 필요함
+        # Ground Truth
         gt_detail = skeleton_dict['ground_truth'].copy()
-        if 'ground_truth_detail' in new_data:
-            gt_detail.update(new_data['ground_truth_detail'])
+        if 'ground_truth_detail' in data_part_1:
+            gt_detail.update(data_part_1['ground_truth_detail'])
         final_data['ground_truth_detail'] = gt_detail
 
-        # 나머지 신규 필드 추가
-        final_data['generation_targets'] = new_data.get('generation_targets')
-        final_data['constraints'] = new_data.get('constraints')
+        # Merge Part 2 Data
+        final_data['generation_targets'] = data_part_2.get('generation_targets')
+        final_data['constraints'] = data_part_2.get('constraints')
 
         return ScenarioExpansion.model_validate(final_data)
-
-    def _build_user_prompt(self, theme: str) -> str:
-        return f"Please generate a highly detailed mystery scenario in plain, descriptive sentences. Theme: {theme}"
-
-    def _extract_json(self, text: str) -> str:
-        start = text.find("{")
-        end = text.rfind("}")
-
-        if start == -1 or end == -1 or end <= start:
-            raise ValueError(
-                f"LLM output is incomplete JSON:\n{text}"
-            )
-
-        return text[start:end + 1]
-
-    def _safe_json_load(self, text: str) -> Dict[str, Any]:
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            # Simple repair for common LLM JSON issues
-            repaired = (
-                text.replace("True", "true")
-                .replace("False", "false")
-                .replace("None", "null")
-            )
-            return json.loads(repaired)

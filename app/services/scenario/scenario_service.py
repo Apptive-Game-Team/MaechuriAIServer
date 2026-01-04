@@ -1,6 +1,8 @@
 from pydantic import ValidationError
 
-from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion
+from app.models.schemas import ClueSetSchema
+from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion, ScenarioResult
+from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.consistency_validator import ConsistencyValidator
 from app.services.agent.scenario_agent import ScenarioAgent
 from app.services.llm.gemini_client import GeminiClient
@@ -11,16 +13,14 @@ class ScenarioService:
 
     def __init__(self):
         llm_client = GeminiClient() # TODO : 여기서 LLM CLIENT 수정
-        self.agent = ScenarioAgent(llm_client)
+        self.scenario_agent = ScenarioAgent(llm_client)
+        self.clue_agent = ClueAgent(llm_client)
         self.validator = ConsistencyValidator()
 
     def generate(self, pre_input: str) -> dict:
         # 생성 시작
         # 평서문 생성
-        case_state = self.agent.generate_case(pre_input)
-
-        # TODO : 테스트 코드
-        print(case_state)
+        case_state = self.scenario_agent.generate_case(pre_input)
 
         # 요청 속도 조절
         time.sleep(3)
@@ -29,7 +29,7 @@ class ScenarioService:
         skeleton_result: ScenarioSkeleton | None = None
         for attempt in range(3):
             try:
-                skeleton_result = self.agent.generate_skeleton(case_state)
+                skeleton_result = self.scenario_agent.generate_skeleton(case_state)
                 break
             except ValidationError as error:
                 print(error)
@@ -44,7 +44,7 @@ class ScenarioService:
         expansion_result: ScenarioExpansion | None = None
         for attempt in range(3):
             try:
-                expansion_result = self.agent.generate_expansion(skeleton_result)
+                expansion_result = self.scenario_agent.generate_expansion(skeleton_result)
                 break
             except ValidationError as error:
                 print(error)
@@ -52,4 +52,23 @@ class ScenarioService:
         if expansion_result is None:
             raise RuntimeError("Expansion of Scenario failed to generate")
 
-        return expansion_result.model_dump()
+        # 3차 단서 생성
+        clue_result: ClueSetSchema | None = None
+
+        for attempt in range(3):
+            try:
+                clue_result = self.clue_agent.generate_clues(expansion_result)
+                break
+            except ValidationError as error:
+                print(error)
+
+        if clue_result is None:
+            raise RuntimeError("Clue of Scenario failed to generate")
+
+        # Combine into ScenarioResult
+        final_scenario = ScenarioResult(
+            **expansion_result.model_dump(), # 본인
+            clues=clue_result # 추가
+        )
+
+        return final_scenario.model_dump(mode='json')

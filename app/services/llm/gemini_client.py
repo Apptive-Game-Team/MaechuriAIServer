@@ -18,13 +18,26 @@ class GeminiClient(LLMClient):
 
     def complete(self,
                  system: str,
-                 user: str = "") -> str:
+                 user: str = "",
+                 response_schema: dict | None = None) -> str:
         prompt = (
             "=== SYSTEM ===\n"
             f"{system}\n\n"
             "=== USER ===\n"
             f"{user}"
         )
+
+        config_params = {
+            "temperature": 0.2,
+            "max_output_tokens": 8192,
+        }
+
+        if response_schema:
+            config_params["response_mime_type"] = "application/json"
+            config_params["response_schema"] = response_schema
+        else:
+            # Default behavior if needed, or just plain text
+            pass
 
         max_retries = 5
         base_delay = 2
@@ -34,11 +47,7 @@ class GeminiClient(LLMClient):
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,
-                    config=types.GenerateContentConfig(
-                        temperature=0.2,
-                        max_output_tokens=4096,
-                        response_mime_type="application/json",
-                    ),
+                    config=types.GenerateContentConfig(**config_params),
                 )
                 return response.text.strip()
             
@@ -52,3 +61,5 @@ class GeminiClient(LLMClient):
                         continue
                 # 다른 에러이거나 재시도 횟수를 초과한 경우 에러 발생
                 raise e
+
+        return "Error"
