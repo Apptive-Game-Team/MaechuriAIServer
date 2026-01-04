@@ -10,7 +10,17 @@ Instructions:
 4. Language: Korean (한국어).
 
 Fields to focus on:
+
 - world_detail: Environmental rules (visibility, access control).
+
 - ground_truth_detail: Causal explanation of the crime and required evidence types.
+
+    * Use integer IDs (1, 2, 3...) for `culprit_ids`.
+
 - generation_targets: Concrete goals for suspects and evidence.
+
+    * In `suspects.roles`, do not use names, use integer IDs for any references.
+
+
+
 - constraints: Logical or narrative constraints.

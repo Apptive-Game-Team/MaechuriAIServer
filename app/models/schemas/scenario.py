@@ -53,7 +53,7 @@ class GroundTruthSkeletonSchema(BaseModel):
     crime_location: str
 
 class GroundTruthSchema(GroundTruthSkeletonSchema):
-    culprit_ids: List[str] = []
+    culprit_ids: List[int] = []
     method: str = ""
     required_evidence: List[RequiredEvidenceSchema] = []
 

@@ -21,6 +21,7 @@ These clues must logically support the Ground Truth while respecting the World R
 
 4. **Field Specifics**:
    - `is_red_herring`: Set to `true` for misleading clues, `false` for relevant clues.
+   - `related_suspect_ids`: MUST use integer IDs (1, 2, 3...) that match the suspects in the scenario.
    - `logic_explanation`: 
      - For relevant clues: Explain how it points to the truth.
      - For red herrings: Explain how it is intended to mislead or what innocent suspect it points to.
