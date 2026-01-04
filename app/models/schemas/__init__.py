@@ -14,12 +14,18 @@ from .scenario import (
     EvidenceGenConfig,
     GenerationTargetsSchema,
     ScenarioSkeleton,
-    ScenarioExpansion
+    ScenarioExpansion,
+    ScenarioResult
 )
 
 from .suspect import (
     CaseContextSchema,
     SuspectGenerationRequest
+)
+
+from .clue import (
+    ClueItemSchema,
+    ClueSetSchema
 )
 
 __all__ = [
@@ -39,6 +45,9 @@ __all__ = [
     "GenerationTargetsSchema",
     "ScenarioSkeleton",
     "ScenarioExpansion",
+    "ScenarioResult",
     "CaseContextSchema",
     "SuspectGenerationRequest",
+    "ClueItemSchema",
+    "ClueSetSchema",
 ]
