@@ -11,8 +11,7 @@ class SuspectAgent:
         self.build_prompt = PromptLoader.load(
             "app/prompts/suspect/build.txt"
         )
-
-    def generate(self, agent_input: dict) -> dict:
+    async def generate(self, agent_input: dict) -> dict:
         prompt = self._build_prompt(agent_input)
 
         raw = self.llm.complete(
@@ -22,6 +21,12 @@ class SuspectAgent:
         json_text = extract_json(raw)
 
         return safe_json_load(json_text)
+
+    async def chat_generate(self,
+                      suspect_personality: dict,
+                      previous_chat: str,
+                      user_message: str) -> dict:
+        pass
 
     def _build_prompt(self, agent_input: dict) -> str:
         return json.dumps({
