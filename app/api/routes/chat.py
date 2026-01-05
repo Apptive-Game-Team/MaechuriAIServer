@@ -3,14 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.db.repositories.chat_repository import ChatRepository
-from app.db.repositories.scenario_repository import ScenarioRepository
-from app.services.llm.gemini_client import GeminiClient
 from app.services.npc.chat_service import ChatService
-from app.services.agent.suspect_agent import SuspectAgent
-from app.services.agent.clue_agent import ClueAgent
+from app.api.dependencies.chat_dependencies import get_chat_service
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
 
 # 요청 바디 정의
 class SuspectChatRequest(BaseModel):
@@ -19,43 +16,12 @@ class SuspectChatRequest(BaseModel):
     user_id: int
     user_message: str
 
+
 class ClueChatRequest(BaseModel):
     scenario_id: int
     clue_id: int
     user_id: int
     user_message: str
-
-# ================= Dependency =================
-def get_gemini() -> GeminiClient:
-    return GeminiClient()
-
-def get_chat_repository() -> ChatRepository:
-    return ChatRepository()
-
-def get_scenario_repository() -> ScenarioRepository:
-    return ScenarioRepository()
-
-def get_suspect_agent(
-        llm_client: Annotated[GeminiClient, Depends(get_gemini)],
-) -> SuspectAgent:
-    return SuspectAgent(llm_client)
-
-def get_clue_agent(
-        llm_client: Annotated[GeminiClient, Depends(get_gemini)],
-) -> ClueAgent:
-    return ClueAgent(llm_client)
-
-def get_chat_service(
-    chat_repository: Annotated[ChatRepository, Depends(get_chat_repository)],
-    scenario_repository: Annotated[ScenarioRepository, Depends(get_scenario_repository)],
-    suspect_agent: Annotated[SuspectAgent, Depends(get_suspect_agent)],
-    clue_agent: Annotated[ClueAgent, Depends(get_clue_agent)]
-) -> ChatService:
-    return ChatService(chat_repository=chat_repository,
-                       scenario_repository=scenario_repository,
-                       suspect_agent=suspect_agent, 
-                       clue_agent=clue_agent)
-# ================= End =================
 
 @router.post("/suspect")
 async def chat_with_suspect(
