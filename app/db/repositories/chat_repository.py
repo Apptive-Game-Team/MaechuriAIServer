@@ -1,5 +1,4 @@
 from typing import List, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
 
 class ChatRepository:
     """

@@ -1,5 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional
 from app.models.schemas.scenario import ScenarioResult
 from app.models.schemas.clue import ClueItemSchema
 

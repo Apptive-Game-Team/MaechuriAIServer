@@ -1,9 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.db.repositories import scenario_repository
 from app.db.repositories.chat_repository import ChatRepository
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.llm.gemini_client import GeminiClient
