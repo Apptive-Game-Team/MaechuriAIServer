@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+from app.api.routes.scenario import router as scenario_router
+from app.api.routes.chat import router as chat_router
+import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -21,9 +24,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # app.include_router()
+    app.include_router(scenario_router)
+    app.include_router(chat_router)
 
     # 모델 로드 등 초기화 로직 필요
     return app
 
 app = create_app()
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
