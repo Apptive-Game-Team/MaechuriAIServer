@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 def extract_json(text: str) -> str:
     """
@@ -28,3 +28,10 @@ def safe_json_load(text: str) -> Dict[str, Any]:
             .replace("None", "null")
         )
         return json.loads(repaired)
+
+def format_history(history: List[Dict[str, str]]) -> str:
+    """
+    Converts a list of chat history dictionaries to a formatted string.
+    Expected format of history items: {'role': '...', 'content': '...'}
+    """
+    return "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
