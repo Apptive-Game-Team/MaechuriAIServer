@@ -3,6 +3,8 @@ from typing import Annotated
 from pydantic import BaseModel
 
 from app.services.scenario.scenario_service import ScenarioService
+from app.api.dependencies.scenario_dependencies import get_scenario_service
+
 
 class ScenarioSolve(BaseModel):
     scenario_id: int
@@ -10,12 +12,8 @@ class ScenarioSolve(BaseModel):
     user_id: int
     user_solution: str
 
-router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
-# ================= Dependency =================
-def get_scenario_service() -> ScenarioService:
-    return ScenarioService()
-# ================= End =================
+router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
 @router.post("/daily")
 async def create_daily_scenario(
