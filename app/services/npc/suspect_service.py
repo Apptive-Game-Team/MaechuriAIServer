@@ -8,7 +8,7 @@ JSON dict를 직접 조작하지 않습니다.
 
 from app.models.schemas import SuspectGenerationRequest
 from app.services.agent.consistency_validator import ConsistencyValidator
-from app.services.agent.suspect_agent import SuspectAgent
+from app.services.agent.suspect_generator import SuspectGenerator
 from app.services.llm.gemini_client import GeminiClient
 
 
@@ -20,7 +20,7 @@ class SuspectService:
 
     def __init__(self):
         llm_client = GeminiClient()
-        self.agent = SuspectAgent(llm_client)
+        self.agent = SuspectGenerator(llm_client)
         self.validator = ConsistencyValidator()
 
     def generate(self, pre_json: dict) -> dict:

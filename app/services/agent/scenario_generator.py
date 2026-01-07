@@ -9,7 +9,7 @@ from app.models.schemas.scenario import (
 )
 
 
-class ScenarioAgent:
+class ScenarioGenerator:
     def __init__(self, llm_client):
         self.llm = llm_client
         self.case_prompt = PromptLoader.load(
