@@ -5,7 +5,7 @@ from app.services.scenario.scenario_service import ScenarioService
 from app.api.dependencies.scenario_dependencies import get_scenario_service
 from app.models.schemas.solve import ScenarioSolveRequest, ScenarioSolveResponse
 
-router = APIRouter(prefix="/scenarios", tags=["scenarios"])
+router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 
 @router.post("/daily")
 async def create_daily_scenario(

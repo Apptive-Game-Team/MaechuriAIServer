@@ -6,7 +6,7 @@ from app.services.npc.chat_service import ChatService
 from app.api.dependencies.chat_dependencies import get_chat_service
 from app.models.schemas.chat import SuspectChatRequest, ClueChatRequest, ChatResponse
 
-router = APIRouter(prefix="/chats", tags=["chats"])
+router = APIRouter(prefix="/api/chats", tags=["chats"])
 
 @router.post("/suspect")
 async def chat_with_suspect(
