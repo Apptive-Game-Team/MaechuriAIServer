@@ -1,0 +1,34 @@
+import json
+import time
+from typing import Type, TypeVar
+from pydantic import BaseModel
+from app.core.utils import extract_json, safe_json_load
+
+T = TypeVar("T", bound=BaseModel)
+
+class BaseGenerator:
+    def __init__(self, llm_client, system_prompt: str):
+        self.llm = llm_client
+        self.system_prompt = system_prompt
+
+    def _generate(self,
+                  user_input: dict | str,
+                  response_model: Type[T]) -> T:
+        
+        user_str = user_input
+        if isinstance(user_input, dict):
+             user_str = json.dumps(user_input, indent=2, ensure_ascii=False)
+        
+        raw_response = self.llm.complete(
+            system=self.system_prompt,
+            user=user_str,
+            response_schema=response_model.model_json_schema()
+        )
+
+        print(raw_response)
+        
+        json_text = extract_json(raw_response)
+        data_dict = safe_json_load(json_text)
+        
+        time.sleep(3) # Prevent API rate limit
+        return response_model.model_validate(data_dict)
