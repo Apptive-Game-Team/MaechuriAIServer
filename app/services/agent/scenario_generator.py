@@ -1,17 +1,15 @@
 import time
-import time
 from app.core.utils import extract_json, safe_json_load
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.schemas.scenario import (
     ScenarioSkeleton, 
     ScenarioExpansion, 
-    ScenarioExpansionRequest,
     ExpansionPart1,
     ExpansionPart2
 )
 
 
-class ScenarioAgent:
+class ScenarioGenerator:
     def __init__(self, llm_client):
         self.llm = llm_client
         self.case_prompt = PromptLoader.load(

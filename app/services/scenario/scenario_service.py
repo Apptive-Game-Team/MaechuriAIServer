@@ -2,9 +2,9 @@ from pydantic import ValidationError
 
 from app.models.schemas import ClueSetSchema
 from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion, ScenarioResult
-from app.services.agent.clue_agent import ClueAgent
+from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.consistency_validator import ConsistencyValidator
-from app.services.agent.scenario_agent import ScenarioAgent
+from app.services.agent.scenario_generator import ScenarioGenerator
 from app.services.llm.gemini_client import GeminiClient
 import time
 
@@ -13,8 +13,8 @@ class ScenarioService:
 
     def __init__(self):
         llm_client = GeminiClient() # TODO : 여기서 LLM CLIENT 수정
-        self.scenario_agent = ScenarioAgent(llm_client)
-        self.clue_agent = ClueAgent(llm_client)
+        self.scenario_agent = ScenarioGenerator(llm_client)
+        self.clue_generator = ClueGenerator(llm_client)
         self.validator = ConsistencyValidator()
 
     def generate(self, pre_input: str) -> dict:
@@ -57,7 +57,7 @@ class ScenarioService:
 
         for attempt in range(3):
             try:
-                clue_result = self.clue_agent.generate_clues(expansion_result)
+                clue_result = self.clue_generator.generate_clues(expansion_result)
                 break
             except ValidationError as error:
                 print(error)

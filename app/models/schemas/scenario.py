@@ -1,6 +1,8 @@
-from typing import List, Literal, Optional, Tuple
+from typing import List, Literal, Optional
 from datetime import time
 from pydantic import BaseModel, Field
+
+from .clue import ClueSetSchema
 
 # --- Common ---
 class TimeRangeSchema(BaseModel):
@@ -79,8 +81,6 @@ class GenerationTargetsSchema(BaseModel):
     evidence: EvidenceGenConfig
 
 # ===============================================================
-
-from .clue import ClueSetSchema
 
 
 # --- Scenario Main ---

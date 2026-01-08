@@ -1,4 +1,5 @@
 from app.services.npc.suspect_service import SuspectService
+import json
 
 service = SuspectService()
 
@@ -46,5 +47,4 @@ pre_json = {
 }
 post_json = service.generate(pre_json)
 
-import json
 print(json.dumps(post_json, indent=2, ensure_ascii=False))
