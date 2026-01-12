@@ -19,7 +19,8 @@ Fields to focus on:
 
 - generation_targets: Concrete goals for suspects and evidence.
 
-    * In `suspects.roles`, do not use names, use integer IDs for any references.
+    * `suspects.suspects`: List of suspects. Each must have `id` (integer, 1-based), `name` (Korean name), and `role`.
+    * Use these integer IDs for any references in other fields (e.g., `related_suspect_ids`, `culprit_ids`).
 
 
 

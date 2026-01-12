@@ -1,4 +1,5 @@
 from typing import List, Literal, Optional
+from .map import MapOutputSchema
 from datetime import time
 from pydantic import BaseModel, Field
 
@@ -66,9 +67,14 @@ class ConstraintsSchema(BaseModel):
     at_least_one_uncertain_alibi: bool = False
 
 # --- Generation Targets ---
+class DetailedSuspect(BaseModel):
+    id: int
+    name: str
+    role: str
+
 class SuspectGenConfig(BaseModel):
     count: int = Field(ge=1)
-    roles: List[str]
+    suspects: List[DetailedSuspect]
     allow_lying: bool
     liar_ratio: float = Field(ge=0.0, le=1.0)
 
@@ -110,7 +116,7 @@ class ExpansionPart2(BaseModel):
     generation_targets: GenerationTargetsSchema
     constraints: ConstraintsSchema
 
-
 class ScenarioResult(ScenarioExpansion):
     clues: ClueSetSchema
+    map: MapOutputSchema | dict = {}
 
