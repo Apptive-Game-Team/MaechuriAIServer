@@ -128,6 +128,22 @@ class SuspectGenerator:
                 "is_culprit": s.is_culprit
             })
 
+        # Map skeleton 정보 요약 (있는 경우)
+        map_info = ""
+        if request.map_skeleton:
+            room_names = [r.name for r in request.map_skeleton.rooms]
+            corridor_info = [
+                f"{c.name}: connects {[conn.room_id for conn in c.connections]}"
+                for c in request.map_skeleton.corridors
+            ]
+            map_info = f"""
+
+[MAP SKELETON]
+Available rooms: {room_names}
+Corridors: {corridor_info}
+- Use this information to generate realistic timelines considering room accessibility
+"""
+
         single_instruction = f"""
 {self.build_prompt}
 
@@ -138,7 +154,7 @@ You must generate EXACTLY ONE suspect with the following requirements:
 
 [ALREADY GENERATED SUSPECTS]
 {json.dumps(existing_summary, ensure_ascii=False, indent=2) if existing_summary else "None yet"}
-
+{map_info}
 [IMPORTANT]
 - Do NOT duplicate names or roles from already generated suspects
 - Return a SINGLE suspect object (not a list)
@@ -146,8 +162,11 @@ You must generate EXACTLY ONE suspect with the following requirements:
 - is_culprit MUST be {is_culprit}
 """
 
+        # Exclude map_skeleton from JSON dump to avoid duplication
+        request_data = request.model_dump(mode='json', exclude={'map_skeleton'})
+
         return json.dumps({
-            "input": request.model_dump(mode='json'),
+            "input": request_data,
             "instruction": single_instruction,
         }, ensure_ascii=False)
 

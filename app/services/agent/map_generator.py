@@ -1,67 +1,107 @@
-from app.services.agent.base_generator import BaseGenerator
+import json
+import time
+from typing import Type, TypeVar
+
+from pydantic import BaseModel
+
+from app.core.utils import extract_json, safe_json_load
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.schemas.scenario import ScenarioExpansion
 from app.models.schemas.clue import ClueSetSchema
-from app.models.schemas.map import MapOutputSchema
+from app.models.schemas.map import MapOutputSchema, MapSkeletonSchema
+
+T = TypeVar("T", bound=BaseModel)
 
 
-class MapGenerator(BaseGenerator):
+class MapGenerator:
+    """Map 생성기 - 두 단계(Skeleton, Detail)로 분리"""
+
     def __init__(self, llm_client):
-        system_prompt = PromptLoader.load("app/prompts/map/generation.txt")
-        super().__init__(llm_client, system_prompt)
+        self.llm = llm_client
+        self.skeleton_prompt = PromptLoader.load("app/prompts/map/skeleton.txt")
+        self.detail_prompt = PromptLoader.load("app/prompts/map/detail.txt")
 
-    def generate_map(self,
-                     scenario: ScenarioExpansion,
-                     clues: ClueSetSchema) -> MapOutputSchema:
-        """
-        Generates a map based on the provided ScenarioExpansion and ClueSetSchema.
-        """
-        # Prepare input
-        full_data = scenario.model_dump(mode='json')
-        full_data['clues'] = clues.model_dump(mode='json')
-        
-        map_input = self._extract_map_generator_input(full_data)
-        
-        return self._generate(map_input, MapOutputSchema)
+    def _generate_with_prompt(
+        self,
+        user_input: dict | str,
+        response_model: Type[T],
+        system_prompt: str
+    ) -> T:
+        """지정된 프롬프트로 LLM 호출"""
+        user_str = user_input
+        if isinstance(user_input, dict):
+            user_str = json.dumps(user_input, indent=2, ensure_ascii=False)
 
-    def _extract_map_generator_input(self, p: dict) -> dict:
+        raw_response = self.llm.complete(
+            system=system_prompt,
+            user=user_str,
+            response_schema=response_model.model_json_schema()
+        )
+
+        json_text = extract_json(raw_response)
+        data_dict = safe_json_load(json_text)
+
+        time.sleep(3)  # Prevent API rate limit
+        return response_model.model_validate(data_dict)
+
+    def generate_skeleton(self, scenario: ScenarioExpansion) -> MapSkeletonSchema:
         """
-        시나리오 전체 JSON(p)에서
-        map_generator에 필요한 '필드 단위 정보'만
-        값 변경 없이 그대로 추출한다.
+        1단계: 방 구조 + 복도 + 위치 관계 생성
         """
+        skeleton_input = self._extract_skeleton_input(scenario)
+        return self._generate_with_prompt(
+            skeleton_input,
+            MapSkeletonSchema,
+            self.skeleton_prompt
+        )
+
+    def generate_detail(
+        self,
+        scenario: ScenarioExpansion,
+        skeleton: MapSkeletonSchema,
+        clues: ClueSetSchema
+    ) -> MapOutputSchema:
+        """
+        2단계: 오브젝트 배치 + 상세 정보
+        """
+        detail_input = self._extract_detail_input(scenario, skeleton, clues)
+        return self._generate_with_prompt(
+            detail_input,
+            MapOutputSchema,
+            self.detail_prompt
+        )
+
+    def _extract_skeleton_input(self,
+                                scenario: ScenarioExpansion) -> dict:
+        """Skeleton 생성을 위한 입력 추출"""
         return {
-            # 분위기 / 난이도 / 톤
-            "meta": p.get("meta"),
-
-            # 공간의 존재 자체 (이름 목록)
+            "meta": scenario.meta.model_dump(mode='json'),
+            "incident": scenario.incident.model_dump(mode='json'),
             "world": {
-                "locations": p.get("world", {}).get("locations"),
-                "time_granularity_minutes": p.get("world", {}).get("time_granularity_minutes"),
+                "locations": scenario.world.locations,
+                "time_granularity_minutes": scenario.world.time_granularity_minutes,
             },
+        }
 
-            # 시야 / 접근 / 증거 타입 규칙
-            "world_detail": {
-                "visibility_rules": p.get("world_detail", {}).get("visibility_rules"),
-                "access_rules": p.get("world_detail", {}).get("access_rules"),
-                "evidence_types": p.get("world_detail", {}).get("evidence_types"),
-            },
-
-            # suspect / evidence 생성 파라미터
-            "generation_targets": p.get("generation_targets"),
-
-            # 단서의 '위치와 성격' 정보만
+    def _extract_detail_input(
+        self,
+        scenario: ScenarioExpansion,
+        skeleton: MapSkeletonSchema,
+        clues: ClueSetSchema
+    ) -> dict:
+        """Detail 생성을 위한 입력 추출"""
+        return {
+            "meta": scenario.meta.model_dump(mode='json'),
+            "map_skeleton": skeleton.model_dump(mode='json'),
             "clues": {
                 "clues": [
                     {
-                        "name": c.get("name"),
-                        "found_at": c.get("found_at"),
-                        "is_red_herring": c.get("is_red_herring")
+                        "name": c.name,
+                        "found_at": c.found_at,
+                        "is_red_herring": c.is_red_herring
                     }
-                    for c in p.get("clues", {}).get("clues", [])
+                    for c in clues.clues
                 ]
             },
-
-            # 세계 제약 조건
-            "constraints": p.get("constraints"),
+            "generation_targets": scenario.generation_targets.model_dump(mode='json'),
         }

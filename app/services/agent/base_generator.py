@@ -25,8 +25,6 @@ class BaseGenerator:
             response_schema=response_model.model_json_schema()
         )
 
-        print(raw_response)
-        
         json_text = extract_json(raw_response)
         data_dict = safe_json_load(json_text)
         
