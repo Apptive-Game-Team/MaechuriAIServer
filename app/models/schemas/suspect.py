@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
 from pydantic import BaseModel, Field
 from app.models.schemas.clue import ClueItemSchema
+from app.models.schemas.map import MapSkeletonSchema
 from app.models.schemas.scenario import (
     TimeRangeSchema,
     WorldContextSchema,
@@ -59,12 +60,14 @@ class SuspectGenerationRequest(BaseModel):
     generation_config: SuspectGenConfig
     clues: List[ClueItemSchema] = []
     constraints: Optional[ConstraintsSchema] = None
+    map_skeleton: Optional[MapSkeletonSchema] = None
 
     @classmethod
     def from_expansion(
         cls,
         expansion: ScenarioExpansion,
-        clues: List[ClueItemSchema] = []
+        clues: List[ClueItemSchema] = [],
+        map_skeleton: Optional[MapSkeletonSchema] = None
     ) -> SuspectGenerationRequest:
         """ScenarioExpansion에서 SuspectGenerationRequest 생성"""
         return cls(
@@ -78,7 +81,8 @@ class SuspectGenerationRequest(BaseModel):
             ground_truth=expansion.ground_truth_detail,
             generation_config=expansion.generation_targets.suspects,
             clues=clues,
-            constraints=expansion.constraints
+            constraints=expansion.constraints,
+            map_skeleton=map_skeleton
         )
 
 
