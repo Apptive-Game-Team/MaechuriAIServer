@@ -2,22 +2,21 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ClientError
 import time
-import os
 
+from app.core.config import settings
 from .llm_client import LLMClient
 
 
 class GeminiClient(LLMClient):
     def __init__(self):
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
+        if not settings.GEMINI_API_KEY:
             raise RuntimeError(
-                "GEMINI_API_KEY environment variable is not set. "
-                "Please configure your Gemini API key before using GeminiClient."
+                "GEMINI_API_KEY is not set. "
+                "Please create .env file from .env.example and set your API key."
             )
 
-        self.client = genai.Client(api_key=api_key)
-        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model = settings.GEMINI_MODEL
 
     def complete(
         self,
