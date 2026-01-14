@@ -1,90 +1,159 @@
-from datetime import time
-import re
-
-from .answering_rule import AnsweringRule
-from .dialogue_state import DialogueState
-from .observation import Observation
-from .time_memory import TimeMemory
-from .truth_model import TruthModel
+from typing import List, Dict, Any, Optional
+from app.models.domain.fsm.interrogation import InterrogationState, AllowedMoves
 
 
 class Suspect:
     def __init__(
             self,
-            suspect_id: str, # TODO: 번호로 할 것인지?
-            time_memory: TimeMemory,
-            observation: Observation,
-            answering_rule: AnsweringRule,
-            truth_model: TruthModel,
-            dialogue_state: DialogueState,
+            suspect_id: int,
+            name: str,
+            role: str,
+            age: int,
+            gender: str,
+            description: str,
+            is_culprit: bool,
+            current_pressure: int,
+            secrets: List[str],
+            evidence_seen: List[str],
+            timeline: List[Dict[str, Any]],
+            # New fields for chat
+            time_memory: Optional[Dict[str, Any]] = None,
+            observation: Optional[Dict[str, Any]] = None,
+            answering_rule: Optional[Dict[str, Any]] = None,
+            truth_model: Optional[Dict[str, Any]] = None,
+            secrets_by_stage: Optional[Dict[str, List[str]]] = None,
+            critical_evidence_ids: Optional[List[int]] = None,
+            # Context fields (set after creation)
+            incident_summary: str = "",
+            primary_location: str = "",
     ):
         self.suspect_id = suspect_id
-        self.time_memory = time_memory
-        self.observation = observation
-        self.answering_rule = answering_rule
-        self.truth_model = truth_model
-        self.dialogue_state = dialogue_state
+        self.name = name
+        self.role = role
+        self.age = age
+        self.gender = gender
+        self.description = description
+        self.is_culprit = is_culprit
+        self.current_pressure = current_pressure
+        self.secrets = secrets
+        self.evidence_seen = evidence_seen
+        self.timeline = timeline
+
+        # Chat-related fields
+        self.time_memory = time_memory or {"routines": [], "anchors": []}
+        self.observation = observation or {"can_see": [], "cannot_see": []}
+        self.answering_rule = answering_rule or {
+            "minute_precision_allowed": False,
+            "unknown_reply_policy": "잘 모르겠습니다"
+        }
+        self.truth_model = truth_model or {"hide_topics": [], "lie_strategy": "deflect"}
+        self.secrets_by_stage = secrets_by_stage or {
+            "defensive": [],
+            "cornered": [],
+            "breakdown": [],
+            "confession": []
+        }
+        self.critical_evidence_ids = critical_evidence_ids or []
+
+        # Context
+        self.incident_summary = incident_summary
+        self.primary_location = primary_location
+
+    @classmethod
+    def from_schema(cls, schema_data: dict, case_context: dict = None) -> "Suspect":
+        """
+        Create Suspect from SuspectSchema data.
+        Optionally inject case_context for incident_summary and primary_location.
+        """
+        case_context = case_context or {}
+
+        return cls(
+            suspect_id=schema_data["suspect_id"],
+            name=schema_data["name"],
+            role=schema_data["role"],
+            age=schema_data.get("age", 0),
+            gender=schema_data.get("gender", "Unknown"),
+            description=schema_data.get("description", ""),
+            is_culprit=schema_data["is_culprit"],
+            current_pressure=schema_data.get("current_pressure", 0),
+            secrets=schema_data.get("secrets", []),
+            evidence_seen=schema_data.get("evidence_seen", []),
+            timeline=schema_data.get("timeline", []),
+            # New fields
+            time_memory=schema_data.get("time_memory"),
+            observation=schema_data.get("observation"),
+            answering_rule=schema_data.get("answering_rule"),
+            truth_model=schema_data.get("truth_model"),
+            secrets_by_stage=schema_data.get("secrets_by_stage"),
+            critical_evidence_ids=schema_data.get("critical_evidence_ids", []),
+            # Context injection
+            incident_summary=case_context.get("summary", ""),
+            primary_location=case_context.get("primary_location", ""),
+        )
 
     @classmethod
     def from_json(cls, data: dict) -> "Suspect":
-        return cls(
-            suspect_id=data["suspect_id"],
-            time_memory=TimeMemory(
-                anchors=data["time_memory"]["anchors"],
-                routines=data["time_memory"]["routines"],
-            ),
-            observation=Observation(
-                can_see=data["observation"]["can_see"],
-                cannot_see=data["observation"]["cannot_see"],
-                noise_effect=data["observation"]["noise_effect"],
-            ),
-            answering_rule=AnsweringRule(
-                minute_precision_allowed=data["answering_rule"]["minute_precision_allowed"],
-                unknown_reply_policy=data["answering_rule"]["unknown_reply_policy"],
-                out_of_incident_time_policy=data["answering_rule"]["out_of_incident_time_policy"],
-            ),
-            truth_model=TruthModel(
-                is_lying=data["truth_model"]["is_lying"],
-                hide_topics=data["truth_model"]["hide_topics"],
-                lie_strategy=data["truth_model"]["lie_strategy"],
-            ),
-            dialogue_state=DialogueState(),
-        )
+        """Legacy method - use from_schema for new code."""
+        return cls.from_schema(data)
 
+    def to_personality_dict(self) -> Dict[str, Any]:
+        """
+        Convert to personality dict format for SuspectAgent.chat_generate().
+        This is the format expected by chat_service.py.
+        """
+        return {
+            # Basic info
+            "name": self.name,
+            "role": self.role,
+            "age": self.age,
+            "gender": self.gender,
+            "description": self.description,
 
-    # TODO: 대사 관련 수정. 시간 수정
-    def answer(self, user_message: str) -> str:
-        t_str = self._extract_time(user_message)
-        if not t_str:
-            return "그건 잘 모르겠네요."
+            # Context
+            "incident_summary": self.incident_summary,
+            "primary_location": self.primary_location,
 
-        if t_str in self.dialogue_state.asked_times:
-            return "아까 말씀드린 것과 같아요."
+            # Memory & Behavior
+            "time_memory": self.time_memory,
+            "observation": self.observation,
+            "answering_rule": self.answering_rule,
+            "truth_model": self.truth_model,
 
-        self.dialogue_state.asked_times.add(t_str)
-        t = time.fromisoformat(t_str)
+            # Secrets (FSM-ready)
+            "secrets_by_stage": self.secrets_by_stage,
 
-        if self.answering_rule.minute_precision_allowed:
-            if self.time_memory.has_exact_minute(t):
-                return f"{t_str}쯤에는 분명히 기억나요."
+            # Evidence tracking
+            "critical_evidence_ids": self.critical_evidence_ids,
+            "evidence_seen": [],  # Initialize empty, updated during interrogation
 
-        routine = self.time_memory.find_routine(t)
-        if routine:
-            return (
-                f"정확한 시간은 기억 안 나지만 "
-                f"{routine['activity']} 하고 있었어요."
-            )
+            # Interrogation state (initialized)
+            "interrogation_state": {
+                "state": InterrogationState.DEFENSIVE,
+                "metrics": {
+                    "pressure": self.current_pressure,
+                    "contradictions": 0,
+                    "evidence_weight_seen": 0,
+                    "trust_in_interrogator": 0
+                },
+                "allowed_moves": AllowedMoves.DEFENSIVE
+            }
+        }
 
-        return "그 시간대 일은 잘 기억나지 않네요."
+    def get_revealed_secrets(self) -> List[str]:
+        """
+        Return secrets that are revealed based on current pressure.
+        The secrets list is ordered from low pressure (defensive) to high pressure (confession).
+        """
+        if not self.secrets:
+            return []
 
-    def _extract_time(self, message: str) -> str | None:
-        match = re.search(r'(\d{1,2})시\s*(\d{1,2})분', message)
-        if match:
-            h, m = match.groups()
-            return f"{int(h):02d}:{int(m):02d}"
+        count = len(self.secrets)
+        step = 100 / count if count > 0 else 100
+        reveal_count = int(self.current_pressure / step) + 1
+        reveal_count = min(reveal_count, count)
 
-        match = re.search(r'(\d{2}:\d{2})', message)
-        if match:
-            return match.group(1)
+        return self.secrets[:reveal_count]
 
-        return None
+    def update_pressure(self, amount: int) -> None:
+        """Update pressure, clamping between 0 and 100."""
+        self.current_pressure = max(0, min(100, self.current_pressure + amount))

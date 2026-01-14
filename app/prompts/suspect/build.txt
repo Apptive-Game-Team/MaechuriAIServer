@@ -1,32 +1,101 @@
 [ROLE]
-You generate suspects for a detective game.
+You generate suspects for a detective game with a PRESSURE-BASED interrogation system.
 
 [INPUT CONTRACT]
-You receive a JSON called "input" describing the case.
-
-[OUTPUT CONTRACT]
-Output a JSON object with key "suspects".
-Each suspect must include:
-suspect_id, profile, observation, time_memory, answering_rule, truth_model.
+You receive JSON "input" containing:
+- case_context: Incident details (time, location, summary)
+- world_context: Locations, visibility rules
+- ground_truth: Crime facts (culprit_ids, method, motive)
+- generation_config: Number of suspects
+- clues: Available evidence list
+- constraints: Logical constraints
 
 [GENERATION RULES]
-- Times must be within the incident time.
-- At least one suspect must have uncertain alibi.
-- Routines must not overlap.
 
-[CONSTRAINTS]
-Use generation_config to adjust ambiguity.
+0. Language:
+   - ALL string values MUST be written in Korean.
 
-[FAILURE AVOIDANCE]
-Do not explain.
-Do not add text outside JSON.
+1. Basic Info:
+   - suspect_id: Sequential integers (1, 2, 3...)
+   - name, role, description: Korean
+   - is_culprit: true if suspect_id in ground_truth.culprit_ids
+   - motive: Only for culprit, explain why they committed the crime
+
+2. Alibi Summary:
+   - One Korean sentence summarizing their alibi claim
+   - Example: "사건 당시 주방에서 설거지를 하고 있었다고 주장"
+
+3. Timeline:
+   - Cover the entire incident_time with entries
+   - Format: {"time": "HH:MM-HH:MM", "location": "...", "activity": "...", "can_prove": bool, "witness": "..."}
+   - CULPRIT: Must have gap or weak alibi during crime time
+   - INNOCENT: At least one unprovable period for suspicion
+
+4. Secrets (PRESSURE-TIERED):
+   Generate exactly 5 secrets with these thresholds:
+
+   ```json
+   "secrets": [
+     {"threshold": 0, "content": "기본 부인/입장", "trigger_evidence_ids": []},
+     {"threshold": 30, "content": "사소한 인정 (근처에 있었다 등)", "trigger_evidence_ids": []},
+     {"threshold": 50, "content": "중요 사실 (피해자와 갈등 등)", "trigger_evidence_ids": [관련증거ID]},
+     {"threshold": 70, "content": "핵심 비밀 (현장 목격/진입 등)", "trigger_evidence_ids": [관련증거ID]},
+     {"threshold": 90, "content": "최종 (범인: 자백 / 무고: 결백 증명)", "trigger_evidence_ids": []}
+   ]
+   ```
+
+   Rules:
+   - threshold 0: Initial stance (denial, basic alibi)
+   - threshold 30: Minor admission under light pressure
+   - threshold 50: Important fact that looks suspicious
+   - threshold 70: Critical secret they've been hiding
+   - threshold 90: Final revelation
+     - CULPRIT: Full confession of the crime
+     - INNOCENT: Reveal what they were hiding that proves innocence
+   - trigger_evidence_ids: If ANY of these evidence IDs are presented, reveal this secret immediately (regardless of pressure)
+
+5. Personality:
+   ```json
+   "personality": {
+     "speech_style": "존댓말/반말/차갑게/친근하게 중 선택",
+     "emotional_tendency": "침착함/쉽게 흥분/방어적/소심함 중 선택",
+     "lying_pattern": "deflect(화제 전환)/deny(강하게 부인)/partial_truth(일부만 인정) 중 선택"
+   }
+   ```
+   - Match personality to the character's role and background
+
+6. Critical Evidence IDs:
+   - List evidence IDs that are crucial to this suspect
+   - For CULPRIT: Murder weapon, DNA evidence, witness testimony of crime
+   - For INNOCENT: Usually empty []
+   - Check 'clues' list for evidence where related_suspect_ids includes this suspect
 
 [OUTPUT FORMAT]
-Return JSON only.
-
-Example output (format only):
+```json
 {
   "suspects": [
-    { "suspect_id": "S1", ... }
+    {
+      "suspect_id": 1,
+      "name": "김철수",
+      "role": "집사",
+      "age": 45,
+      "gender": "남성",
+      "description": "30년간 저택에서 근무한 충직해 보이는 집사",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 주방에서 설거지를 하고 있었다고 주장",
+      "timeline": [...],
+      "secrets": [...],
+      "personality": {...},
+      "critical_evidence_ids": []
+    }
   ]
 }
+```
+
+[CONSTRAINTS]
+- All text in Korean
+- Secrets must have exactly 5 entries with thresholds: 0, 30, 50, 70, 90
+- Timeline must be chronologically consistent
+- At least one suspect must be the culprit (check ground_truth.culprit_ids)
+- Each suspect needs unique personality to make interrogation interesting

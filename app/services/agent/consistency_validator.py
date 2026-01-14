@@ -8,7 +8,7 @@ from app.models.schemas import SuspectGenerationRequest
 class ValidationIssue:
     code: str
     message: str
-    suspect_id: str | None = None
+    suspect_id: int | str | None = None
 
 @dataclass
 class ValidationResult:
@@ -136,12 +136,8 @@ class ConsistencyValidator:
         for s in suspects:
             sid = s.get("suspect_id")
 
-            observations = s.get("observation", [])
-            cannot_see = set()
-
-            for o in observations:
-                for loc in o.get("cannot_see", []):
-                    cannot_see.add(loc)
+            obs = s.get("observation", {})
+            cannot_see = set(obs.get("cannot_see", []))
 
             anchors = s.get("time_memory", {}).get("anchors", [])
 

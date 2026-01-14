@@ -1,0 +1,778 @@
+{
+  "meta": {
+    "difficulty": "hard",
+    "theme": "밀실 살인",
+    "tone": "미스터리",
+    "language": "한국어"
+  },
+  "incident": {
+    "type": "살인",
+    "summary": "제목: 설야 온천의 비극\n\n2023년 12월, 폭설로 고립된 강원도 깊은 산속의 고급 한옥 온천 리조트 '청산재'에서 끔찍한 사건이 발생했다. 밤늦은 시각, 리조트의 직원들이 순찰 중 유명 건축가이자 부동산 개발업자인 강태산 회장이 자신의 전용 노천탕에서 싸늘한 주검으로 발견된 것이다. 발견 당시 강 회장은 온천물 속에 잠겨 있었고, 주변은 고요함만이 감돌았다.\n\n경찰 조사 결과, 강 회장의 사인은 익사가 아닌 심장을 정확히 꿰뚫은 예리한 칼날에 의한 사망으로 밝혀졌다. 그러나 현장에서는 범행에 사용된 칼이 감쪽같이 사라진 상태였다. 더욱 기이한 점은 강 회장의 전용 노천탕이 높은 담장으로 둘러싸여 있었고, 외부로 통하는 유일한 출입구는 그의 스위트룸 내부를 통해서만 가능했다는 것이다. 스위트룸의 문은 안에서 굳게 잠겨 있었으며, 창문 또한 파손된 흔적 없이 닫혀 있었다. 완벽한 밀실 살인, 그리고 사라진 흉기.\n\n사건 당일 '청산재'에는 강 회장을 포함해 총 네 명의 인물이 머무르고 있었다. 최근 강 회장의 비리를 폭로하려다 해고 위기에 처했던 비서 이수진, 강 회장에게 프로젝트를 빼앗기고 앙심을 품고 있던 라이벌 건축가 박준영, 강 회장의 강압적인 리조트 부지 매입 시도에 맞서 갈등을 겪던 '청산재'의 젊은 여주인 김민서, 그리고 도박 빚으로 강 회장에게 거액을 요구했으나 거절당한 조카 최영호. 이들 모두는 각자의 방에 있었다고 주장하지만, 누구도 명확한 알리바이를 제시하지 못하고 있다. 눈 내리는 밤, 온천의 평화를 깨뜨린 잔혹한 밀실 살인의 범인은 과연 누구인가?",
+    "time_range": {
+      "start": "20:00:00Z",
+      "end": "06:00:00Z"
+    },
+    "location": "청산재 리조트 강태산 회장 전용 노천탕",
+    "primary_object": "강태산 회장"
+  },
+  "world": {
+    "locations": [
+      "청산재 리조트",
+      "강태산 회장 전용 노천탕",
+      "강태산 회장 스위트룸",
+      "이수진 비서의 방",
+      "박준영 건축가의 방",
+      "김민서 여주인의 방",
+      "최영호 조카의 방"
+    ],
+    "time_granularity_minutes": 30
+  },
+  "ground_truth": {
+    "culprit_count": 1,
+    "crime_time_range": {
+      "start": "22:00:00Z",
+      "end": "02:00:00Z"
+    },
+    "crime_location": "청산재 리조트 강태산 회장 전용 노천탕"
+  },
+  "world_detail": {
+    "locations": [
+      "청산재 리조트",
+      "강태산 회장 전용 노천탕",
+      "강태산 회장 스위트룸",
+      "이수진 비서의 방",
+      "박준영 건축가의 방",
+      "김민서 여주인의 방",
+      "최영호 조카의 방"
+    ],
+    "time_granularity_minutes": 30,
+    "visibility_rules": [
+      {
+        "from_location": "강태산 회장 전용 노천탕",
+        "can_see": [
+          "강태산 회장 스위트룸"
+        ],
+        "cannot_see": [
+          "청산재 리조트",
+          "이수진 비서의 방",
+          "박준영 건축가의 방",
+          "김민서 여주인의 방",
+          "최영호 조카의 방"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "강태산 회장 스위트룸",
+        "can_see": [
+          "강태산 회장 전용 노천탕"
+        ],
+        "cannot_see": [
+          "청산재 리조트",
+          "이수진 비서의 방",
+          "박준영 건축가의 방",
+          "김민서 여주인의 방",
+          "최영호 조카의 방"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "이수진 비서의 방",
+        "can_see": [],
+        "cannot_see": [
+          "강태산 회장 전용 노천탕",
+          "강태산 회장 스위트룸",
+          "박준영 건축가의 방",
+          "김민서 여주인의 방",
+          "최영호 조카의 방"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "박준영 건축가의 방",
+        "can_see": [],
+        "cannot_see": [
+          "강태산 회장 전용 노천탕",
+          "강태산 회장 스위트룸",
+          "이수진 비서의 방",
+          "김민서 여주인의 방",
+          "최영호 조카의 방"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "김민서 여주인의 방",
+        "can_see": [],
+        "cannot_see": [
+          "강태산 회장 전용 노천탕",
+          "강태산 회장 스위트룸",
+          "이수진 비서의 방",
+          "박준영 건축가의 방",
+          "최영호 조카의 방"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "최영호 조카의 방",
+        "can_see": [],
+        "cannot_see": [
+          "강태산 회장 전용 노천탕",
+          "강태산 회장 스위트룸",
+          "이수진 비서의 방",
+          "박준영 건축가의 방",
+          "김민서 여주인의 방"
+        ],
+        "evidence_type": null
+      }
+    ],
+    "access_rules": [
+      {
+        "location": "강태산 회장 전용 노천탕",
+        "requires": "강태산 회장 스위트룸"
+      },
+      {
+        "location": "강태산 회장 스위트룸",
+        "requires": "스위트룸 열쇠"
+      },
+      {
+        "location": "이수진 비서의 방",
+        "requires": "방 열쇠"
+      },
+      {
+        "location": "박준영 건축가의 방",
+        "requires": "방 열쇠"
+      },
+      {
+        "location": "김민서 여주인의 방",
+        "requires": "방 열쇠"
+      },
+      {
+        "location": "최영호 조카의 방",
+        "requires": "방 열쇠"
+      }
+    ],
+    "evidence_types": [
+      "흉기",
+      "혈흔",
+      "지문",
+      "발자국"
+    ]
+  },
+  "ground_truth_detail": {
+    "culprit_count": 1,
+    "crime_time_range": {
+      "start": "22:00:00Z",
+      "end": "02:00:00Z"
+    },
+    "crime_location": "청산재 리조트 강태산 회장 전용 노천탕",
+    "culprit_ids": [
+      1
+    ],
+    "method": "범인(이수진)은 강태산 회장 스위트룸의 복제 열쇠를 이용해 침입했다. 노천탕에서 강 회장을 칼로 찔러 살해한 뒤, 흉기를 챙겨 스위트룸으로 돌아왔다. 밀실을 위장하기 위해 문고리에 실을 묶어 문을 닫고 밖에서 잠근 후 실을 회수했다. 이후 흉기는 리조트 외부의 눈 속에 숨겼다.",
+    "required_evidence": [
+      {
+        "type": "흉기",
+        "min_count": 1
+      },
+      {
+        "type": "혈흔",
+        "min_count": 1
+      },
+      {
+        "type": "지문",
+        "min_count": 1
+      },
+      {
+        "type": "발자국",
+        "min_count": 1
+      }
+    ]
+  },
+  "generation_targets": {
+    "suspects": {
+      "count": 4,
+      "suspects": [
+        {
+          "id": 1,
+          "name": "이수진",
+          "role": "강태산 회장의 비서"
+        },
+        {
+          "id": 2,
+          "name": "박준영",
+          "role": "라이벌 건축가"
+        },
+        {
+          "id": 3,
+          "name": "김민서",
+          "role": "청산재 여주인"
+        },
+        {
+          "id": 4,
+          "name": "최영호",
+          "role": "강태산 회장의 조카"
+        }
+      ],
+      "allow_lying": true,
+      "liar_ratio": 0.5
+    },
+    "evidence": {
+      "count_range": [
+        5,
+        8
+      ],
+      "ambiguity_level": "high"
+    }
+  },
+  "constraints": {
+    "no_supernatural": true,
+    "no_time_travel": true,
+    "at_least_one_uncertain_alibi": true
+  },
+  "clues": {
+    "clues": [
+      {
+        "id": 101,
+        "name": "눈 속의 칼",
+        "found_at": "청산재 리조트",
+        "description": "리조트 건물 뒤편, 깊게 쌓인 눈 속에서 발견된 날카로운 과도. 칼날에 희미한 혈흔이 묻어 있으며, 손잡이 부분은 깨끗하게 닦여 있다.",
+        "related_suspect_ids": [
+          1
+        ],
+        "logic_explanation": "살해에 사용된 흉기로, 범인이 범행 후 은폐하려 했던 증거이다. 손잡이가 닦여 있지만, 칼날의 혈흔은 강 회장의 것과 일치할 가능성이 높다.",
+        "is_red_herring": false
+      },
+      {
+        "id": 102,
+        "name": "스위트룸 복도의 혈흔",
+        "found_at": "강태산 회장 스위트룸",
+        "description": "강태산 회장 스위트룸 문 바로 안쪽 복도 바닥에서 육안으로는 잘 보이지 않는 미세한 혈흔 자국이 발견되었다. 루미놀 반응에 강하게 나타난다.",
+        "related_suspect_ids": [
+          1
+        ],
+        "logic_explanation": "범인이 노천탕에서 흉기를 들고 스위트룸으로 돌아왔을 때, 흉기에서 떨어진 혈흔으로 추정된다. 이는 범인이 스위트룸을 통해 이동했음을 시사한다.",
+        "is_red_herring": false
+      },
+      {
+        "id": 103,
+        "name": "문고리의 실 조각과 지문",
+        "found_at": "강태산 회장 스위트룸",
+        "description": "강태산 회장 스위트룸 문고리 안쪽에서 아주 짧은 실 조각이 발견되었다. 실 조각 주변 문고리에서 이수진 비서의 지문이 희미하게 검출되었다.",
+        "related_suspect_ids": [
+          1
+        ],
+        "logic_explanation": "밀실 트릭을 위해 문고리에 실을 묶었던 흔적이며, 이수진 비서의 지문은 그녀가 문을 조작했음을 강력히 시사한다.",
+        "is_red_herring": false
+      },
+      {
+        "id": 104,
+        "name": "노천탕 주변의 발자국",
+        "found_at": "강태산 회장 전용 노천탕",
+        "description": "노천탕 주변의 젖은 흙바닥에서 박준영 건축가의 것으로 보이는 발자국이 선명하게 발견되었다. 발자국은 노천탕 입구에서 탕 가장자리까지 이어져 있다.",
+        "related_suspect_ids": [
+          2
+        ],
+        "logic_explanation": "박준영 건축가가 범행 시간대에 노천탕 근처에 있었을 가능성을 제시하여 그를 용의선상에 올리지만, 그는 리조트 건축 관련 점검을 위해 방문했을 수도 있다.",
+        "is_red_herring": true
+      },
+      {
+        "id": 105,
+        "name": "김민서의 방에서 발견된 만년필",
+        "found_at": "김민서 여주인의 방",
+        "description": "김민서 여주인의 방 서랍에서 강태산 회장이 아끼던 것으로 알려진 고급 만년필이 발견되었다. 만년필에는 강 회장의 이니셜이 새겨져 있다.",
+        "related_suspect_ids": [
+          3
+        ],
+        "logic_explanation": "김민서 여주인이 강 회장의 물건을 가지고 있었다는 사실은 그녀와 강 회장 사이에 모종의 관계나 갈등이 있었을 것이라는 의심을 불러일으킨다.",
+        "is_red_herring": true
+      },
+      {
+        "id": 106,
+        "name": "최영호의 방에서 발견된 협박 쪽지",
+        "found_at": "최영호 조카의 방",
+        "description": "최영호 조카의 방 쓰레기통에서 구겨진 쪽지가 발견되었다. 쪽지에는 \"회장님, 이번 일 그냥 넘어가지 않겠습니다. 각오하십시오.\"라는 협박성 문구가 적혀 있다.",
+        "related_suspect_ids": [
+          4
+        ],
+        "logic_explanation": "최영호 조카가 강 회장에게 앙심을 품고 있었음을 보여주어 그를 유력한 용의자로 보이게 하지만, 이는 단순한 갈등의 표현일 수 있다.",
+        "is_red_herring": true
+      }
+    ]
+  },
+  "map": {
+    "rooms": [
+      {
+        "id": 1,
+        "name": "청산재 리조트",
+        "width": 18,
+        "height": 18,
+        "mood": "미스터리"
+      },
+      {
+        "id": 2,
+        "name": "강태산 회장 전용 노천탕",
+        "width": 15,
+        "height": 12,
+        "mood": "미스터리"
+      },
+      {
+        "id": 3,
+        "name": "강태산 회장 스위트룸",
+        "width": 16,
+        "height": 14,
+        "mood": "미스터리"
+      },
+      {
+        "id": 4,
+        "name": "이수진 비서의 방",
+        "width": 10,
+        "height": 10,
+        "mood": "미스터리"
+      },
+      {
+        "id": 5,
+        "name": "박준영 건축가의 방",
+        "width": 10,
+        "height": 10,
+        "mood": "미스터리"
+      },
+      {
+        "id": 6,
+        "name": "김민서 여주인의 방",
+        "width": 10,
+        "height": 10,
+        "mood": "미스터리"
+      },
+      {
+        "id": 7,
+        "name": "최영호 조카의 방",
+        "width": 10,
+        "height": 10,
+        "mood": "미스터리"
+      }
+    ],
+    "obj": [
+      {
+        "id": 101,
+        "name": "눈 속의 칼",
+        "position": {
+          "x": 5,
+          "y": 7
+        },
+        "room_id": 1,
+        "type": "clue"
+      },
+      {
+        "id": 102,
+        "name": "스위트룸 복도의 혈흔",
+        "position": {
+          "x": 8,
+          "y": 5
+        },
+        "room_id": 3,
+        "type": "clue"
+      },
+      {
+        "id": 103,
+        "name": "문고리의 실 조각과 지문",
+        "position": {
+          "x": 3,
+          "y": 9
+        },
+        "room_id": 3,
+        "type": "clue"
+      },
+      {
+        "id": 104,
+        "name": "노천탕 주변의 발자국",
+        "position": {
+          "x": 7,
+          "y": 4
+        },
+        "room_id": 2,
+        "type": "clue"
+      },
+      {
+        "id": 105,
+        "name": "김민서의 방에서 발견된 만년필",
+        "position": {
+          "x": 2,
+          "y": 6
+        },
+        "room_id": 6,
+        "type": "clue"
+      },
+      {
+        "id": 106,
+        "name": "최영호의 방에서 발견된 협박 쪽지",
+        "position": {
+          "x": 5,
+          "y": 3
+        },
+        "room_id": 7,
+        "type": "clue"
+      },
+      {
+        "id": 201,
+        "name": "이수진",
+        "position": {
+          "x": 4,
+          "y": 4
+        },
+        "room_id": 4,
+        "type": "suspect"
+      },
+      {
+        "id": 202,
+        "name": "박준영",
+        "position": {
+          "x": 6,
+          "y": 5
+        },
+        "room_id": 5,
+        "type": "suspect"
+      },
+      {
+        "id": 203,
+        "name": "김민서",
+        "position": {
+          "x": 7,
+          "y": 7
+        },
+        "room_id": 6,
+        "type": "suspect"
+      },
+      {
+        "id": 204,
+        "name": "최영호",
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "room_id": 7,
+        "type": "suspect"
+      }
+    ]
+  },
+  "suspects": [
+    {
+      "suspect_id": 1,
+      "name": "이수진",
+      "role": "강태산 회장의 비서",
+      "age": 32,
+      "gender": "여성",
+      "description": "단정하고 냉철한 인상의 여성. 항상 침착함을 유지하려 노력하지만, 눈빛에는 불안감이 스쳐 지나간다. 강 회장의 비서로서 오랫동안 그림자처럼 일해왔다.",
+      "is_culprit": true,
+      "motive": "강태산 회장의 비리를 폭로하려다 해고 위기에 처했고, 회장이 자신의 약점을 이용해 협박하자 더 이상 참지 못하고 살해를 결심했다. 회장의 죽음으로 자신의 비리 폭로 계획이 묻히고, 자신의 미래를 지키려 했다.",
+      "alibi_summary": "사건 당일 밤, 자신의 방에서 서류 작업을 하다가 잠들었다고 주장한다.",
+      "timeline": [
+        {
+          "time": "20:00-22:00",
+          "location": "이수진 비서의 방",
+          "activity": "밀린 서류 작업을 했다.",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "22:00-00:00",
+          "location": "강태산 회장 스위트룸 및 전용 노천탕",
+          "activity": "강태산 회장을 살해하고 흉기를 은닉했다.",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "00:00-02:00",
+          "location": "청산재 리조트 외부 및 이수진 비서의 방",
+          "activity": "흉기를 눈 속에 숨기고 자신의 방으로 돌아왔다.",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "02:00-06:00",
+          "location": "이수진 비서의 방",
+          "activity": "잠들었다고 주장한다.",
+          "can_prove": false,
+          "witness": null
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "저는 그날 밤 내내 제 방에 있었습니다. 회장님께는 아무런 악감정도 없어요.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "사실, 회장님과 최근 비리 문제로 크게 다퉜습니다. 하지만 살인까지 할 정도는 아닙니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "회장님 스위트룸의 복제 열쇠를 가지고 있었습니다. 비서로서 비상시에 필요하다고 생각해서요. 하지만 그날 밤에는 사용하지 않았습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 70,
+          "content": "밤 11시경, 회장님 스위트룸에 잠시 들어갔었습니다. 서류를 두고 온 것 같아서요. 그때는 회장님이 노천탕에 계셨고, 저는 아무것도 보지 못했습니다. 문고리에 실을 묶어 잠그는 것을 봤지만, 왜 그랬는지는 모릅니다.",
+          "trigger_evidence_ids": [
+            103
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "맞아요... 제가 회장님을 죽였습니다. 비리를 폭로하려던 저를 회장님이 협박했고, 더 이상 참을 수 없었어요. 복제 열쇠로 들어가 노천탕에서 회장님을 찔렀고, 흉기는 리조트 뒤편 눈 속에 숨겼습니다. 밀실은 문고리에 실을 묶어 밖에서 잠근 후 실을 회수하는 방식으로 만들었습니다.",
+          "trigger_evidence_ids": []
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말",
+        "emotional_tendency": "침착함",
+        "lying_pattern": "deny"
+      },
+      "critical_evidence_ids": [
+        101,
+        102,
+        103
+      ]
+    },
+    {
+      "suspect_id": 2,
+      "name": "박준영",
+      "role": "라이벌 건축가",
+      "age": 50,
+      "gender": "남성",
+      "description": "강태산 회장에게 프로젝트를 빼앗기고 앙심을 품고 있는 중년의 건축가. 깔끔한 외모에 다소 냉소적인 인상입니다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 자신의 방에서 작업 후 리조트 주변을 산책했다고 주장합니다.",
+      "timeline": [
+        {
+          "time": "20:00-22:00",
+          "location": "박준영의 방",
+          "activity": "건축 설계 작업",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "22:00-23:00",
+          "location": "청산재 리조트 정원 및 주변",
+          "activity": "밤공기를 쐴 겸 산책",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "23:00-00:00",
+          "location": "노천탕 근처",
+          "activity": "리조트 증축 계획 관련 현장 구조물 점검",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "00:00-00:30",
+          "location": "박준영의 방",
+          "activity": "휴식",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "00:30-06:00",
+          "location": "박준영의 방",
+          "activity": "수면",
+          "can_prove": false,
+          "witness": null
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "강 회장과는 사업적으로 얽힌 사이였지만, 살인과는 무관합니다. 저는 그저 제 방에 있었습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "사실 그날 밤, 잠이 오지 않아 리조트 주변을 잠시 산책했습니다. 밤공기가 좋아서요.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "산책 중 노천탕 근처까지 갔던 건 맞습니다. 강 회장과의 프로젝트 때문에 리조트 증축 계획을 검토 중이었고, 현장 구조를 확인하러 간 것이었습니다. 강 회장에게 앙심은 있었지만, 살해할 생각은 없었습니다.",
+          "trigger_evidence_ids": [
+            104
+          ]
+        },
+        {
+          "threshold": 70,
+          "content": "노천탕 근처에서 강 회장과 이수진 비서가 심하게 다투는 소리를 들었습니다. 저는 그저 제 할 일을 하고 있었고, 그들의 사적인 일에 끼어들고 싶지 않아 모른 척 지나쳤습니다.",
+          "trigger_evidence_ids": [
+            104
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "저는 강 회장을 죽이지 않았습니다. 노천탕 근처에서 돌아오던 길에, 이수진 비서가 강 회장 스위트룸에서 급하게 나오는 것을 보았습니다. 그녀의 손에 무언가 들려있었던 것 같기도 합니다. 저는 그저 제 방으로 돌아와 잠들었을 뿐입니다.",
+          "trigger_evidence_ids": []
+        }
+      ],
+      "personality": {
+        "speech_style": "차갑게",
+        "emotional_tendency": "방어적",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_evidence_ids": [
+        104
+      ]
+    },
+    {
+      "suspect_id": 3,
+      "name": "김민서",
+      "role": "청산재 여주인",
+      "age": 32,
+      "gender": "여성",
+      "description": "청산재 리조트를 운영하는 젊은 여주인. 단아한 외모와 차분한 태도를 지녔지만, 리조트 운영에 대한 강한 책임감을 가지고 있다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당일 밤에는 리조트 마감 업무를 처리한 후, 자신의 방에서 휴식을 취했다고 주장한다.",
+      "timeline": [
+        {
+          "time": "20:00-22:00",
+          "location": "청산재 리조트 로비",
+          "activity": "리조트 마감 업무 및 손님 응대",
+          "can_prove": true,
+          "witness": "직원 최지훈"
+        },
+        {
+          "time": "22:00-23:00",
+          "location": "김민서 여주인의 방",
+          "activity": "휴식",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "23:00-23:30",
+          "location": "강태산 회장 스위트룸 및 노천탕",
+          "activity": "강 회장 시신 발견 및 만년필 습득 후 도주",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "23:30-06:00",
+          "location": "김민서 여주인의 방",
+          "activity": "충격과 공포에 잠 못 이루고 방에 숨어있었음",
+          "can_prove": false,
+          "witness": null
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "저는 사건 당일 제 방에서 잠을 자고 있었습니다. 강 회장님과는 사업적인 문제로 갈등이 있었지만, 살인까지 저지를 이유는 없습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "사실, 강 회장님이 리조트 부지를 강압적으로 매입하려 해서 많이 힘들었습니다. 그날 저녁에도 언쟁이 있었지만, 밤에는 제 방에 있었습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "강 회장님이 아끼던 만년필이 제 방에서 발견되었다고요? 그건... 제가 잠시 가지고 있었던 겁니다. 그날 밤, 강 회장님 방에 잠시 들렀다가 가져왔습니다.",
+          "trigger_evidence_ids": [
+            105
+          ]
+        },
+        {
+          "threshold": 70,
+          "content": "밤 11시쯤, 강 회장님께 마지막으로 부지 문제에 대해 이야기하려고 스위트룸에 갔었습니다. 문이 잠겨있지 않아 들어갔는데, 노천탕에서 강 회장님이 이미 돌아가신 상태였습니다. 너무 놀라서... 만년필을 들고 도망쳤습니다.",
+          "trigger_evidence_ids": [
+            105
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "저는 강 회장님을 죽이지 않았습니다. 그저 시신을 발견하고 너무 무서워서 도망쳤을 뿐입니다. 만년필은 제가 강 회장님께 돌려드리려던 것이었는데, 그 상황에서 무심코 들고 나왔습니다. 제가 범인이 아니라는 걸 증명할 방법은 없지만, 정말입니다.",
+          "trigger_evidence_ids": []
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말, 단호하게",
+        "emotional_tendency": "방어적",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_evidence_ids": [
+        105
+      ]
+    },
+    {
+      "suspect_id": 4,
+      "name": "최영호",
+      "role": "강태산 회장의 조카",
+      "age": 32,
+      "gender": "남성",
+      "description": "강태산 회장의 조카로, 다소 경박하고 충동적인 성격. 최근 도박 빚으로 회장에게 돈을 요구했으나 거절당했다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당일 밤, 자신의 방에서 술을 마시며 잠들었다고 주장하지만, 중간에 잠시 리조트 주변을 산책한 사실은 숨기고 있다.",
+      "timeline": [
+        {
+          "time": "20:00-22:00",
+          "location": "최영호 조카의 방",
+          "activity": "혼자 술을 마시며 시간을 보냄",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "22:00-23:00",
+          "location": "청산재 리조트 주변",
+          "activity": "답답한 마음에 리조트 주변을 산책함",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "23:00-06:00",
+          "location": "최영호 조카의 방",
+          "activity": "방으로 돌아와 잠이 듦",
+          "can_prove": false,
+          "witness": null
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "저는 그 시간에 제 방에서 혼자 술을 마시고 있었습니다. 회장님과는 최근 좀 다퉜지만, 제가 그럴 리 없습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "사실 술을 마시다가 답답해서 밤 10시쯤부터 11시까지 리조트 주변을 잠깐 산책했습니다. 너무 추워서 금방 들어왔어요.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "산책 중에 회장님 노천탕 쪽에서 희미하게 인기척을 느꼈습니다. 하지만 대수롭지 않게 생각하고 제 방으로 돌아왔습니다.",
+          "trigger_evidence_ids": [
+            106
+          ]
+        },
+        {
+          "threshold": 70,
+          "content": "사실 노천탕 근처에서 박준영 씨를 봤습니다. 그는 뭔가 숨기는 듯한 표정으로 급하게 자리를 뜨더군요. 저는 그저 놀라서 제 방으로 돌아왔습니다.",
+          "trigger_evidence_ids": [
+            104
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "저는 회장님에게 도박 빚 때문에 돈을 요구했지만 거절당했습니다. 그래서 화가 나서 협박 쪽지를 써서 회장님 방 문틈에 끼워 넣으려다 그냥 제 방으로 가져와 찢어버렸습니다. 살인은 제가 한 짓이 아닙니다.",
+          "trigger_evidence_ids": [
+            106
+          ]
+        }
+      ],
+      "personality": {
+        "speech_style": "반말",
+        "emotional_tendency": "쉽게 흥분",
+        "lying_pattern": "deflect"
+      },
+      "critical_evidence_ids": []
+    }
+  ]
+}
