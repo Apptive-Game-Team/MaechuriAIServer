@@ -2,7 +2,7 @@ from pydantic import ValidationError
 
 from app.models.schemas import ClueSetSchema
 from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion, ScenarioResult
-from app.models.schemas.map import MapOutputSchema
+from app.models.schemas.map import MapOutputSchema, MapSkeletonSchema
 from app.models.schemas.suspect import SuspectGenerationRequest, SuspectListSchema
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
@@ -58,13 +58,33 @@ class ScenarioService:
         if expansion_result is None:
             raise RuntimeError("Expansion of Scenario failed to generate")
 
-        # 2차 단서 생성 (suspect보다 먼저 생성해야 trigger_evidence_ids 설정 가능)
+        print("Expansion generated successfully")
+        time.sleep(3)
+
+        # 3차 맵 스켈레톤 생성 (방 구조 + 복도)
+        print("Map skeleton generating...")
+        map_skeleton: MapSkeletonSchema | None = None
+        for attempt in range(3):
+            try:
+                map_skeleton = self.map_generator.generate_skeleton(expansion_result)
+                break
+            except ValidationError as error:
+                print(error)
+                time.sleep(2)
+
+        if map_skeleton is None:
+            raise RuntimeError("Map skeleton failed to generate")
+
+        print("Map skeleton generated successfully")
+        time.sleep(3)
+
+        # 4차 단서 생성 (map_skeleton 정보 포함)
         print("Clues generating...")
         clue_result: ClueSetSchema | None = None
 
         for attempt in range(3):
             try:
-                clue_result = self.clue_generator.generate_clues(expansion_result)
+                clue_result = self.clue_generator.generate_clues(expansion_result, map_skeleton)
                 break
             except ValidationError as error:
                 print(error)
@@ -76,10 +96,12 @@ class ScenarioService:
         print("Clues generated successfully")
         time.sleep(3)
 
-        # 3차 용의자 생성 (clue 정보를 포함하여 생성)
+        # 5차 용의자 생성 (clue + map_skeleton 정보 포함)
         print("Suspects generating...")
         suspects_result: SuspectListSchema | None = None
-        suspect_req = SuspectGenerationRequest.from_expansion(expansion_result, clue_result.clues)
+        suspect_req = SuspectGenerationRequest.from_expansion(
+            expansion_result, clue_result.clues, map_skeleton
+        )
 
         for attempt in range(3):
             try:
@@ -95,17 +117,23 @@ class ScenarioService:
         print("Suspects generated successfully")
         time.sleep(3)
 
-        # 4차 맵 생성
+        # 6차 맵 디테일 생성 (skeleton + clue 기반)
+        print("Map detail generating...")
         map_result: MapOutputSchema | None = None
         for attempt in range(3):
             try:
-                map_result = self.map_generator.generate_map(expansion_result, clue_result)
+                map_result = self.map_generator.generate_detail(
+                    expansion_result, map_skeleton, clue_result
+                )
                 break
             except ValidationError as error:
                 print(error)
+                time.sleep(2)
 
         if map_result is None:
-             raise RuntimeError("Map of Scenario failed to generate")
+            raise RuntimeError("Map detail failed to generate")
+
+        print("Map detail generated successfully")
 
         # Combine into ScenarioResult
         final_scenario = ScenarioResult(

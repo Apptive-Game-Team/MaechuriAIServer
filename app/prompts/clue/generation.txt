@@ -19,14 +19,20 @@ These clues must logically support the Ground Truth while respecting the World R
 3. **Consistency**:
    - Even Red Herrings must be physically possible within the world (e.g., if a suspect wasn't in the kitchen, their footprints shouldn't be there unless planted).
 
-4. **Field Specifics**:
+4. **Map Skeleton Awareness** (if provided):
+   - Use the `map_skeleton` data to place clues in valid rooms.
+   - The `found_at` field MUST match one of the room names in `map_skeleton.rooms`.
+   - Consider corridor connections when determining how clues might be moved or discovered.
+   - Room sizes (width, height) can inform clue placement logic.
+
+5. **Field Specifics**:
    - `is_red_herring`: Set to `true` for misleading clues, `false` for relevant clues.
    - `related_suspect_ids`: MUST use integer IDs (1, 2, 3...) that match the suspects in the scenario.
-   - `logic_explanation`: 
+   - `logic_explanation`:
      - For relevant clues: Explain how it points to the truth.
      - For red herrings: Explain how it is intended to mislead or what innocent suspect it points to.
 
-5. **Language**: Korean (한국어).
+6. **Language**: Korean (한국어).
 
 ---
 
