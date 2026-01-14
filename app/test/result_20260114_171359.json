@@ -1,0 +1,802 @@
+{
+  "meta": {
+    "difficulty": "hard",
+    "theme": "Revenge",
+    "tone": "Mysterious",
+    "language": "한국어"
+  },
+  "incident": {
+    "type": "Murder",
+    "summary": "**제목: 단풍 온천의 마지막 심판**\n\n늦가을 저녁, 깊은 산속에 자리한 고즈넉한 고급 온천 리조트 '단풍 온천'에서 끔찍한 사건이 발생했다. 모두가 저녁 식사를 마치고 휴식을 취하던 밤 9시경, 악명 높은 음식 평론가 강태수 씨가 자신의 스위트룸에 딸린 노천탕에서 싸늘한 주검으로 발견된 것이다. 그는 얼굴을 물에 담근 채 미동도 없이 떠 있었고, 주변에는 붉게 물든 단풍잎들이 고요히 흩날리고 있었다.\n\n현장은 기묘한 의문투성이였다. 스위트룸의 문은 안에서 잠겨 있었고, 유일한 열쇠는 강태수 씨의 옷가지가 놓인 탁자 위에 가지런히 놓여 있었다. 외부 침입의 흔적은 전혀 없었으며, 강태수 씨의 지갑이나 고가의 시계 등 소지품은 온전히 남아 있었다. 특히 강태수 씨는 심장이 약해 혼자서는 절대 뜨거운 온천에 들어가지 않는 것으로 알려져 있었기에, 그가 왜 홀로 노천탕에 있었는지 자체가 미스터리였다. 노천탕 가장자리에서는 강태수 씨의 것이 아닌, 섬세하게 조각된 작은 나무 빗 하나가 발견되었고, 희미하지만 특이한 약초 향이 공기 중에 감돌고 있었다.\n\n이날 단풍 온천에는 강태수 씨를 포함해 몇몇 인물들이 머물고 있었다. 과거 강태수 씨의 혹평으로 레스토랑이 폐업 위기에 처했던 젊은 수석 셰프 이진우, 강태수 씨의 모든 일정을 관리하며 그의 건강 상태를 누구보다 잘 아는 비서 박미영, 최근 강태수 씨와 공개적으로 설전을 벌였던 라이벌 평론가 최민준, 그리고 수년 전 강태수 씨의 악평으로 가업이 흔들렸던 단풍 온천의 안주인 김영숙 여사. 이들 모두는 각자의 이유로 강태수 씨에게 앙심을 품고 있었으며, 사건 발생 시각에 대한 명확한 알리바이를 제시하지 못하고 있다. 과연 이 고요한 온천에서 벌어진 밀실 살인의 진실은 무엇일까?",
+    "time_range": {
+      "start": "21:00:00Z",
+      "end": "22:00:00Z"
+    },
+    "location": "단풍 온천 리조트, 강태수 씨 스위트룸 노천탕",
+    "primary_object": "강태수"
+  },
+  "world": {
+    "locations": [
+      "단풍 온천 리조트",
+      "강태수 씨 스위트룸",
+      "노천탕",
+      "리조트 로비",
+      "레스토랑"
+    ],
+    "time_granularity_minutes": 30
+  },
+  "ground_truth": {
+    "culprit_count": 1,
+    "crime_time_range": {
+      "start": "20:00:00Z",
+      "end": "21:00:00Z"
+    },
+    "crime_location": "강태수 씨 스위트룸 노천탕"
+  },
+  "world_detail": {
+    "locations": [
+      "단풍 온천 리조트",
+      "강태수 씨 스위트룸",
+      "노천탕",
+      "리조트 로비",
+      "레스토랑",
+      "직원 전용 통로"
+    ],
+    "time_granularity_minutes": 30,
+    "visibility_rules": [
+      {
+        "from_location": "단풍 온천 리조트",
+        "can_see": [
+          "리조트 로비",
+          "레스토랑"
+        ],
+        "cannot_see": [
+          "강태수 씨 스위트룸",
+          "노천탕",
+          "직원 전용 통로"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "강태수 씨 스위트룸",
+        "can_see": [
+          "노천탕"
+        ],
+        "cannot_see": [
+          "리조트 로비",
+          "레스토랑",
+          "직원 전용 통로"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "노천탕",
+        "can_see": [
+          "강태수 씨 스위트룸"
+        ],
+        "cannot_see": [
+          "리조트 로비",
+          "레스토랑",
+          "직원 전용 통로"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "노천탕",
+        "can_see": [],
+        "cannot_see": [],
+        "evidence_type": "나무 빗"
+      },
+      {
+        "from_location": "노천탕",
+        "can_see": [],
+        "cannot_see": [],
+        "evidence_type": "약초 향"
+      },
+      {
+        "from_location": "리조트 로비",
+        "can_see": [
+          "레스토랑"
+        ],
+        "cannot_see": [
+          "강태수 씨 스위트룸",
+          "노천탕",
+          "직원 전용 통로"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "레스토랑",
+        "can_see": [
+          "리조트 로비"
+        ],
+        "cannot_see": [
+          "강태수 씨 스위트룸",
+          "노천탕",
+          "직원 전용 통로"
+        ],
+        "evidence_type": null
+      },
+      {
+        "from_location": "직원 전용 통로",
+        "can_see": [
+          "강태수 씨 스위트룸"
+        ],
+        "cannot_see": [
+          "리조트 로비",
+          "레스토랑",
+          "노천탕"
+        ],
+        "evidence_type": null
+      }
+    ],
+    "access_rules": [
+      {
+        "location": "강태수 씨 스위트룸",
+        "requires": "스위트룸 열쇠"
+      },
+      {
+        "location": "직원 전용 통로",
+        "requires": "직원 출입증"
+      }
+    ],
+    "evidence_types": [
+      "나무 빗",
+      "약초 향",
+      "수면제 성분"
+    ]
+  },
+  "ground_truth_detail": {
+    "culprit_count": 1,
+    "crime_time_range": {
+      "start": "20:00:00Z",
+      "end": "21:00:00Z"
+    },
+    "crime_location": "강태수 씨 스위트룸 노천탕",
+    "culprit_ids": [
+      4
+    ],
+    "method": "김영숙은 강태수 씨의 심장병을 알고 있었고, 그가 뜨거운 온천을 피한다는 사실을 이용했다. 그녀는 강태수 씨가 마실 차에 특별한 약초를 이용한 수면제를 몰래 타서 그를 무력화시켰다. 강태수 씨가 잠들자, 김영숙은 그를 노천탕으로 옮겨 얼굴을 물에 담가 익사시켰다. 범행 후, 그녀는 스위트룸 문을 안에서 잠그고, 자신의 나무 빗을 현장에 남겨두는 실수를 저질렀다. 그리고 리조트 안주인으로서 알고 있던 '직원 전용 통로'를 이용해 스위트룸을 빠져나갔다. 열쇠는 강태수 씨의 옷가지 위에 놓아 밀실 살인처럼 보이게 했다.",
+    "required_evidence": [
+      {
+        "type": "나무 빗",
+        "min_count": 1
+      },
+      {
+        "type": "약초 향",
+        "min_count": 1
+      },
+      {
+        "type": "수면제 성분",
+        "min_count": 1
+      }
+    ]
+  },
+  "generation_targets": {
+    "suspects": {
+      "count": 4,
+      "suspects": [
+        {
+          "id": 1,
+          "name": "이진우",
+          "role": "수석 셰프"
+        },
+        {
+          "id": 2,
+          "name": "박미영",
+          "role": "비서"
+        },
+        {
+          "id": 3,
+          "name": "최민준",
+          "role": "라이벌 평론가"
+        },
+        {
+          "id": 4,
+          "name": "김영숙",
+          "role": "단풍 온천 안주인"
+        }
+      ],
+      "allow_lying": true,
+      "liar_ratio": 0.5
+    },
+    "evidence": {
+      "count_range": [
+        4,
+        6
+      ],
+      "ambiguity_level": "high"
+    }
+  },
+  "constraints": {
+    "no_supernatural": true,
+    "no_time_travel": true,
+    "at_least_one_uncertain_alibi": true
+  },
+  "clues": {
+    "clues": [
+      {
+        "id": 101,
+        "name": "김영숙의 나무 빗",
+        "found_at": "노천탕",
+        "description": "강태수 씨가 익사한 노천탕 물가에서 발견된, 섬세하게 조각된 나무 빗. 빗살 사이에 긴 머리카락 몇 가닥이 엉켜 있다.",
+        "related_suspect_ids": [
+          4
+        ],
+        "logic_explanation": "범인 김영숙이 범행 중 실수로 현장에 떨어뜨린 물건이다. 그녀의 소유임을 증명할 수 있다.",
+        "is_red_herring": false
+      },
+      {
+        "id": 102,
+        "name": "약초 향이 나는 찻잔과 수면제 성분",
+        "found_at": "강태수 씨 스위트룸",
+        "description": "스위트룸 테이블 위에서 발견된, 비어있는 찻잔. 잔 안쪽에서 희미하게 독특한 약초 향이 나며, 잔여물 분석 결과 수면제 성분이 검출되었다.",
+        "related_suspect_ids": [
+          4
+        ],
+        "logic_explanation": "강태수 씨가 무력화된 방법과 관련된 결정적인 증거이다. 김영숙이 사용한 약초 수면제와 일치한다.",
+        "is_red_herring": false
+      },
+      {
+        "id": 103,
+        "name": "직원 전용 통로의 흙 발자국",
+        "found_at": "직원 전용 통로",
+        "description": "강태수 씨 스위트룸과 연결된 직원 전용 통로 바닥에서 발견된, 젖은 흙이 묻은 신발 자국. 자국은 스위트룸 방향에서 통로 밖으로 향하고 있다.",
+        "related_suspect_ids": [
+          4
+        ],
+        "logic_explanation": "범인 김영숙이 스위트룸을 빠져나갈 때 이용한 직원 전용 통로에서 발견된 증거이다. 그녀가 이 통로를 이용했음을 암시한다.",
+        "is_red_herring": false
+      },
+      {
+        "id": 104,
+        "name": "박상민의 명함",
+        "found_at": "강태수 씨 스위트룸",
+        "description": "강태수 씨 스위트룸 문 앞에서 발견된, 박상민이라는 이름이 적힌 명함. 명함 뒷면에는 \"오늘 저녁 8시, 중요한 이야기\"라고 손글씨로 쓰여 있다.",
+        "related_suspect_ids": [
+          1
+        ],
+        "logic_explanation": "박상민이 강태수 씨를 만나러 왔거나, 범행 시간대에 스위트룸 근처에 있었음을 암시하여 그를 용의자로 오인하게 만든다. 실제 범행과는 무관하다.",
+        "is_red_herring": true
+      },
+      {
+        "id": 105,
+        "name": "이지은의 머리핀",
+        "found_at": "리조트 로비",
+        "description": "리조트 로비 바닥에서 발견된, 화려한 보석이 박힌 머리핀. 리조트 직원 이지은 씨의 것으로 확인되었다.",
+        "related_suspect_ids": [
+          2
+        ],
+        "logic_explanation": "이지은이 범행 시간대에 로비에 있었거나, 급하게 움직이다가 떨어뜨린 것처럼 보이게 하여 그녀를 용의선상에 올린다. 실제로는 이지은이 평소에도 자주 물건을 잃어버리는 습관이 있으며, 범행과는 무관하다.",
+        "is_red_herring": true
+      },
+      {
+        "id": 106,
+        "name": "찢어진 커튼 조각",
+        "found_at": "노천탕",
+        "description": "노천탕 가장자리 바닥에서 발견된, 짙은 남색의 찢어진 커튼 조각. 날카로운 것에 긁힌 듯한 흔적이 있다.",
+        "related_suspect_ids": [],
+        "logic_explanation": "피해자가 저항했거나, 범인이 급하게 도주하는 과정에서 발생한 것처럼 보이게 하여, 수면제로 무력화된 후 익사했다는 진실을 가린다. 실제로는 리조트 청소 중 우연히 찢어진 커튼 조각이 바람에 날려온 것이다.",
+        "is_red_herring": true
+      }
+    ]
+  },
+  "map": {
+    "rooms": [
+      {
+        "id": 1,
+        "name": "리조트 로비",
+        "width": 18,
+        "height": 15,
+        "mood": "Mysterious"
+      },
+      {
+        "id": 2,
+        "name": "레스토랑",
+        "width": 17,
+        "height": 14,
+        "mood": "Mysterious"
+      },
+      {
+        "id": 3,
+        "name": "강태수 씨 스위트룸",
+        "width": 12,
+        "height": 10,
+        "mood": "Mysterious"
+      },
+      {
+        "id": 4,
+        "name": "노천탕",
+        "width": 9,
+        "height": 8,
+        "mood": "Mysterious"
+      }
+    ],
+    "corridors": [
+      {
+        "id": 1,
+        "name": "메인 복도",
+        "connections": [
+          {
+            "room_id": 1,
+            "direction": "east"
+          },
+          {
+            "room_id": 2,
+            "direction": "west"
+          }
+        ],
+        "width_hint": 4,
+        "length_hint": 6
+      },
+      {
+        "id": 2,
+        "name": "객실 복도",
+        "connections": [
+          {
+            "room_id": 1,
+            "direction": "north"
+          },
+          {
+            "room_id": 3,
+            "direction": "south"
+          }
+        ],
+        "width_hint": 3,
+        "length_hint": 7
+      },
+      {
+        "id": 3,
+        "name": "스위트룸 통로",
+        "connections": [
+          {
+            "room_id": 3,
+            "direction": "east"
+          },
+          {
+            "room_id": 4,
+            "direction": "west"
+          }
+        ],
+        "width_hint": 2,
+        "length_hint": 3
+      }
+    ],
+    "obj": [
+      {
+        "id": 1,
+        "name": "김영숙의 나무 빗",
+        "position": {
+          "x": 2,
+          "y": 2
+        },
+        "room_id": 4,
+        "type": "clue"
+      },
+      {
+        "id": 2,
+        "name": "약초 향이 나는 찻잔과 수면제 성분",
+        "position": {
+          "x": 3,
+          "y": 3
+        },
+        "room_id": 3,
+        "type": "clue"
+      },
+      {
+        "id": 3,
+        "name": "박상민의 명함",
+        "position": {
+          "x": 8,
+          "y": 5
+        },
+        "room_id": 3,
+        "type": "clue"
+      },
+      {
+        "id": 4,
+        "name": "이지은의 머리핀",
+        "position": {
+          "x": 3,
+          "y": 4
+        },
+        "room_id": 1,
+        "type": "clue"
+      },
+      {
+        "id": 5,
+        "name": "찢어진 커튼 조각",
+        "position": {
+          "x": 6,
+          "y": 4
+        },
+        "room_id": 4,
+        "type": "clue"
+      },
+      {
+        "id": 6,
+        "name": "이진우",
+        "position": {
+          "x": 8,
+          "y": 6
+        },
+        "room_id": 2,
+        "type": "suspect"
+      },
+      {
+        "id": 7,
+        "name": "박미영",
+        "position": {
+          "x": 5,
+          "y": 7
+        },
+        "room_id": 3,
+        "type": "suspect"
+      },
+      {
+        "id": 8,
+        "name": "최민준",
+        "position": {
+          "x": 10,
+          "y": 7
+        },
+        "room_id": 1,
+        "type": "suspect"
+      },
+      {
+        "id": 9,
+        "name": "김영숙",
+        "position": {
+          "x": 4,
+          "y": 6
+        },
+        "room_id": 4,
+        "type": "suspect"
+      }
+    ]
+  },
+  "suspects": [
+    {
+      "suspect_id": 1,
+      "name": "이진우",
+      "role": "수석 셰프",
+      "age": 29,
+      "gender": "남성",
+      "description": "젊고 유능하지만 강태수 평론가의 혹평으로 레스토랑이 폐업 위기에 처해 앙심을 품고 있다. 항상 깔끔한 조리복을 입고 있으며, 손에는 요리사 특유의 굳은살이 박혀있다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 레스토랑 주방에서 다음 날 아침 식사 재료를 준비하고 있었다고 주장한다.",
+      "timeline": [
+        {
+          "time": "19:00-20:00",
+          "location": "레스토랑 주방",
+          "activity": "저녁 식사 마무리 및 정리",
+          "can_prove": true,
+          "witness": "동료 셰프"
+        },
+        {
+          "time": "20:00-20:30",
+          "location": "레스토랑 주방",
+          "activity": "다음 날 아침 식사 재료 준비",
+          "can_prove": true,
+          "witness": "동료 셰프"
+        },
+        {
+          "time": "20:30-21:00",
+          "location": "직원 휴게실 및 리조트 복도",
+          "activity": "잠시 휴식 및 개인 통화, 복도 산책",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "21:00-21:30",
+          "location": "레스토랑 주방",
+          "activity": "다시 재료 준비",
+          "can_prove": true,
+          "witness": "동료 셰프"
+        },
+        {
+          "time": "21:30-22:00",
+          "location": "레스토랑 주방",
+          "activity": "동료 셰프와 함께 사건 소식 들음",
+          "can_prove": true,
+          "witness": "동료 셰프"
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "저는 강태수 씨를 죽이지 않았습니다. 사건 당시에는 주방에서 다음 날 아침 식사 재료를 준비하고 있었습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "강태수 씨 때문에 레스토랑이 폐업 위기에 처한 건 사실입니다. 그에게 앙심을 품고 있었지만, 살인까지 저지를 생각은 없었습니다. 그저 그가 사라졌으면 좋겠다고 생각했을 뿐입니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "사실 8시 30분쯤 잠시 휴게실에 있었습니다. 답답해서 바람 좀 쐴 겸 리조트 복도를 잠시 걸었습니다. 그때 강태수 씨 스위트룸 문이 살짝 열려있는 것을 본 것 같지만, 대수롭지 않게 생각했습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 70,
+          "content": "그때 스위트룸 문이 열려있던 건 확실합니다. 그리고 그 문 앞에서 '박상민'이라는 분의 명함을 주웠습니다. 명함 뒷면에는 '오늘 저녁 8시, 중요한 이야기'라고 쓰여 있었습니다. 괜히 오해받을까 봐 말하지 못했습니다.",
+          "trigger_evidence_ids": [
+            104
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "저는 명함을 주운 후 바로 휴게실로 돌아갔습니다. 제가 본 박상민 씨는 스위트룸 문을 두드리고 있었고, 강태수 씨는 문을 열어주지 않았습니다. 저는 그저 우연히 그 명함을 발견했을 뿐, 살인과는 아무 관련이 없습니다. 그 명함은 제가 아닌 다른 사람이 강태수 씨를 만나러 왔다는 증거입니다.",
+          "trigger_evidence_ids": []
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말",
+        "emotional_tendency": "방어적",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_evidence_ids": []
+    },
+    {
+      "suspect_id": 2,
+      "name": "박미영",
+      "role": "비서",
+      "age": 35,
+      "gender": "여성",
+      "description": "강태수 씨의 모든 일정을 관리하는 유능한 비서. 항상 단정하고 침착한 태도를 유지한다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 강태수 씨의 다음 날 일정을 정리하거나 개인 업무를 처리하고 있었다고 주장합니다.",
+      "timeline": [
+        {
+          "time": "19:00-20:00",
+          "location": "리조트 로비",
+          "activity": "강태수 씨의 다음 날 일정 정리 및 개인 업무 처리",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "20:00-20:30",
+          "location": "강태수 씨 스위트룸 앞 복도",
+          "activity": "강태수 씨에게 가져다줄 차 준비를 위해 대기",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "20:30-21:00",
+          "location": "리조트 로비",
+          "activity": "리조트 직원과 잠시 대화 후 개인 객실로 이동",
+          "can_prove": true,
+          "witness": "리조트 직원"
+        },
+        {
+          "time": "21:00-22:00",
+          "location": "자신의 객실",
+          "activity": "휴식",
+          "can_prove": false,
+          "witness": null
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "저는 강태수 씨의 비서 박미영입니다. 사건 당시 저는 제 할 일을 하고 있었고, 강태수 씨에게 해를 끼칠 이유가 없습니다. 제 알리바이는 확실합니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "사실 8시쯤 강태수 씨 스위트룸 복도에서 차 준비를 위해 대기하고 있었는데, 그때 김영숙 여사님이 스위트룸 쪽으로 가는 것을 봤습니다. 잠시 후 다시 돌아오시는 것도요.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "강태수 씨는 최근 건강이 급격히 나빠져 뜨거운 온천에 절대 들어가지 말라는 의사의 경고를 받았습니다. 제가 늘 곁에서 지켰는데, 왜 혼자 노천탕에 계셨는지 모르겠습니다. 혹시 제가 준비한 차에 뭔가 있었을까요?",
+          "trigger_evidence_ids": [
+            102
+          ]
+        },
+        {
+          "threshold": 70,
+          "content": "그날 저녁, 강태수 씨가 저에게 몰래 리조트 직원 이지은 씨와 만날 약속을 잡아달라고 부탁했습니다. 이지은 씨가 로비에서 강태수 씨를 기다리다 머리핀을 떨어뜨린 것 같습니다. 저는 그저 강태수 씨의 사생활을 지켜주려 했을 뿐입니다.",
+          "trigger_evidence_ids": [
+            105
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "사실 저는 강태수 씨가 이지은 씨와 만나는 것을 돕기 위해 스위트룸 문을 잠시 열어두고 복도에서 기다렸습니다. 그때 김영숙 여사님이 스위트룸으로 들어가는 것을 확실히 봤습니다. 저는 그저 강태수 씨의 사생활을 지켜주려 했을 뿐입니다. 제가 문을 열어둔 것이 화근이 된 것 같습니다.",
+          "trigger_evidence_ids": []
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말",
+        "emotional_tendency": "방어적",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_evidence_ids": []
+    },
+    {
+      "suspect_id": 3,
+      "name": "최민준",
+      "role": "라이벌 평론가",
+      "age": 48,
+      "gender": "남성",
+      "description": "날카로운 비판으로 유명한 음식 평론가. 강태수와는 오랜 라이벌 관계이며, 최근 공개적으로 설전을 벌였다. 깔끔하고 세련된 외모를 가졌지만, 눈빛은 다소 차갑다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 자신의 스위트룸에서 다음 날 마감할 원고를 작성하고 있었다고 주장한다.",
+      "timeline": [
+        {
+          "time": "19:00-20:00",
+          "location": "레스토랑",
+          "activity": "저녁 식사",
+          "can_prove": true,
+          "witness": "레스토랑 직원"
+        },
+        {
+          "time": "20:00-20:30",
+          "location": "최민준 씨 스위트룸",
+          "activity": "다음 날 마감할 원고 작성",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "20:30-20:45",
+          "location": "스위트룸 복도",
+          "activity": "바람을 쐴 겸 복도로 나왔다가 강태수 씨 스위트룸 문이 살짝 열린 것을 목격",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "20:45-21:00",
+          "location": "최민준 씨 스위트룸",
+          "activity": "원고 작성",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "21:00-22:00",
+          "location": "최민준 씨 스위트룸",
+          "activity": "휴식",
+          "can_prove": false,
+          "witness": null
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "강태수 씨와는 비즈니스 라이벌일 뿐, 살해할 이유가 없습니다. 저는 사건 시각 제 방에서 원고를 쓰고 있었습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "솔직히 강태수 씨의 죽음이 저에게 나쁠 건 없지만, 제가 직접 나설 만큼 한가한 사람은 아닙니다. 그저 제 방에 있었습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "사건 당일 저녁 식사 후, 강태수 씨와 로비에서 마주쳤습니다. 그는 저에게 비웃으며 '네 글은 이제 아무도 안 읽는다'고 말했고, 저는 화가 나서 '당신이야말로 곧 끝날 것'이라고 받아쳤습니다. 그게 마지막 대화였습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 70,
+          "content": "사실... 8시 30분쯤, 제 방에서 원고를 쓰다가 잠시 바람을 쐴 겸 복도로 나왔습니다. 그때 강태수 씨 스위트룸 문이 살짝 열려 있었고, 안에서 희미하게 인기척이 느껴졌습니다. 누군가 있는 것 같았지만, 신경 쓰지 않고 제 방으로 돌아왔습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 90,
+          "content": "제가 숨긴 것은... 8시 45분경, 강태수 씨 스위트룸 근처를 지나가다가 누군가 직원 전용 통로로 급하게 들어가는 것을 봤습니다. 어두워서 얼굴은 보지 못했지만, 키가 작고 단발머리였습니다. 저는 괜히 엮이기 싫어서 모른 척 제 방으로 돌아왔습니다. 그게 전부입니다.",
+          "trigger_evidence_ids": [
+            103
+          ]
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말, 냉소적",
+        "emotional_tendency": "방어적",
+        "lying_pattern": "deny"
+      },
+      "critical_evidence_ids": []
+    },
+    {
+      "suspect_id": 4,
+      "name": "김영숙",
+      "role": "단풍 온천 안주인",
+      "age": 58,
+      "gender": "여성",
+      "description": "단풍 온천을 수십 년간 운영해온 여인. 단아하고 기품 있는 외모지만, 눈빛에는 강단이 느껴진다. 과거 강태수 씨의 혹평으로 온천이 큰 피해를 입었다.",
+      "is_culprit": true,
+      "motive": "수년 전 강태수 씨의 악평으로 단풍 온천의 명성과 가업이 위기에 처했던 것에 대한 깊은 원한과 복수심.",
+      "alibi_summary": "사건 발생 시각에 자신의 집무실에서 장부를 정리하고 있었다고 주장한다.",
+      "timeline": [
+        {
+          "time": "19:00-19:30",
+          "location": "리조트 레스토랑",
+          "activity": "손님들과 저녁 식사 후 인사",
+          "can_prove": true,
+          "witness": "리조트 직원 및 손님들"
+        },
+        {
+          "time": "19:30-20:00",
+          "location": "강태수 씨 스위트룸",
+          "activity": "강태수 씨에게 차를 대접하며 대화",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "20:00-20:30",
+          "location": "강태수 씨 스위트룸 노천탕",
+          "activity": "강태수 씨를 노천탕으로 옮기고 범행 실행",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "20:30-21:00",
+          "location": "직원 전용 통로",
+          "activity": "직원 전용 통로를 이용해 스위트룸에서 빠져나와 집무실로 복귀",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "21:00-21:30",
+          "location": "집무실",
+          "activity": "장부 정리",
+          "can_prove": false,
+          "witness": null
+        },
+        {
+          "time": "21:30-22:00",
+          "location": "리조트 로비",
+          "activity": "순찰 중 강태수 씨 사망 소식 접함",
+          "can_prove": true,
+          "witness": "리조트 직원"
+        }
+      ],
+      "secrets": [
+        {
+          "threshold": 0,
+          "content": "강태수 씨와는 사업적인 관계일 뿐, 개인적인 원한은 없습니다. 사건 시각에는 집무실에서 장부를 정리하고 있었습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 30,
+          "content": "사건 당일 저녁 식사 후 강태수 씨 스위트룸에 잠시 들러 차를 대접하며 안부를 물었습니다. 하지만 8시 이전에 나왔습니다.",
+          "trigger_evidence_ids": []
+        },
+        {
+          "threshold": 50,
+          "content": "강태수 씨가 과거 저희 온천에 대해 악평을 남겨 큰 피해를 입은 것은 사실입니다. 하지만 그 일로 그를 해칠 생각은 없었습니다. 그리고 그가 심장이 약해 뜨거운 온천을 피한다는 것도 알고 있었습니다.",
+          "trigger_evidence_ids": [
+            101,
+            102
+          ]
+        },
+        {
+          "threshold": 70,
+          "content": "강태수 씨에게 드린 차에 제가 직접 만든 약초 수면제를 조금 넣었습니다. 그가 잠시 잠들면 온천에 들어가지 못하게 하려던 것뿐입니다. 그 후 저는 직원 전용 통로로 나왔습니다.",
+          "trigger_evidence_ids": [
+            102,
+            103
+          ]
+        },
+        {
+          "threshold": 90,
+          "content": "네, 제가 강태수 씨를 죽였습니다. 잠든 그를 노천탕으로 옮겨 물에 얼굴을 담갔습니다. 온천의 명예를 되찾고 싶었습니다. 제 나무 빗을 떨어뜨린 것도, 직원 통로로 도망친 것도 모두 사실입니다.",
+          "trigger_evidence_ids": []
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말",
+        "emotional_tendency": "침착함",
+        "lying_pattern": "deny"
+      },
+      "critical_evidence_ids": [
+        101,
+        102,
+        103
+      ]
+    }
+  ]
+}
