@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional
 from .map import MapOutputSchema
 from datetime import time
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator, ValidationError
 
 from .clue import ClueSetSchema
 
@@ -9,6 +9,12 @@ from .clue import ClueSetSchema
 class TimeRangeSchema(BaseModel):
     start: time
     end: time
+
+    @model_validator(mode='after')
+    def check_time_range(self) -> 'TimeRangeSchema':
+        if self.start >= self.end:
+            raise ValueError('start time must be before end time')
+        return self
 
 # --- Meta ---
 class MetaSchema(BaseModel):
@@ -119,4 +125,5 @@ class ExpansionPart2(BaseModel):
 class ScenarioResult(ScenarioExpansion):
     clues: ClueSetSchema
     map: MapOutputSchema | dict = {}
+    suspects: dict | list = []
 

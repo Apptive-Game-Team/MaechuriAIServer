@@ -2,6 +2,7 @@ from typing import List
 from pydantic import BaseModel, Field
 
 class ClueItemSchema(BaseModel):
+    id: int = Field(description="Unique numeric identifier for the clue (e.g., 101, 102)")
     name: str = Field(description="Short name of the clue")
     found_at: str = Field(description="The location where the clue is discovered - must be one of scenario.world.locations")
     description: str = Field(description="Detailed description of what the clue is and how it looks")

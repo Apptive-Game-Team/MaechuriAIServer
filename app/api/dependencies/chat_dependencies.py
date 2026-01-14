@@ -5,7 +5,8 @@ from fastapi import Depends
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.llm.gemini_client import GeminiClient
 from app.services.npc.chat_service import ChatService
-from app.services.agent.suspect_agent import SuspectAgent
+from app.services.agent.pressure_judge import PressureJudge
+from app.services.agent.suspect_actor import SuspectActor
 from app.services.agent.clue_agent import ClueAgent
 
 
@@ -17,24 +18,33 @@ def get_scenario_repository() -> ScenarioRepository:
     return ScenarioRepository()
 
 
-def get_suspect_agent(
-        llm_client: Annotated[GeminiClient, Depends(get_gemini)],
-) -> SuspectAgent:
-    return SuspectAgent(llm_client)
+def get_pressure_judge(
+    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+) -> PressureJudge:
+    return PressureJudge(llm_client)
+
+
+def get_suspect_actor(
+    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+) -> SuspectActor:
+    return SuspectActor(llm_client)
 
 
 def get_clue_agent(
-        llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
 ) -> ClueAgent:
     return ClueAgent(llm_client)
 
 
 def get_chat_service(
     scenario_repository: Annotated[ScenarioRepository, Depends(get_scenario_repository)],
-    suspect_agent: Annotated[SuspectAgent, Depends(get_suspect_agent)],
+    pressure_judge: Annotated[PressureJudge, Depends(get_pressure_judge)],
+    suspect_actor: Annotated[SuspectActor, Depends(get_suspect_actor)],
     clue_agent: Annotated[ClueAgent, Depends(get_clue_agent)]
 ) -> ChatService:
-    return ChatService(scenario_repository=scenario_repository,
-                       suspect_agent=suspect_agent,
-                       clue_agent=clue_agent)
-
+    return ChatService(
+        scenario_repository=scenario_repository,
+        pressure_judge=pressure_judge,
+        suspect_actor=suspect_actor,
+        clue_agent=clue_agent
+    )
