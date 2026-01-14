@@ -6,11 +6,37 @@ from .embedding_model import EmbeddingModel
 DEFAULT_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 class SBERTModel(EmbeddingModel):
+    """Embedding model based on Sentence-BERT (SBERT).
+
+    This class wraps a `sentence_transformers.SentenceTransformer` model
+    and exposes a simple interface for turning input text into dense
+    vector embeddings.
+    """
 
     def __init__(self, model_name_or_path: str = DEFAULT_MODEL) -> None:
+        """Initialize the SBERTModel.
+
+        Parameters
+        ----------
+        model_name_or_path : str, optional
+            The name of, or local path to, a SentenceTransformer model to load.
+            Defaults to ``DEFAULT_MODEL``.
+        """
         self.model = SentenceTransformer(model_name_or_path)
 
     def embed(self, text: str) -> List[float]:
+        """Compute an embedding vector for the given text.
+
+        Parameters
+        ----------
+        text : str
+            The input text to encode as an embedding.
+
+        Returns
+        -------
+        List[float]
+            The embedding of the input text as a list of floating-point values.
+        """
         return self.model.encode(text).tolist()
 
 
