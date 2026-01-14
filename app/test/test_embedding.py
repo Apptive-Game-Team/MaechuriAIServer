@@ -18,6 +18,11 @@ from app.services.embedding.sbert_model import SBERTModel
 OUTPUT_DIR = "app/test/output"
 
 
+def embed_to_tensor(model: SBERTModel, text: str) -> torch.Tensor:
+    """Helper function to convert text to embedding tensor."""
+    return torch.tensor(model.embed(text))
+
+
 def save_result(data: dict, prefix: str) -> str:
     """결과를 JSON 파일로 저장"""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -71,14 +76,15 @@ def test_embedding_generation(model=None):
         for text in test_texts:
             print(f"\nGenerating embedding for: '{text}'")
             embedding = model.embed(text)
+            embedding_dim = len(embedding)
 
-            print(f"  - Embedding dimension: {len(embedding)}")
+            print(f"  - Embedding dimension: {embedding_dim}")
             print(f"  - First 5 values: {embedding[:5]}")
 
             results.append(
                 {
                     "text": text,
-                    "embedding_dim": len(embedding),
+                    "embedding_dim": embedding_dim,
                     "embedding_sample": embedding[:5],
                 }
             )
@@ -119,8 +125,8 @@ def test_similarity_calculation(model=None):
 
     print("\n--- Similar Pairs ---")
     for text1, text2 in similar_pairs:
-        embedding1 = torch.tensor(model.embed(text1))
-        embedding2 = torch.tensor(model.embed(text2))
+        embedding1 = embed_to_tensor(model, text1)
+        embedding2 = embed_to_tensor(model, text2)
         similarity = util.cos_sim(embedding1, embedding2).item()
 
         print(f"'{text1}' <-> '{text2}': {similarity:.4f}")
@@ -130,8 +136,8 @@ def test_similarity_calculation(model=None):
 
     print("\n--- Different Pairs ---")
     for text1, text2 in different_pairs:
-        embedding1 = torch.tensor(model.embed(text1))
-        embedding2 = torch.tensor(model.embed(text2))
+        embedding1 = embed_to_tensor(model, text1)
+        embedding2 = embed_to_tensor(model, text2)
         similarity = util.cos_sim(embedding1, embedding2).item()
 
         print(f"'{text1}' <-> '{text2}': {similarity:.4f}")
@@ -156,9 +162,9 @@ def test_multilingual_support(model=None):
 
     # 같은 의미의 다국어 문장
     multilingual_sentences = {
-        "korean": "안녕하세요, 저는 이요환입니다.",
-        "english": "Hello, I am Lee Yohwan.",
-        "japanese": "こんにちは、私はイ・ヨファンです。",
+        "korean": "안녕하세요, 저는 김철수입니다.",
+        "english": "Hello, I am Kim Chulsoo.",
+        "japanese": "こんにちは、私はキム・チョルスです。",
     }
 
     results = []
@@ -167,7 +173,7 @@ def test_multilingual_support(model=None):
     embeddings = {}
     for lang, text in multilingual_sentences.items():
         print(f"{lang}: '{text}'")
-        embeddings[lang] = torch.tensor(model.embed(text))
+        embeddings[lang] = embed_to_tensor(model, text)
 
     print("\n--- Cross-lingual Similarities ---")
     languages = list(multilingual_sentences.keys())
