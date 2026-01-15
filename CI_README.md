@@ -5,7 +5,7 @@ This repository uses GitHub Actions for Continuous Integration (CI) to automatic
 ## Overview
 
 The CI workflow automatically:
-- Builds a Docker image of the FastAPI application
+- Builds a Docker image of the FastAPI application for ARM64 Linux architecture
 - Pushes the image to GitHub Container Registry (ghcr.io)
 - Tags images with branch names, commit SHAs, and `latest` for the default branch
 
@@ -48,14 +48,15 @@ The CI workflow runs automatically when:
 
 The Docker image is built using:
 - **Base image**: `python:3.12-slim`
+- **Architecture**: `linux/arm64` (ARM 64-bit for ARM Linux servers)
 - **Application**: FastAPI app running on port 8000
 - **Command**: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
 
 ### Image Tags
 
 Images are tagged with:
-- Branch name (e.g., `ghcr.io/apptive-game-team/maechuriaiserver:main`)
-- Branch and commit SHA (e.g., `ghcr.io/apptive-game-team/maechuriaiserver:main-abc1234`)
+- Branch name (e.g., `ghcr.io/apptive-game-team/maechuri-ai:main`)
+- Branch and commit SHA (e.g., `ghcr.io/apptive-game-team/maechuri-ai:main-abc1234`)
 - `latest` tag for the default branch
 
 ### Pulling the Image
@@ -67,10 +68,10 @@ Once the workflow runs successfully, you can pull the image:
 echo $GHCR_TOKEN | docker login ghcr.io -u $GHCR_USER --password-stdin
 
 # Pull the image
-docker pull ghcr.io/apptive-game-team/maechuriaiserver:latest
+docker pull ghcr.io/apptive-game-team/maechuri-ai:latest
 
 # Run the container
-docker run -d -p 8000:8000 --env-file .env ghcr.io/apptive-game-team/maechuriaiserver:latest
+docker run -d -p 8000:8000 --env-file .env ghcr.io/apptive-game-team/maechuri-ai:latest
 ```
 
 ## Files
@@ -84,7 +85,7 @@ docker run -d -p 8000:8000 --env-file .env ghcr.io/apptive-game-team/maechuriais
 The CI workflow only builds and pushes Docker images. For deployment, the server can pull the latest image using:
 
 ```bash
-docker pull ghcr.io/apptive-game-team/maechuriaiserver:latest
+docker pull ghcr.io/apptive-game-team/maechuri-ai:latest
 docker-compose up -d
 ```
 
