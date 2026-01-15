@@ -3,7 +3,6 @@ from typing import List
 
 
 class EmbeddingModel(ABC):
-class EmbeddingModel(ABC):
     """
     Abstract base class for text embedding models.
 
@@ -13,6 +12,7 @@ class EmbeddingModel(ABC):
     retrieval, or classification).
     """
 
+    @abstractmethod
     def embed(self, text: str) -> List[float]:
         """
         Compute an embedding vector for the given input text.

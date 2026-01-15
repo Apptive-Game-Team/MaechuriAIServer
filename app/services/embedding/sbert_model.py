@@ -1,6 +1,6 @@
 from typing import List
 from sentence_transformers import SentenceTransformer
-from .embedding_model import EmbeddingModel
+from embedding_model import EmbeddingModel
 
 
 DEFAULT_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
