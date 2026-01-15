@@ -9,8 +9,8 @@ router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 
 @router.post("/daily")
 async def create_daily_scenario(
-        theme: str = "random",
-        scenario_service: ScenarioService = Annotated[ScenarioService, Depends(get_scenario_service)]):
+        scenario_service: Annotated[ScenarioService, Depends(get_scenario_service)],
+        theme: str = "random"):
     """
     Creates a new daily mystery scenario.
     """
