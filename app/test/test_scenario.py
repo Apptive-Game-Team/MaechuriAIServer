@@ -3,11 +3,11 @@ import os
 from datetime import datetime
 from app.services.scenario.scenario_service import ScenarioService
 
-if __name__ == "__main__":
+def test_scenario():
     print("SCENARIO TEST START")
 
     agent = ScenarioService()
-    test_dict = agent.generate("온천에서 발생한 일")
+    test_dict = agent.generate("밀실 방화 사망 사건", 1)
 
     print(test_dict)
     # 결과 저장 (현재 시각 기준 파일명)
