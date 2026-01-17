@@ -1,5 +1,23 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, List, Literal
+from pydantic import BaseModel, Field
+
+
+class ChatMessageSchema(BaseModel):
+    """단일 대화 메시지"""
+    role: Literal["user", "suspect", "detective"]
+    content: str
+
+
+class SuspectChatHistorySchema(BaseModel):
+    """용의자 대화 히스토리 (세션 상태)"""
+    chat_history: List[ChatMessageSchema] = Field(default_factory=list)
+    pressure: int = Field(default=0, ge=0, le=100)
+    evidence_seen_ids: List[int] = Field(default_factory=list)
+
+
+class ClueChatHistorySchema(BaseModel):
+    """증거 대화 히스토리"""
+    chat_history: List[ChatMessageSchema] = Field(default_factory=list)
 
 
 class SuspectChatRequest(BaseModel):
@@ -7,8 +25,8 @@ class SuspectChatRequest(BaseModel):
     scenario_id: int
     suspect_id: int
     user_message: str
-    history: dict = {}
-    evidence_id: Optional[int] = None  # 증거 제시 시
+    history: SuspectChatHistorySchema = Field(default_factory=SuspectChatHistorySchema)
+    evidence_id: Optional[int] = None
 
 
 class ClueChatRequest(BaseModel):
@@ -16,7 +34,7 @@ class ClueChatRequest(BaseModel):
     scenario_id: int
     clue_id: int
     user_message: str
-    history: dict = {}
+    history: ClueChatHistorySchema = Field(default_factory=ClueChatHistorySchema)
 
 
 class SuspectChatResponse(BaseModel):
@@ -25,12 +43,11 @@ class SuspectChatResponse(BaseModel):
     answer: str
     pressure: int
     pressure_delta: int
-    tier: str  # CALM, NERVOUS, CORNERED, BREAKDOWN
-    history: dict
+    history: SuspectChatHistorySchema
 
 
-class ChatResponse(BaseModel):
-    """기본 대화 응답 (증거 대화용)"""
+class ClueChatResponse(BaseModel):
+    """증거 대화 응답"""
     user_message: str
-    history: dict
     answer: str
+    history: ClueChatHistorySchema
