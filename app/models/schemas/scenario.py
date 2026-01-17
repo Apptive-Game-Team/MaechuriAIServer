@@ -10,12 +10,6 @@ class TimeRangeSchema(BaseModel):
     start: time
     end: time
 
-    @model_validator(mode='after')
-    def check_time_range(self) -> 'TimeRangeSchema':
-        if self.start >= self.end:
-            raise ValueError('start time must be before end time')
-        return self
-
 # --- Meta ---
 class MetaSchema(BaseModel):
     difficulty: Literal["easy", "mid", "hard"]
