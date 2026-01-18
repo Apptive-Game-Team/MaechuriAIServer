@@ -10,13 +10,14 @@ router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 @router.post("/daily")
 async def create_daily_scenario(
         scenario_service: Annotated[ScenarioService, Depends(get_scenario_service)],
-        theme: str = "random"):
+        theme: str = "random",
+        scenario_id: int = 0):
     """
     Creates a new daily mystery scenario.
+    Scenario의 번호는 외부에서 정해주도록 합니다.
     """
     try:
-        # ScenarioService를 호출하여 시나리오 생성 (Case -> Skeleton -> Expansion -> Clues)
-        result = scenario_service.generate(theme)
+        result = scenario_service.generate(theme, scenario_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

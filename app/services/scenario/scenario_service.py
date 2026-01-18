@@ -23,7 +23,9 @@ class ScenarioService:
         self.suspect_generator = SuspectGenerator(llm_client)
         self.validator = ConsistencyValidator()
 
-    def generate(self, pre_input: str) -> dict:
+    def generate(self,
+                 pre_input: str,
+                 scenario_id: int) -> dict:
         # 생성 시작
         # 평서문 생성
         case_state = self.scenario_generator.generate_case(pre_input)

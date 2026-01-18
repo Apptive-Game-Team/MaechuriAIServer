@@ -26,6 +26,7 @@ These clues must logically support the Ground Truth while respecting the World R
    - Room sizes (width, height) can inform clue placement logic.
 
 5. **Field Specifics**:
+   - `id`: Sequential integers starting from 1 (1, 2, 3...). Do NOT use 101, 102 style IDs.
    - `is_red_herring`: Set to `true` for misleading clues, `false` for relevant clues.
    - `related_suspect_ids`: MUST use integer IDs (1, 2, 3...) that match the suspects in the scenario.
    - `logic_explanation`:

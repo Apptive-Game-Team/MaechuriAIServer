@@ -94,7 +94,7 @@ def test_suspect_generator():
     clues_data = scenario_data.get("clues_detail", {}).get("clues", [])
     clues = []
     for i, c in enumerate(clues_data):
-        clue_id = 101 + i
+        clue_id = i + 1
         clues.append(ClueItemSchema(id=clue_id, **c))
 
     # Constraints
