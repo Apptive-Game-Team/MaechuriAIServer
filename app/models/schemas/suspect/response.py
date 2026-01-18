@@ -5,7 +5,7 @@ from .common import TimelineEntrySchema, SecretTierSchema, PersonalitySchema
 
 
 class SuspectSchema(BaseModel):
-    """Complete suspect information."""
+    """Complete suspect information for API responses and game state."""
     # Basic info
     suspect_id: int = Field(description="용의자 고유 ID (1, 2, 3...)")
     name: str = Field(description="이름")

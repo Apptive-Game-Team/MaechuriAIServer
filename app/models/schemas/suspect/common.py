@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class TimelineEntrySchema(BaseModel):
-    """Timeline entry for suspect activity."""
+    """Timeline entry for suspect activity. Time format: 'HH:MM-HH:MM' (e.g., '14:00-15:00')."""
     time: str = Field(description="시간 범위 (예: '14:00-15:00')")
     location: str = Field(description="위치")
     activity: str = Field(description="활동 내용")

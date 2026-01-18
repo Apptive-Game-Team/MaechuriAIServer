@@ -2,7 +2,7 @@
 from datetime import time, datetime
 from typing import List
 
-from sqlalchemy import String, Text, Boolean, CheckConstraint
+from sqlalchemy import String, Text, Boolean, Time, CheckConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -23,14 +23,14 @@ class Scenario(Base):
     # Incident
     incident_type: Mapped[str] = mapped_column(String(100))
     incident_summary: Mapped[str] = mapped_column(Text)
-    incident_time_start: Mapped[time] = mapped_column()
-    incident_time_end: Mapped[time] = mapped_column()
+    incident_time_start: Mapped[time] = mapped_column(Time)
+    incident_time_end: Mapped[time] = mapped_column(Time)
     incident_location: Mapped[str] = mapped_column(String(100))
     primary_object: Mapped[str] = mapped_column(String(100))
 
     # Ground Truth
-    crime_time_start: Mapped[time] = mapped_column()
-    crime_time_end: Mapped[time] = mapped_column()
+    crime_time_start: Mapped[time] = mapped_column(Time)
+    crime_time_end: Mapped[time] = mapped_column(Time)
     crime_location: Mapped[str] = mapped_column(String(100))
     crime_method: Mapped[str] = mapped_column(Text)
 
