@@ -21,7 +21,8 @@ class SuspectActor:
         suspect: SuspectSchema,
         state: SuspectState,
         user_message: str,
-        evidence_presented: Optional[dict] = None
+        evidence_presented: Optional[dict] = None,
+        rag_context: Optional[str] = None
     ) -> str:
         """
         용의자 응답 생성.
@@ -31,6 +32,7 @@ class SuspectActor:
             state: 현재 런타임 상태 (pressure, revealed secrets 등)
             user_message: 유저 메시지
             evidence_presented: 제시된 증거 (있다면)
+            rag_context: RAG로 검색된 관련 컨텍스트 (있다면)
 
         Returns:
             용의자의 응답 문자열
@@ -57,6 +59,7 @@ class SuspectActor:
             "revealed_secrets": self._format_secrets(revealed_secrets),
             "evidence_presented": json.dumps(evidence_presented, ensure_ascii=False) if evidence_presented else "None",
             "chat_history": self._format_history(state.get_recent_history(10)),
+            "rag_context": rag_context or "",
         }
 
         # 3. 시스템 프롬프트 포맷팅

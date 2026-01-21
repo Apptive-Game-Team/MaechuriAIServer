@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Annotated
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.database import get_db
 from app.services.scenario.scenario_service import ScenarioService
+from app.services.rag import get_rag_service, RAGService
 from app.api.dependencies.scenario_dependencies import get_scenario_service
 from app.models.schemas.solve import ScenarioSolveRequest, ScenarioSolveResponse
 
@@ -21,6 +25,30 @@ async def create_daily_scenario(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{scenario_id}/index")
+async def index_scenario(
+        scenario_id: int,
+        db: Annotated[AsyncSession, Depends(get_db)]
+):
+    """
+    시나리오 데이터를 RAG용으로 인덱싱합니다.
+
+    시나리오 생성 후 이 엔드포인트를 호출하여 용의자, 증거 등의 임베딩을 생성합니다.
+    이 작업이 완료되어야 RAG 기능이 활성화됩니다.
+    """
+    try:
+        rag_service = get_rag_service()
+        stats = await rag_service.index_scenario(db, scenario_id)
+        return {
+            "scenario_id": scenario_id,
+            "indexed": True,
+            "stats": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Indexing failed: {str(e)}")
+
 
 @router.post("/solve")
 async def solve_scenario(solution: ScenarioSolveRequest):

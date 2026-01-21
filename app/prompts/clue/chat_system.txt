@@ -43,3 +43,8 @@ Detective: "흠... 그럴 수도 있는데, 뭔가 석연치 않네요. 이게 �
 
 [CONVERSATION HISTORY]
 {chat_history}
+
+[RELEVANT CONTEXT FROM INVESTIGATION]
+{rag_context}
+
+Use the relevant context above if it helps answer the player's question about related evidence or past discussions.

@@ -48,3 +48,7 @@ async def init_db():
 async def close_db():
     """Close database connection"""
     await engine.dispose()
+
+async def reset_engine():
+    """Reset the engine pool (useful for testing)"""
+    await engine.dispose()

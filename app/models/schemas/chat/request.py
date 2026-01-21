@@ -11,6 +11,7 @@ class SuspectChatRequest(BaseModel):
     user_message: str
     history: SuspectChatHistorySchema = Field(default_factory=SuspectChatHistorySchema)
     evidence_id: Optional[int] = None
+    session_id: Optional[str] = None  # For RAG history tracking
 
 
 class ClueChatRequest(BaseModel):
@@ -19,3 +20,4 @@ class ClueChatRequest(BaseModel):
     clue_id: int
     user_message: str
     history: ClueChatHistorySchema = Field(default_factory=ClueChatHistorySchema)
+    session_id: Optional[str] = None  # For RAG history tracking
