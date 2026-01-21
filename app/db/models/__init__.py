@@ -9,6 +9,7 @@ from app.db.models.scenario import (
     SuspectSecret,
     Clue
 )
+from app.db.models.embedding import ChatMessageEmbedding
 
 __all__ = [
     "Scenario",
@@ -19,5 +20,6 @@ __all__ = [
     "Suspect",
     "SuspectTimeline",
     "SuspectSecret",
-    "Clue"
+    "Clue",
+    "ChatMessageEmbedding",
 ]

@@ -1,6 +1,7 @@
 """Clue database model."""
 from typing import Optional
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import String, Text, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -22,5 +23,9 @@ class Clue(Base):
     logic_explanation: Mapped[str] = mapped_column(Text)
     decoded_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_red_herring: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Embeddings for RAG
+    description_embedding = mapped_column(Vector(1024), nullable=True)
+    logic_embedding = mapped_column(Vector(1024), nullable=True)
 
     scenario: Mapped["Scenario"] = relationship(back_populates="clues")
