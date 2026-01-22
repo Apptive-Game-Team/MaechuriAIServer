@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.services.scenario.scenario_service import ScenarioService
-from app.services.rag import get_rag_service, RAGService
+from app.services.rag import get_rag_service
 from app.api.dependencies.scenario_dependencies import get_scenario_service
 from app.models.schemas.solve import ScenarioSolveRequest, ScenarioSolveResponse
 
@@ -14,15 +14,22 @@ router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 @router.post("/daily")
 async def create_daily_scenario(
         scenario_service: Annotated[ScenarioService, Depends(get_scenario_service)],
-        theme: str = "random",
-        scenario_id: int = 0):
+        db: Annotated[AsyncSession, Depends(get_db)],
+        theme: str = "random"):
     """
     Creates a new daily mystery scenario.
-    Scenario의 번호는 외부에서 정해주도록 합니다.
+    Generates the scenario, saves it to DB, and returns with DB-generated scenario_id.
+    Also performs RAG indexing for the scenario.
     """
     try:
-        result = scenario_service.generate(theme, scenario_id)
-        return result
+        scenario_data, scenario_id = await scenario_service.generate_and_save(
+            pre_input=theme,
+            db=db
+        )
+        return {
+            "scenario_id": scenario_id,
+            "scenario": scenario_data
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
