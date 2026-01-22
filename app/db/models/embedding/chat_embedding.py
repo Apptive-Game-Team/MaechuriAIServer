@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Text, Integer, ForeignKey, DateTime
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -29,4 +29,4 @@ class ChatMessageEmbedding(Base):
 
     embedding = mapped_column(Vector(1024))  # BGE-M3 dimension
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
