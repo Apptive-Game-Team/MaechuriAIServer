@@ -118,21 +118,24 @@ class GameSessionRepository:
             New pressure value (0-100)
         """
         game_session = await self.get_session(session_id, scenario_id)
-        if game_session:
-            suspect_key = str(suspect_id)
-            # Ensure we have a dict
-            pressures = dict(game_session.suspect_pressures or {})
-            pressures[suspect_key] = new_pressure
+        if game_session is None:
+            raise ValueError(
+                f"Game session not found for session_id={session_id!r}, scenario_id={scenario_id!r}"
+            )
+        suspect_key = str(suspect_id)
+        # Ensure we have a dict
+        pressures = dict(game_session.suspect_pressures or {})
+        pressures[suspect_key] = new_pressure
 
-            # Explicitly re-assign to trigger SQLAlchemy change tracking for JSONB
-            game_session.suspect_pressures = pressures
+        # Explicitly re-assign to trigger SQLAlchemy change tracking for JSONB
+        game_session.suspect_pressures = pressures
 
-            # Update global pressure to max of all suspects
-            if pressures:
-                game_session.current_pressure = max(pressures.values())
+        # Update global pressure to max of all suspects
+        if pressures:
+            game_session.current_pressure = max(pressures.values())
 
-            game_session.last_activity_at = datetime.now()
-            await self.session.flush()
+        game_session.last_activity_at = datetime.now()
+        await self.session.flush()
 
     async def add_evidence_seen(self, session_id: str, scenario_id: int, evidence_id: int) -> None:
         """
