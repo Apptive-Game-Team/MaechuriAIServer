@@ -10,6 +10,7 @@ from app.db.models.scenario import (
     Clue
 )
 from app.db.models.embedding import ChatMessageEmbedding
+from app.db.models.game_session import GameSession
 
 __all__ = [
     "Scenario",
@@ -22,4 +23,5 @@ __all__ = [
     "SuspectSecret",
     "Clue",
     "ChatMessageEmbedding",
+    "GameSession",
 ]
