@@ -89,7 +89,7 @@ class RAGIndexer:
         dict
             Stats containing number of suspects, timelines, and secrets indexed.
         """
-        from sqlalchemy import select
+        from sqlalchemy import select, bindparam
         from sqlalchemy.orm import selectinload
 
         # Load suspects with relationships
@@ -100,11 +100,9 @@ class RAGIndexer:
         )
         suspects = result.scalars().all()
 
-        stats = {
-            "suspects": 0,
-            "timelines": 0,
-            "secrets": 0
-        }
+        suspect_updates = []
+        timeline_updates = []
+        secret_updates = []
         
         for suspect in suspects:
             # Index suspect profile
@@ -115,16 +113,11 @@ class RAGIndexer:
                 age=suspect.age,
                 gender=suspect.gender,
             )
-
-            await db.execute(
-                update(Suspect)
-                .where(
-                    Suspect.scenario_id == scenario_id,
-                    Suspect.suspect_id == suspect.suspect_id,
-                )
-                .values(profile_embedding=profile_embedding)
-            )
-            stats["suspects"] += 1
+            suspect_updates.append({
+                "scenario_id": scenario_id,
+                "suspect_id": suspect.suspect_id,
+                "profile_embedding": profile_embedding
+            })
 
             # Index timelines
             for timeline in suspect.timeline:
@@ -134,36 +127,66 @@ class RAGIndexer:
                     activity=timeline.activity,
                     suspect_name=suspect.name,
                 )
-
-                await db.execute(
-                    update(SuspectTimeline)
-                    .where(
-                        SuspectTimeline.scenario_id == scenario_id,
-                        SuspectTimeline.suspect_id == suspect.suspect_id,
-                        SuspectTimeline.timeline_id == timeline.timeline_id,
-                    )
-                    .values(embedding=timeline_embedding)
-                )
-                stats["timelines"] += 1
+                timeline_updates.append({
+                    "scenario_id": scenario_id,
+                    "suspect_id": suspect.suspect_id,
+                    "timeline_id": timeline.timeline_id,
+                    "embedding": timeline_embedding
+                })
 
             # Index secrets
             for secret in suspect.secrets:
                 secret_embedding = self.embedding_service.embed_secret(
                     content=secret.content, suspect_name=suspect.name
                 )
+                secret_updates.append({
+                    "scenario_id": scenario_id,
+                    "suspect_id": suspect.suspect_id,
+                    "secret_id": secret.secret_id,
+                    "embedding": secret_embedding
+                })
 
-                await db.execute(
-                    update(SuspectSecret)
-                    .where(
-                        SuspectSecret.scenario_id == scenario_id,
-                        SuspectSecret.suspect_id == suspect.suspect_id,
-                        SuspectSecret.secret_id == secret.secret_id,
-                    )
-                    .values(embedding=secret_embedding)
+        # Bulk updates
+        if suspect_updates:
+            await db.execute(
+                update(Suspect)
+                .where(
+                    Suspect.scenario_id == bindparam("scenario_id"),
+                    Suspect.suspect_id == bindparam("suspect_id")
                 )
-                stats["secrets"] += 1
+                .values(profile_embedding=bindparam("profile_embedding")),
+                suspect_updates
+            )
 
-        return stats
+        if timeline_updates:
+            await db.execute(
+                update(SuspectTimeline)
+                .where(
+                    SuspectTimeline.scenario_id == bindparam("scenario_id"),
+                    SuspectTimeline.suspect_id == bindparam("suspect_id"),
+                    SuspectTimeline.timeline_id == bindparam("timeline_id")
+                )
+                .values(embedding=bindparam("embedding")),
+                timeline_updates
+            )
+
+        if secret_updates:
+            await db.execute(
+                update(SuspectSecret)
+                .where(
+                    SuspectSecret.scenario_id == bindparam("scenario_id"),
+                    SuspectSecret.suspect_id == bindparam("suspect_id"),
+                    SuspectSecret.secret_id == bindparam("secret_id")
+                )
+                .values(embedding=bindparam("embedding")),
+                secret_updates
+            )
+
+        return {
+            "suspects": len(suspect_updates),
+            "timelines": len(timeline_updates),
+            "secrets": len(secret_updates)
+        }
 
     async def index_clues(self, db: AsyncSession, scenario_id: int) -> int:
         """Index all clues in a scenario.
@@ -180,12 +203,12 @@ class RAGIndexer:
         int
             Number of clues indexed.
         """
-        from sqlalchemy import select
+        from sqlalchemy import select, bindparam
 
         result = await db.execute(select(Clue).where(Clue.scenario_id == scenario_id))
         clues = result.scalars().all()
 
-        count = 0
+        clue_updates = []
         for clue in clues:
             # Index description
             description_embedding = self.embedding_service.embed_clue_description(
@@ -199,17 +222,28 @@ class RAGIndexer:
                 decoded_answer=clue.decoded_answer,
             )
 
+            clue_updates.append({
+                "scenario_id": scenario_id,
+                "clue_id": clue.clue_id,
+                "description_embedding": description_embedding,
+                "logic_embedding": logic_embedding
+            })
+
+        if clue_updates:
             await db.execute(
                 update(Clue)
-                .where(Clue.scenario_id == scenario_id, Clue.clue_id == clue.clue_id)
-                .values(
-                    description_embedding=description_embedding,
-                    logic_embedding=logic_embedding,
+                .where(
+                    Clue.scenario_id == bindparam("scenario_id"),
+                    Clue.clue_id == bindparam("clue_id")
                 )
+                .values(
+                    description_embedding=bindparam("description_embedding"),
+                    logic_embedding=bindparam("logic_embedding"),
+                ),
+                clue_updates
             )
-            count += 1
 
-        return count
+        return len(clue_updates)
 
     async def index_chat_message(
         self,
