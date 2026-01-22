@@ -56,27 +56,25 @@ class RAGIndexer:
         dict
             Statistics about indexed items.
         """
-        stats = {
-            "suspects": 0,
-            "timelines": 0,
-            "secrets": 0,
-            "clues": 0,
-        }
-
-        # Index suspects
-        suspects_indexed = await self.index_suspects(db, scenario_id)
-        stats["suspects"] = suspects_indexed
-
+        # Index suspects, timelines, and secrets
+        suspect_stats = await self.index_suspects(db, scenario_id)
+        
         # Index clues
         clues_indexed = await self.index_clues(db, scenario_id)
-        stats["clues"] = clues_indexed
+        
+        stats = {
+            "suspects": suspect_stats["suspects"],
+            "timelines": suspect_stats["timelines"],
+            "secrets": suspect_stats["secrets"],
+            "clues": clues_indexed,
+        }
 
         await db.commit()
 
         logger.info(f"Indexed scenario {scenario_id}: {stats}")
         return stats
 
-    async def index_suspects(self, db: AsyncSession, scenario_id: int) -> int:
+    async def index_suspects(self, db: AsyncSession, scenario_id: int) -> dict:
         """Index all suspects in a scenario.
 
         Parameters
@@ -88,8 +86,8 @@ class RAGIndexer:
 
         Returns
         -------
-        int
-            Number of suspects indexed.
+        dict
+            Stats containing number of suspects, timelines, and secrets indexed.
         """
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
@@ -102,7 +100,12 @@ class RAGIndexer:
         )
         suspects = result.scalars().all()
 
-        count = 0
+        stats = {
+            "suspects": 0,
+            "timelines": 0,
+            "secrets": 0
+        }
+        
         for suspect in suspects:
             # Index suspect profile
             profile_embedding = self.embedding_service.embed_suspect_profile(
@@ -121,6 +124,7 @@ class RAGIndexer:
                 )
                 .values(profile_embedding=profile_embedding)
             )
+            stats["suspects"] += 1
 
             # Index timelines
             for timeline in suspect.timeline:
@@ -140,6 +144,7 @@ class RAGIndexer:
                     )
                     .values(embedding=timeline_embedding)
                 )
+                stats["timelines"] += 1
 
             # Index secrets
             for secret in suspect.secrets:
@@ -156,10 +161,9 @@ class RAGIndexer:
                     )
                     .values(embedding=secret_embedding)
                 )
+                stats["secrets"] += 1
 
-            count += 1
-
-        return count
+        return stats
 
     async def index_clues(self, db: AsyncSession, scenario_id: int) -> int:
         """Index all clues in a scenario.
