@@ -46,8 +46,8 @@ class ChatService:
         scenario_id: int,
         suspect_id: int,
         user_message: str,
-        evidence_id: Optional[int] = None,
-        db: AsyncSession = None
+        db: AsyncSession,
+        evidence_id: Optional[int] = None
     ) -> SuspectChatResponse:
         """용의자와 대화 (Stateful with GameSession).
 
@@ -56,12 +56,9 @@ class ChatService:
             scenario_id: 시나리오 ID
             suspect_id: 용의자 ID
             user_message: 유저 메시지
-            evidence_id: 제시할 증거 ID (있다면)
             db: 데이터베이스 세션 (필수)
+            evidence_id: 제시할 증거 ID (있다면)
         """
-        if not db:
-            raise ValueError("Database session is required for GameSession management")
-
         # 1. GameSession 로드 및 검증/생성
         session_repo = GameSessionRepository(db)
         game_session = await session_repo.get_session(session_id, scenario_id)
@@ -192,7 +189,7 @@ class ChatService:
         scenario_id: int,
         clue_id: int,
         user_message: str,
-        db: AsyncSession = None
+        db: AsyncSession
     ) -> ClueChatResponse:
         """증거와 대화 (Stateful with GameSession).
 
@@ -203,9 +200,6 @@ class ChatService:
             user_message: 유저 메시지
             db: 데이터베이스 세션 (필수)
         """
-        if not db:
-            raise ValueError("Database session is required for GameSession management")
-
         # 1. GameSession 로드 및 검증/생성
         session_repo = GameSessionRepository(db)
         game_session = await session_repo.get_session(session_id, scenario_id)
