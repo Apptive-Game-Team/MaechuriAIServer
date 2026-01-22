@@ -448,10 +448,26 @@ class ScenarioRepository:
         if isinstance(time_value, time):
             return time_value
         if isinstance(time_value, str):
-            # Handle "HH:MM:SS" or "HH:MM" format
-            parts = time_value.split(":")
-            hour = int(parts[0])
-            minute = int(parts[1]) if len(parts) > 1 else 0
-            second = int(parts[2]) if len(parts) > 2 else 0
-            return time(hour, minute, second)
+            try:
+                # Remove 'Z' if present (UTC indicator)
+                clean_time = time_value.replace("Z", "")
+                
+                # Handle "YYYY-MM-DDTHH:MM:SS" format if full datetime is provided
+                if "T" in clean_time:
+                    clean_time = clean_time.split("T")[1]
+                
+                # Handle "HH:MM:SS" or "HH:MM" format
+                parts = clean_time.split(":")
+                hour = int(parts[0])
+                minute = int(parts[1]) if len(parts) > 1 else 0
+                
+                # Handle seconds with optional fractional part (e.g. "00.123")
+                second_part = parts[2] if len(parts) > 2 else "0"
+                second = int(float(second_part))
+                
+                return time(hour, minute, second)
+            except Exception as e:
+                # Log the error but re-raise ValueError for consistent handling
+                raise ValueError(f"Failed to parse time string '{time_value}': {str(e)}")
+                
         raise ValueError(f"Cannot parse time value: {time_value}")
