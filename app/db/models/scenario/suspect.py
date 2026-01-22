@@ -1,6 +1,7 @@
 """Suspect database models."""
 from typing import List, Optional
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,6 +33,9 @@ class Suspect(Base):
 
     critical_evidence_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
+    # Embedding for RAG (name + role + description)
+    profile_embedding = mapped_column(Vector(1024), nullable=True)
+
     # Relationships
     scenario: Mapped["Scenario"] = relationship(back_populates="suspects")
     timeline: Mapped[List["SuspectTimeline"]] = relationship(back_populates="suspect", cascade="all, delete-orphan")
@@ -51,6 +55,9 @@ class SuspectTimeline(Base):
     activity: Mapped[str] = mapped_column(Text)
     can_prove: Mapped[bool] = mapped_column(Boolean, default=False)
     witness: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Embedding for RAG (time_range + location + activity)
+    embedding = mapped_column(Vector(1024), nullable=True)
 
     suspect: Mapped["Suspect"] = relationship(back_populates="timeline")
 
@@ -74,6 +81,9 @@ class SuspectSecret(Base):
     threshold: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
     trigger_evidence_ids: Mapped[list] = mapped_column(JSONB, default=list)
+
+    # Embedding for RAG (secret content)
+    embedding = mapped_column(Vector(1024), nullable=True)
 
     suspect: Mapped["Suspect"] = relationship(back_populates="secrets")
 

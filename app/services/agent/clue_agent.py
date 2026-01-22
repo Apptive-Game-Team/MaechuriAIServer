@@ -14,9 +14,17 @@ class ClueAgent:
     ) -> str:
         """
         증거 분석 대화 생성
+
+        Args:
+            clue_info: 증거 정보 (name, description, etc.) + optional rag_context
+            user_message: 유저 메시지
+            history: 대화 히스토리
         """
         # 히스토리 포맷팅
         history_str = "\n".join([f"{msg.get('role')}: {msg.get('content')}" for msg in history])
+
+        # RAG 컨텍스트 추출
+        rag_context = clue_info.get("rag_context", "")
 
         # 시스템 프롬프트 구성
         system_prompt = self.system_prompt_template.format(
@@ -26,11 +34,11 @@ class ClueAgent:
             logic_explanation=clue_info.get("logic_explanation", "논리적 설명 없음"),
             decoded_answer=clue_info.get("decoded_answer", "분석 결과 없음"),
             is_red_herring=clue_info.get("is_red_herring", False),
-            chat_history=history_str
+            chat_history=history_str,
+            rag_context=rag_context
         )
 
         # LLM 호출
-        # LLMClient.complete는 동기 함수이므로 그대로 호출하거나, 필요시 run_in_executor 사용
         response = self.llm.complete(
             system=system_prompt,
             user=user_message

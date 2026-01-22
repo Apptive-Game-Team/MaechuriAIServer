@@ -1,19 +1,16 @@
 """Chat response schemas."""
-from pydantic import BaseModel
-from .common import SuspectChatHistorySchema, ClueChatHistorySchema
+from pydantic import BaseModel, Field
 
 
 class SuspectChatResponse(BaseModel):
-    """Response for suspect chat."""
-    user_message: str
-    answer: str
-    pressure: int
-    pressure_delta: int
-    history: SuspectChatHistorySchema
+    """Response for suspect chat (Stateful - no history returned)."""
+    user_message: str = Field(description="User's question (echo)")
+    answer: str = Field(description="Suspect's response")
+    pressure: int = Field(description="Current pressure level (0-100)")
+    pressure_delta: int = Field(description="Pressure change from this interaction")
 
 
 class ClueChatResponse(BaseModel):
-    """Response for clue chat."""
-    user_message: str
-    answer: str
-    history: ClueChatHistorySchema
+    """Response for clue chat (Stateful - no history returned)."""
+    user_message: str = Field(description="User's question (echo)")
+    answer: str = Field(description="Detective's analysis of the clue")

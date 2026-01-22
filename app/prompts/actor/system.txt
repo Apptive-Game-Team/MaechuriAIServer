@@ -85,6 +85,10 @@ BREAKDOWN (85-100):
 [CHAT HISTORY]
 {chat_history}
 
+[RELEVANT CONTEXT - Use this to inform your response]
+{rag_context}
+
 [INSTRUCTION]
 Now respond to the detective's message as {name}.
 React naturally based on your current pressure state and personality.
+If relevant context is provided above, use it to give more accurate and consistent answers.

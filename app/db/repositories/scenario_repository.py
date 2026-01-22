@@ -1,5 +1,6 @@
 from typing import Optional, List
 from contextlib import asynccontextmanager
+from datetime import time
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -278,3 +279,195 @@ class ScenarioRepository:
             decoded_answer=clue.decoded_answer,
             is_red_herring=clue.is_red_herring
         )
+
+    async def save_scenario(self, scenario_data: dict) -> int:
+        """
+        Save a complete scenario to the database.
+
+        Parameters
+        ----------
+        scenario_data : dict
+            The scenario data from ScenarioResult.model_dump()
+
+        Returns
+        -------
+        int
+            The created scenario ID.
+        """
+        async with self._get_session() as session:
+            # 1. Create main Scenario
+            scenario = Scenario(
+                # Meta
+                difficulty=scenario_data["meta"]["difficulty"],
+                theme=scenario_data["meta"]["theme"],
+                tone=scenario_data["meta"]["tone"],
+                language=scenario_data["meta"].get("language", "ko"),
+                # Incident
+                incident_type=scenario_data["incident"]["type"],
+                incident_summary=scenario_data["incident"]["summary"],
+                incident_time_start=self._parse_time(scenario_data["incident"]["time_range"]["start"]),
+                incident_time_end=self._parse_time(scenario_data["incident"]["time_range"]["end"]),
+                incident_location=scenario_data["incident"]["location"],
+                primary_object=scenario_data["incident"]["primary_object"],
+                # Ground Truth
+                crime_time_start=self._parse_time(scenario_data["ground_truth_detail"]["crime_time_range"]["start"]),
+                crime_time_end=self._parse_time(scenario_data["ground_truth_detail"]["crime_time_range"]["end"]),
+                crime_location=scenario_data["ground_truth_detail"]["crime_location"],
+                crime_method=scenario_data["ground_truth_detail"].get("method", ""),
+                # Constraints
+                no_supernatural=scenario_data["constraints"].get("no_supernatural", True),
+                no_time_travel=scenario_data["constraints"].get("no_time_travel", True),
+            )
+            session.add(scenario)
+            await session.flush()  # Get scenario_id
+
+            scenario_id = scenario.scenario_id
+
+            # 2. Create Locations
+            locations = scenario_data.get("world_detail", {}).get("locations", [])
+            if not locations:
+                locations = scenario_data.get("world", {}).get("locations", [])
+
+            for idx, loc_name in enumerate(locations, start=1):
+                location = Location(
+                    scenario_id=scenario_id,
+                    location_id=idx,
+                    name=loc_name
+                )
+                session.add(location)
+
+            # 3. Create Visibility Rules
+            visibility_rules = scenario_data.get("world_detail", {}).get("visibility_rules", [])
+            for idx, rule in enumerate(visibility_rules, start=1):
+                vis_rule = VisibilityRule(
+                    scenario_id=scenario_id,
+                    rule_id=idx,
+                    from_location=rule["from_location"],
+                    can_see=rule.get("can_see", []),
+                    cannot_see=rule.get("cannot_see", []),
+                    evidence_type=rule.get("evidence_type")
+                )
+                session.add(vis_rule)
+
+            # 4. Create Access Rules
+            access_rules = scenario_data.get("world_detail", {}).get("access_rules", [])
+            for idx, rule in enumerate(access_rules, start=1):
+                acc_rule = AccessRule(
+                    scenario_id=scenario_id,
+                    rule_id=idx,
+                    location=rule["location"],
+                    requires=rule["requires"]
+                )
+                session.add(acc_rule)
+
+            # 5. Create Required Evidence
+            required_evidence = scenario_data.get("ground_truth_detail", {}).get("required_evidence", [])
+            for idx, evidence in enumerate(required_evidence, start=1):
+                req_evidence = RequiredEvidence(
+                    scenario_id=scenario_id,
+                    evidence_id=idx,
+                    type=evidence["type"],
+                    min_count=evidence["min_count"]
+                )
+                session.add(req_evidence)
+
+            # 6. Create Suspects with Timeline and Secrets
+            suspects = scenario_data.get("suspects", [])
+            culprit_ids = scenario_data.get("ground_truth_detail", {}).get("culprit_ids", [])
+
+            for suspect_data in suspects:
+                suspect_id = suspect_data["suspect_id"]
+                is_culprit = suspect_id in culprit_ids or suspect_data.get("is_culprit", False)
+
+                suspect = Suspect(
+                    scenario_id=scenario_id,
+                    suspect_id=suspect_id,
+                    name=suspect_data["name"],
+                    role=suspect_data["role"],
+                    age=suspect_data["age"],
+                    gender=suspect_data["gender"],
+                    description=suspect_data["description"],
+                    is_culprit=is_culprit,
+                    motive=suspect_data.get("motive"),
+                    alibi_summary=suspect_data["alibi_summary"],
+                    # Personality
+                    speech_style=suspect_data["personality"]["speech_style"],
+                    emotional_tendency=suspect_data["personality"]["emotional_tendency"],
+                    lying_pattern=suspect_data["personality"]["lying_pattern"],
+                    critical_evidence_ids=suspect_data.get("critical_evidence_ids", [])
+                )
+                session.add(suspect)
+
+                # Timeline
+                for t_idx, timeline in enumerate(suspect_data.get("timeline", []), start=1):
+                    timeline_entry = SuspectTimeline(
+                        scenario_id=scenario_id,
+                        suspect_id=suspect_id,
+                        timeline_id=t_idx,
+                        time_range=timeline["time"],
+                        location=timeline["location"],
+                        activity=timeline["activity"],
+                        can_prove=timeline["can_prove"],
+                        witness=timeline.get("witness")
+                    )
+                    session.add(timeline_entry)
+
+                # Secrets
+                for s_idx, secret in enumerate(suspect_data.get("secrets", []), start=1):
+                    secret_entry = SuspectSecret(
+                        scenario_id=scenario_id,
+                        suspect_id=suspect_id,
+                        secret_id=s_idx,
+                        threshold=secret["threshold"],
+                        content=secret["content"],
+                        trigger_evidence_ids=secret.get("trigger_evidence_ids", [])
+                    )
+                    session.add(secret_entry)
+
+            # 7. Create Clues
+            clues = scenario_data.get("clues", {}).get("clues", [])
+            for clue_data in clues:
+                clue = Clue(
+                    scenario_id=scenario_id,
+                    clue_id=clue_data["id"],
+                    name=clue_data["name"],
+                    found_at=clue_data["found_at"],
+                    description=clue_data["description"],
+                    related_suspect_ids=clue_data.get("related_suspect_ids", []),
+                    logic_explanation=clue_data["logic_explanation"],
+                    decoded_answer=clue_data.get("decoded_answer"),
+                    is_red_herring=clue_data.get("is_red_herring", False)
+                )
+                session.add(clue)
+
+            await session.commit()
+            return scenario_id
+
+    def _parse_time(self, time_value) -> time:
+        """Parse time value to datetime.time object."""
+        if isinstance(time_value, time):
+            return time_value
+        if isinstance(time_value, str):
+            try:
+                # Remove 'Z' if present (UTC indicator)
+                clean_time = time_value.replace("Z", "")
+                
+                # Handle "YYYY-MM-DDTHH:MM:SS" format if full datetime is provided
+                if "T" in clean_time:
+                    clean_time = clean_time.split("T")[1]
+                
+                # Handle "HH:MM:SS" or "HH:MM" format
+                parts = clean_time.split(":")
+                hour = int(parts[0])
+                minute = int(parts[1]) if len(parts) > 1 else 0
+                
+                # Handle seconds with optional fractional part (e.g. "00.123")
+                second_part = parts[2] if len(parts) > 2 else "0"
+                second = int(float(second_part))
+                
+                return time(hour, minute, second)
+            except Exception as e:
+                # Log the error but re-raise ValueError for consistent handling
+                raise ValueError(f"Failed to parse time string '{time_value}': {str(e)}")
+                
+        raise ValueError(f"Cannot parse time value: {time_value}")
