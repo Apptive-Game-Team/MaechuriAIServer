@@ -1,5 +1,5 @@
 """RAG Service - Orchestrates retrieval and context building for agents."""
-from typing import Optional, List
+from typing import Optional
 from dataclasses import dataclass
 import logging
 
