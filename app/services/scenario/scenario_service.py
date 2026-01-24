@@ -1,12 +1,9 @@
 import time
 import logging
 
-from pydantic import ValidationError
 
-from app.models.schemas import ClueSetSchema
-from app.models.schemas.scenario import ScenarioSkeleton, ScenarioExpansion, ScenarioResult
-from app.models.schemas.map import MapOutputSchema, MapSkeletonSchema
-from app.models.schemas.suspect import SuspectGenerationRequest, SuspectListSchema
+from app.models.schemas.scenario import ScenarioResult
+from app.models.schemas.suspect import SuspectGenerationRequest
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
 from app.services.agent.consistency_validator import ConsistencyValidator
@@ -15,6 +12,7 @@ from app.services.agent.suspect_generator import SuspectGenerator
 from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.rag import get_rag_service
+from app.core.json_retry import JSONParseRetry
 
 
 logger = logging.getLogger(__name__)
@@ -39,121 +37,100 @@ class ScenarioService:
         self.repository = ScenarioRepository()
         self.rag_service = get_rag_service()
 
+        # JSON 재시도 정책
+        self.json_retry = JSONParseRetry(
+            max_attempts=3,
+            backoff_seconds=2.0,
+            backoff_multiplier=1.5  # 2초 → 3초 → 4.5초
+        )
+
     def generate(self,
-                 pre_input: str,
-                 scenario_id: int) -> dict:
+                 pre_input: str) -> dict:
         # 생성 시작
-        # 평서문 생성
+        # 1. 평서문 생성
         case_state = self.scenario_generator.generate_case(pre_input)
 
         # 요청 속도 조절
         time.sleep(3)
 
-        # 1차로 스켈레톤 생성
-        skeleton_result: ScenarioSkeleton | None = None
-        for attempt in range(3):
-            try:
-                skeleton_result = self.scenario_generator.generate_skeleton(case_state)
-                break
-            except ValidationError as error:
-                print(error)
+        # 2. Skeleton 생성 (재시도 적용)
+        skeleton_result = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.scenario_generator.generate_skeleton(case_state),
+            schema_name="ScenarioSkeleton"
+        )
 
         if skeleton_result is None:
-            raise RuntimeError("Skeleton of Scenario failed to generate")
+            raise RuntimeError("Skeleton generation failed after retries")
 
-        print("Skeleton generated successfully")
-        # 2차로 디테일 생성
+        logger.info("Skeleton generated successfully")
         time.sleep(3)
 
-        expansion_result: ScenarioExpansion | None = None
-        for attempt in range(3):
-            try:
-                expansion_result = self.scenario_generator.generate_expansion(skeleton_result)
-                break
-            except ValidationError as error:
-                print(error)
+        # 3. Expansion 생성 (재시도 적용)
+        expansion_result = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.scenario_generator.generate_expansion(skeleton_result),
+            schema_name="ScenarioExpansion"
+        )
 
         if expansion_result is None:
-            raise RuntimeError("Expansion of Scenario failed to generate")
+            raise RuntimeError("Expansion generation failed after retries")
 
-        print("Expansion generated successfully")
+        logger.info("Expansion generated successfully")
         time.sleep(3)
 
-        # 3차 맵 스켈레톤 생성 (방 구조 + 복도)
-        print("Map skeleton generating...")
-        map_skeleton: MapSkeletonSchema | None = None
-        for attempt in range(3):
-            try:
-                map_skeleton = self.map_generator.generate_skeleton(expansion_result)
-                break
-            except ValidationError as error:
-                print(error)
-                time.sleep(2)
+        # 4. Map Skeleton 생성 (재시도 적용)
+        map_skeleton = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.map_generator.generate_skeleton(expansion_result),
+            schema_name="MapSkeleton"
+        )
 
         if map_skeleton is None:
-            raise RuntimeError("Map skeleton failed to generate")
+            raise RuntimeError("Map skeleton generation failed after retries")
 
-        print("Map skeleton generated successfully")
+        logger.info("Map skeleton generated successfully")
         time.sleep(3)
 
-        # 4차 단서 생성 (map_skeleton 정보 포함)
-        print("Clues generating...")
-        clue_result: ClueSetSchema | None = None
-
-        for attempt in range(3):
-            try:
-                clue_result = self.clue_generator.generate_clues(expansion_result, map_skeleton)
-                break
-            except ValidationError as error:
-                print(error)
-                time.sleep(2)
+        # 5. Clues 생성 (재시도 적용)
+        clue_result = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
+            schema_name="ClueSet"
+        )
 
         if clue_result is None:
-            raise RuntimeError("Clue of Scenario failed to generate")
+            raise RuntimeError("Clue generation failed after retries")
 
-        print("Clues generated successfully")
+        logger.info("Clues generated successfully")
         time.sleep(3)
 
-        # 5차 용의자 생성 (clue + map_skeleton 정보 포함)
-        print("Suspects generating...")
-        suspects_result: SuspectListSchema | None = None
+        # 6. Suspects 생성 (재시도 적용)
         suspect_req = SuspectGenerationRequest.from_expansion(
             expansion_result, clue_result.clues, map_skeleton
         )
 
-        for attempt in range(3):
-            try:
-                suspects_result = self.suspect_generator.generate(suspect_req)
-                break
-            except Exception as error:
-                print(f"Suspect generation error: {error}")
-                time.sleep(2)
+        suspects_result = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.suspect_generator.generate(suspect_req),
+            schema_name="SuspectList"
+        )
 
         if suspects_result is None:
-            raise RuntimeError("Suspects of Scenario failed to generate")
+            raise RuntimeError("Suspect generation failed after retries")
 
-        print("Suspects generated successfully")
+        logger.info("Suspects generated successfully")
         time.sleep(3)
 
-        # 6차 맵 디테일 생성 (skeleton + clue 기반)
-        print("Map detail generating...")
-        map_result: MapOutputSchema | None = None
-        for attempt in range(3):
-            try:
-                map_result = self.map_generator.generate_detail(
-                    expansion_result, map_skeleton, clue_result
-                )
-                break
-            except ValidationError as error:
-                print(error)
-                time.sleep(2)
+        # 7. Map Detail 생성 (재시도 적용)
+        map_result = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.map_generator.generate_detail(
+                expansion_result, map_skeleton, clue_result
+            ),
+            schema_name="MapDetail"
+        )
 
         if map_result is None:
-            raise RuntimeError("Map detail failed to generate")
+            raise RuntimeError("Map detail generation failed after retries")
 
-        print("Map detail generated successfully")
+        logger.info("Map detail generated successfully")
 
-        # Combine into ScenarioResult
+        # 8. 최종 결과 조합
         final_scenario = ScenarioResult(
             **expansion_result.model_dump(),  # 본인
             clues=clue_result,  # 추가
@@ -210,7 +187,12 @@ class ScenarioService:
             Tuple of (scenario_data, scenario_id)
         """
         # Generate scenario (sync operation)
-        scenario_data = self.generate(pre_input, scenario_id=0)
+
+        import asyncio
+        scenario_data = await asyncio.to_thread(
+            self.generate,
+            pre_input,
+        )
 
         # Save to DB and index for RAG
         scenario_id = await self.save_to_db(scenario_data, db)
