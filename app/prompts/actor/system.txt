@@ -33,7 +33,7 @@ Is Culprit: {is_culprit}
 - Higher pressure = more nervous, may slip up or reveal more
 
 [EVIDENCE JUST PRESENTED]
-{evidence_presented}
+{clue_presented}
 
 [BEHAVIOR BY PRESSURE TIER]
 

@@ -29,7 +29,7 @@ async def chat_with_suspect(
     - Judge LLM이 유저 입력을 평가하여 pressure 변화량을 계산합니다.
     - Actor LLM이 현재 pressure에 맞는 용의자 응답을 생성합니다.
     - RAG를 통해 관련 과거 대화와 용의자 정보를 검색합니다.
-    - evidence_id를 전달하면 해당 증거를 제시합니다.
+    - clue_id를 전달하면 해당 단서를 제시합니다.
     - 대화 후 GameSession을 업데이트하고 메시지를 RAG에 저장합니다.
     """
     return await chat_service.suspect_chat(
@@ -37,7 +37,7 @@ async def chat_with_suspect(
         scenario_id=request.scenario_id,
         suspect_id=request.suspect_id,
         user_message=request.user_message,
-        evidence_id=request.evidence_id,
+        clue_id=request.clue_id,
         db=db
     )
 

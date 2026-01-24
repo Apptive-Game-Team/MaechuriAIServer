@@ -30,10 +30,10 @@ class SuspectSchema(BaseModel):
     # Personality
     personality: PersonalitySchema = Field(description="성격 및 말투")
 
-    # Critical evidence for confession
-    critical_evidence_ids: List[int] = Field(
+    # Critical clues for confession
+    critical_clue_ids: List[int] = Field(
         default=[],
-        description="모두 제시 시 자백 유도 가능한 핵심 증거 ID들"
+        description="모두 제시 시 자백 유도 가능한 핵심 단서 ID들"
     )
 
 

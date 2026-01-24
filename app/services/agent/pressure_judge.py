@@ -24,7 +24,7 @@ class PressureJudge:
         suspect_summary: str,
         current_pressure: int,
         conversation_context: str,
-        evidence_presented: Optional[dict] = None,
+        clue_presented: Optional[dict] = None,
         suspect_alibi: Optional[str] = None,
         suspect_timeline: Optional[str] = None
     ) -> PressureJudgeOutput:
@@ -36,7 +36,7 @@ class PressureJudge:
             suspect_summary: 용의자 요약 정보 (이름, 역할, 범인여부)
             current_pressure: 현재 pressure (0-100)
             conversation_context: 최근 대화 맥락
-            evidence_presented: 제시된 증거 (있다면)
+            clue_presented: 제시된 단서 (있다면)
             suspect_alibi: 용의자의 알리바이 요약
             suspect_timeline: 용의자의 타임라인 요약
 
@@ -46,7 +46,7 @@ class PressureJudge:
 
         input_data = {
             "user_message": user_message,
-            "evidence_presented": evidence_presented,
+            "clue_presented": clue_presented,
             "current_pressure": current_pressure,
             "suspect_summary": suspect_summary,
             "suspect_alibi": suspect_alibi or "정보 없음",

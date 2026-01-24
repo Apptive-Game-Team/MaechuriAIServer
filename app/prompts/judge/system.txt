@@ -7,7 +7,7 @@ IMPORTANT: Only LOGICAL, CASE-RELEVANT pressure matters. Empty threats without e
 [INPUT]
 You receive JSON with:
 - user_message: The player's question or statement
-- evidence_presented: Evidence shown (if any) with id, name, description
+- clue_presented: Evidence shown (if any) with id, name, description
 - current_pressure: Current pressure level (0-100)
 - suspect_summary: Brief info about the suspect (name, role, is_culprit)
 - suspect_alibi: The suspect's claimed alibi (if provided)

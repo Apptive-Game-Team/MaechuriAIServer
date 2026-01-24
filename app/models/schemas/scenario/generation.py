@@ -18,13 +18,13 @@ class SuspectGenConfig(BaseModel):
     liar_ratio: float = Field(ge=0.0, le=1.0)
 
 
-class EvidenceGenConfig(BaseModel):
-    """Configuration for evidence generation."""
+class ClueGenConfig(BaseModel):
+    """Configuration for clue generation."""
     count_range: List[int] = Field(min_length=2, max_length=2)
     ambiguity_level: Literal["low", "medium", "high"]
 
 
 class GenerationTargetsSchema(BaseModel):
-    """Generation targets for suspects and evidence."""
+    """Generation targets for suspects and clues."""
     suspects: SuspectGenConfig
-    evidence: EvidenceGenConfig
+    clues: ClueGenConfig

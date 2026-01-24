@@ -9,7 +9,7 @@ class SuspectChatRequest(BaseModel):
     scenario_id: int = Field(description="Scenario ID")
     suspect_id: int = Field(description="Suspect ID to interrogate")
     user_message: str = Field(description="User's question/message")
-    evidence_id: Optional[int] = Field(default=None, description="Evidence ID to present (optional)")
+    clue_id: Optional[int] = Field(default=None, description="Clue ID to present (optional)")
 
 
 class ClueChatRequest(BaseModel):

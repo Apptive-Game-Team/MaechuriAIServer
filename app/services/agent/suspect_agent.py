@@ -1,5 +1,4 @@
 import json
-import os
 from typing import List, Optional
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.domain.fsm.interrogation import InterrogationState, AllowedMoves
@@ -13,9 +12,9 @@ class SuspectAgent:
                             suspect_personality: dict,
                             user_message: str,
                             history: dict,
-                            evidence: Optional[List[dict]] = None) -> str:
+                            clues: Optional[List[dict]] = None) -> str:
         # 1. Update Interrogation State (FSM)
-        self._update_interrogation_state(suspect_personality, user_message, evidence or [])
+        self._update_interrogation_state(suspect_personality, user_message, clues or [])
 
         # 2. Extract & Format Data for Prompt
         state_data = suspect_personality.get("interrogation_state", {})
@@ -39,9 +38,9 @@ class SuspectAgent:
         secrets_map = suspect_personality.get("secrets_by_stage", {})
         current_secrets = secrets_map.get(current_state_key, [])
 
-        # Format evidence list
-        evidence_seen = suspect_personality.get("evidence_seen", [])
-        evidence_str = "\n".join([f"- {e['id']} (Weight: {e.get('weight', 0)})" for e in evidence_seen]) or "No evidence presented yet."
+        # Format clue list
+        clue_seen = suspect_personality.get("clue_seen", [])
+        clue_str = "\n".join([f"- {e['id']} (Weight: {e.get('weight', 0)})" for e in clue_seen]) or "No clue presented yet."
 
         # Construct prompt data
         prompt_data = {
@@ -60,7 +59,7 @@ class SuspectAgent:
             "current_state": state_data.get("state", InterrogationState.DEFENSIVE),
             "pressure_level": metrics.get("pressure", 0),
             "allowed_moves": ", ".join(state_data.get("allowed_moves", AllowedMoves.DEFENSIVE)),
-            "evidence_list": evidence_str,
+            "clue_list": clue_str,
             "current_secrets": json.dumps(current_secrets, ensure_ascii=False, indent=2),
             "chat_history": "\n".join(
                 f"{entry['role']}: {entry['content']}"
@@ -75,7 +74,7 @@ class SuspectAgent:
     def _update_interrogation_state(self,
                                     suspect: dict,
                                     user_msg: str,
-                                    new_evidence: List[dict]):
+                                    new_clues: List[dict]):
         """
         Deterministically updates the interrogation state based on inputs.
         Modifies suspect dict in-place.
@@ -84,11 +83,11 @@ class SuspectAgent:
         if "interrogation_state" not in suspect:
             suspect["interrogation_state"] = {
                 "state": InterrogationState.DEFENSIVE,
-                "metrics": {"pressure": 0, "contradictions": 0, "evidence_weight_seen": 0, "trust_in_interrogator": 0},
+                "metrics": {"pressure": 0, "contradictions": 0, "clue_weight_seen": 0, "trust_in_interrogator": 0},
                 "allowed_moves": AllowedMoves.DEFENSIVE
             }
-        if "evidence_seen" not in suspect:
-            suspect["evidence_seen"] = []
+        if "clue_seen" not in suspect:
+            suspect["clue_seen"] = []
 
         state_data = suspect["interrogation_state"]
         metrics = state_data["metrics"]
@@ -104,14 +103,14 @@ class SuspectAgent:
             current_state = raw_current
 
         # --- 1. Update Metrics ---
-        # Evidence Processing
-        for ev in new_evidence:
+        # Clue Processing
+        for ev in new_clues:
             # Check if already seen to avoid duplicate pressure
-            existing_ids = {e["id"] for e in suspect["evidence_seen"]}
+            existing_ids = {e["id"] for e in suspect["clue_seen"]}
             if ev["id"] not in existing_ids:
-                suspect["evidence_seen"].append(ev)
+                suspect["clue_seen"].append(ev)
                 weight = ev.get("weight", 0)
-                metrics["evidence_weight_seen"] += weight
+                metrics["clue_weight_seen"] += weight
                 metrics["pressure"] += weight
 
         # Contradiction Detection (Dynamic Keyword Rule)
@@ -123,21 +122,21 @@ class SuspectAgent:
             metrics["pressure"] += 15
 
         # --- 2. Check Transitions ---
-        seen_ids = {e["id"] for e in suspect["evidence_seen"]}
+        seen_ids = {e["id"] for e in suspect["clue_seen"]}
         next_state = current_state
         
-        # Get dynamic critical evidence IDs
-        critical_ids = suspect.get("critical_evidence_ids", [])
+        # Get dynamic critical clue IDs
+        critical_ids = suspect.get("critical_clue_ids", [])
 
         if current_state == InterrogationState.DEFENSIVE:
             if (metrics["pressure"] >= 65 or
                 metrics["contradictions"] >= 2 or
-                metrics["evidence_weight_seen"] >= 60):
+                metrics["clue_weight_seen"] >= 60):
                 next_state = InterrogationState.CORNERED
 
         elif current_state == InterrogationState.CORNERED:
             # Trigger breakdown if pressure is high, contradictions are frequent,
-            # or if ANY critical evidence has been revealed (shaking their confidence).
+            # or if ANY critical clue has been revealed (shaking their confidence).
             has_seen_any_critical = any(cid in seen_ids for cid in critical_ids)
             
             if (metrics["pressure"] >= 85 or
@@ -146,7 +145,7 @@ class SuspectAgent:
                 next_state = InterrogationState.BREAKDOWN
 
         elif current_state == InterrogationState.BREAKDOWN:
-            # Trigger confession only if ALL critical evidence has been presented.
+            # Trigger confession only if ALL critical clue has been presented.
             has_seen_all_critical = all(cid in seen_ids for cid in critical_ids)
             
             # If critical_ids list is empty, we avoid auto-confession to prevent bugs.
@@ -156,6 +155,6 @@ class SuspectAgent:
         # --- 3. Apply Transition ---
         if next_state != current_state:
             state_data["state"] = next_state
-            state_data["last_transition_reason"] = f"Pressure: {metrics['pressure']}, Evidence: {len(seen_ids)}"
+            state_data["last_transition_reason"] = f"Pressure: {metrics['pressure']}, Clue: {len(seen_ids)}"
             # Update Allowed Moves using Enum logic
             state_data["allowed_moves"] = AllowedMoves.get_moves(next_state)

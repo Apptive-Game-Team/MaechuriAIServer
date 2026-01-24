@@ -16,9 +16,9 @@ class SecretTierSchema(BaseModel):
     """Secret revealed at pressure threshold."""
     threshold: int = Field(ge=0, le=100, description="이 비밀이 공개되는 최소 pressure")
     content: str = Field(description="비밀 내용")
-    trigger_evidence_ids: List[int] = Field(
+    trigger_clue_ids: List[int] = Field(
         default=[],
-        description="이 증거 제시 시 threshold 무시하고 바로 공개"
+        description="이 단서 제시 시 threshold 무시하고 바로 공개"
     )
 
 

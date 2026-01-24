@@ -9,7 +9,7 @@ from .world import (
     WorldContextSchema
 )
 from .ground_truth import (
-    RequiredEvidenceSchema,
+    RequiredClueSchema,
     GroundTruthSkeletonSchema,
     GroundTruthSchema
 )
@@ -17,7 +17,7 @@ from .constraints import ConstraintsSchema
 from .generation import (
     DetailedSuspect,
     SuspectGenConfig,
-    EvidenceGenConfig,
+    ClueGenConfig,
     GenerationTargetsSchema
 )
 from .main import (
@@ -42,7 +42,7 @@ __all__ = [
     "WorldSkeletonSchema",
     "WorldContextSchema",
     # Ground Truth
-    "RequiredEvidenceSchema",
+    "RequiredClueSchema",
     "GroundTruthSkeletonSchema",
     "GroundTruthSchema",
     # Constraints
@@ -50,7 +50,7 @@ __all__ = [
     # Generation
     "DetailedSuspect",
     "SuspectGenConfig",
-    "EvidenceGenConfig",
+    "ClueGenConfig",
     "GenerationTargetsSchema",
     # Main
     "ScenarioSkeleton",

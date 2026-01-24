@@ -17,7 +17,7 @@ Allowed Moves: {allowed_moves}
 - If State is CONFESSION, you CANNOT lie. You must reveal everything.
 
 [EVIDENCE PRESENTED]
-{evidence_list}
+{clue_list}
 
 [MEMORY & BEHAVIOR]
 1. Time Memory (Timeline of your actions):

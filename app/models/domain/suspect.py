@@ -14,7 +14,7 @@ class Suspect:
             is_culprit: bool,
             current_pressure: int,
             secrets: List[str],
-            evidence_seen: List[str],
+            clue_seen: List[str],
             timeline: List[Dict[str, Any]],
             # New fields for chat
             time_memory: Optional[Dict[str, Any]] = None,
@@ -22,7 +22,7 @@ class Suspect:
             answering_rule: Optional[Dict[str, Any]] = None,
             truth_model: Optional[Dict[str, Any]] = None,
             secrets_by_stage: Optional[Dict[str, List[str]]] = None,
-            critical_evidence_ids: Optional[List[int]] = None,
+            critical_clue_ids: Optional[List[int]] = None,
             # Context fields (set after creation)
             incident_summary: str = "",
             primary_location: str = "",
@@ -36,7 +36,7 @@ class Suspect:
         self.is_culprit = is_culprit
         self.current_pressure = current_pressure
         self.secrets = secrets
-        self.evidence_seen = evidence_seen
+        self.clue_seen = clue_seen
         self.timeline = timeline
 
         # Chat-related fields
@@ -53,7 +53,7 @@ class Suspect:
             "breakdown": [],
             "confession": []
         }
-        self.critical_evidence_ids = critical_evidence_ids or []
+        self.critical_clue_ids = critical_clue_ids or []
 
         # Context
         self.incident_summary = incident_summary
@@ -77,7 +77,7 @@ class Suspect:
             is_culprit=schema_data["is_culprit"],
             current_pressure=schema_data.get("current_pressure", 0),
             secrets=schema_data.get("secrets", []),
-            evidence_seen=schema_data.get("evidence_seen", []),
+            clue_seen=schema_data.get("clue_seen", []),
             timeline=schema_data.get("timeline", []),
             # New fields
             time_memory=schema_data.get("time_memory"),
@@ -85,7 +85,7 @@ class Suspect:
             answering_rule=schema_data.get("answering_rule"),
             truth_model=schema_data.get("truth_model"),
             secrets_by_stage=schema_data.get("secrets_by_stage"),
-            critical_evidence_ids=schema_data.get("critical_evidence_ids", []),
+            critical_clue_ids=schema_data.get("critical_clue_ids", []),
             # Context injection
             incident_summary=case_context.get("summary", ""),
             primary_location=case_context.get("primary_location", ""),
@@ -122,9 +122,9 @@ class Suspect:
             # Secrets (FSM-ready)
             "secrets_by_stage": self.secrets_by_stage,
 
-            # Evidence tracking
-            "critical_evidence_ids": self.critical_evidence_ids,
-            "evidence_seen": [],  # Initialize empty, updated during interrogation
+            # Clue tracking
+            "critical_clue_ids": self.critical_clue_ids,
+            "clue_seen": [],  # Initialize empty, updated during interrogation
 
             # Interrogation state (initialized)
             "interrogation_state": {
@@ -132,7 +132,7 @@ class Suspect:
                 "metrics": {
                     "pressure": self.current_pressure,
                     "contradictions": 0,
-                    "evidence_weight_seen": 0,
+                    "clue_weight_seen": 0,
                     "trust_in_interrogator": 0
                 },
                 "allowed_moves": AllowedMoves.DEFENSIVE

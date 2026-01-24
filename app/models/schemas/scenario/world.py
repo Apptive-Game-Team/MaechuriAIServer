@@ -8,7 +8,7 @@ class VisibilityRuleSchema(BaseModel):
     from_location: str
     can_see: List[str]
     cannot_see: List[str]
-    evidence_type: Optional[str] = None
+    clue_type: Optional[str] = None
 
 
 class AccessRuleSchema(BaseModel):
@@ -27,4 +27,4 @@ class WorldContextSchema(WorldSkeletonSchema):
     """Detailed world context including visibility and access rules."""
     visibility_rules: List[VisibilityRuleSchema] = []
     access_rules: Optional[List[AccessRuleSchema]] = []
-    evidence_types: Optional[List[str]] = None
+    clue_types: Optional[List[str]] = None

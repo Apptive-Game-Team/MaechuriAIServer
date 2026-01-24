@@ -21,7 +21,7 @@ class SuspectActor:
         suspect: SuspectSchema,
         state: SuspectState,
         user_message: str,
-        evidence_presented: Optional[dict] = None,
+        clue_presented: Optional[dict] = None,
         rag_context: Optional[str] = None
     ) -> str:
         """
@@ -31,7 +31,7 @@ class SuspectActor:
             suspect: 용의자 스키마 데이터
             state: 현재 런타임 상태 (pressure, revealed secrets 등)
             user_message: 유저 메시지
-            evidence_presented: 제시된 증거 (있다면)
+            clue_presented: 제시된 단서 (있다면)
             rag_context: RAG로 검색된 관련 컨텍스트 (있다면)
 
         Returns:
@@ -57,7 +57,7 @@ class SuspectActor:
             "pressure_level": state.current_pressure,
             "is_culprit": suspect.is_culprit,
             "revealed_secrets": self._format_secrets(revealed_secrets),
-            "evidence_presented": json.dumps(evidence_presented, ensure_ascii=False) if evidence_presented else "None",
+            "clue_presented": json.dumps(clue_presented, ensure_ascii=False) if clue_presented else "None",
             "chat_history": self._format_history(state.get_recent_history(10)),
             "rag_context": rag_context or "",
         }
@@ -81,10 +81,10 @@ class SuspectActor:
         """현재 pressure에서 공개 가능한 비밀 목록"""
         revealed = []
         for secret in suspect.secrets:
-            # threshold 이하이거나 trigger 증거가 제시된 경우
+            # threshold 이하이거나 trigger 단서가 제시된 경우
             if secret.threshold <= state.current_pressure:
                 revealed.append(secret.content)
-            elif any(eid in state.evidence_seen_ids for eid in secret.trigger_evidence_ids):
+            elif any(eid in state.clue_seen_ids for eid in secret.trigger_clue_ids):
                 revealed.append(secret.content)
         return revealed
 
