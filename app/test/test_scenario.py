@@ -1,13 +1,15 @@
 import json
 import os
 from datetime import datetime
+
+from app.services.llm.gemini_client import GeminiClient
 from app.services.scenario.scenario_service import ScenarioService
 
 def test_scenario():
     print("SCENARIO TEST START")
 
-    agent = ScenarioService()
-    test_dict = agent.generate("밀실 방화 사망 사건", 1)
+    agent = ScenarioService(GeminiClient())
+    test_dict = agent.generate("밀실 방화 사망 사건")
 
     print(test_dict)
     # 결과 저장 (현재 시각 기준 파일명)

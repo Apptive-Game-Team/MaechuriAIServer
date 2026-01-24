@@ -13,7 +13,9 @@ from app.models.schemas.scenario_task import (
     ScenarioStatus,
     ScenarioTaskInfo,
     ScenarioCreateRequest,
-    ScenarioCreateResponse
+    ScenarioCreateResponse,
+    ScenarioStatusResponse,
+    ScenarioTaskListResponse
 )
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
@@ -261,39 +263,36 @@ async def solve_scenario(
             detail=f"Failed to evaluate solution: {str(e)}"
         )
 
-@router.get("/tasks")
+@router.get("/tasks", response_model=ScenarioTaskListResponse)
 async def get_all_tasks():
     """
     모든 시나리오 생성 태스크를 조회합니다.
 
     Returns
     -------
-    dict
+    ScenarioTaskListResponse
         모든 태스크 목록
     """
     tasks = []
     for task_key, task_info in scenario_tasks.items():
-        task_data = {
-            "key": task_key,
-            "status": task_info.status,
-            "theme": task_info.theme,
-        }
-        if task_info.scenario_id:
-            task_data["scenario_id"] = task_info.scenario_id
-        if task_info.error:
-            task_data["error"] = task_info.error
-        tasks.append(task_data)
+        tasks.append(ScenarioStatusResponse(
+            key=task_key,
+            status=task_info.status,
+            theme=task_info.theme,
+            scenario_id=task_info.scenario_id,
+            error=task_info.error
+        ))
 
-    return {
-        "total": len(tasks),
-        "tasks": tasks
-    }
+    return ScenarioTaskListResponse(
+        total=len(tasks),
+        tasks=tasks
+    )
 
 
-@router.get("/tasks/{key}")
-async def get_task_scenario_id(key: str):
+@router.get("/tasks/{key}", response_model=ScenarioStatusResponse)
+async def get_task_status(key: str):
     """
-    태스크 키로 시나리오 ID를 조회합니다.
+    태스크 키로 태스크 진행 상태 및 결과를 조회합니다.
 
     Parameters
     ----------
@@ -302,8 +301,8 @@ async def get_task_scenario_id(key: str):
 
     Returns
     -------
-    dict
-        시나리오 ID
+    ScenarioStatusResponse
+        태스크 상세 상태
     """
     task_info = scenario_tasks.get(key)
     if task_info is None:
@@ -312,7 +311,10 @@ async def get_task_scenario_id(key: str):
             detail=f"No task found for key: {key}"
         )
 
-    return {
-        "key": key,
-        "scenario_id": task_info.scenario_id
-    }
+    return ScenarioStatusResponse(
+        key=key,
+        status=task_info.status,
+        theme=task_info.theme,
+        scenario_id=task_info.scenario_id,
+        error=task_info.error
+    )

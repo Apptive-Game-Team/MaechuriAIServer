@@ -107,8 +107,8 @@ class ScenarioTaskListResponse(BaseModel):
     ----------
     total : int
         전체 태스크 개수
-    tasks : list[dict]
+    tasks : list[ScenarioStatusResponse]
         태스크 정보 목록
     """
     total: int
-    tasks: list[dict]
+    tasks: list[ScenarioStatusResponse]
