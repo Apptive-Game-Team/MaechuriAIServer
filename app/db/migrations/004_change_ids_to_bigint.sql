@@ -18,12 +18,16 @@ BEGIN
     END LOOP;
 END $$;
 
--- 2. Alter Table Columns to BIGINT
+-- 2. Alter Table Columns to BIGINT and Rename
 
 -- SCENARIO (Root table)
 ALTER TABLE scenario ALTER COLUMN scenario_id TYPE BIGINT;
--- Update sequence for scenario_id to BIGINT (simulating BIGSERIAL)
+-- Ensure scenario_id behaves like BIGSERIAL (autoincrement)
+-- (SERIAL already has a sequence, we just ensure it's BIGINT)
 ALTER SEQUENCE IF EXISTS scenario_scenario_id_seq AS BIGINT;
+
+-- RENAME TABLE required_evidence TO required_clue
+ALTER TABLE IF EXISTS required_evidence RENAME TO required_clue;
 
 -- LOCATION
 ALTER TABLE location ALTER COLUMN scenario_id TYPE BIGINT;
@@ -32,18 +36,21 @@ ALTER TABLE location ALTER COLUMN location_id TYPE BIGINT;
 -- VISIBILITY_RULE
 ALTER TABLE visibility_rule ALTER COLUMN scenario_id TYPE BIGINT;
 ALTER TABLE visibility_rule ALTER COLUMN rule_id TYPE BIGINT;
+ALTER TABLE visibility_rule RENAME COLUMN evidence_type TO clue_type;
 
 -- ACCESS_RULE
 ALTER TABLE access_rule ALTER COLUMN scenario_id TYPE BIGINT;
 ALTER TABLE access_rule ALTER COLUMN rule_id TYPE BIGINT;
 
--- REQUIRED_EVIDENCE
-ALTER TABLE required_evidence ALTER COLUMN scenario_id TYPE BIGINT;
-ALTER TABLE required_evidence ALTER COLUMN evidence_id TYPE BIGINT;
+-- REQUIRED_CLUE
+ALTER TABLE required_clue ALTER COLUMN scenario_id TYPE BIGINT;
+ALTER TABLE required_clue ALTER COLUMN evidence_id TYPE BIGINT;
+ALTER TABLE required_clue RENAME COLUMN evidence_id TO clue_id;
 
 -- SUSPECT
 ALTER TABLE suspect ALTER COLUMN scenario_id TYPE BIGINT;
 ALTER TABLE suspect ALTER COLUMN suspect_id TYPE BIGINT;
+ALTER TABLE suspect RENAME COLUMN critical_evidence_ids TO critical_clue_ids;
 
 -- SUSPECT_TIMELINE
 ALTER TABLE suspect_timeline ALTER COLUMN scenario_id TYPE BIGINT;
@@ -54,6 +61,7 @@ ALTER TABLE suspect_timeline ALTER COLUMN timeline_id TYPE BIGINT;
 ALTER TABLE suspect_secret ALTER COLUMN scenario_id TYPE BIGINT;
 ALTER TABLE suspect_secret ALTER COLUMN suspect_id TYPE BIGINT;
 ALTER TABLE suspect_secret ALTER COLUMN secret_id TYPE BIGINT;
+ALTER TABLE suspect_secret RENAME COLUMN trigger_evidence_ids TO trigger_clue_ids;
 
 -- CLUE
 ALTER TABLE clue ALTER COLUMN scenario_id TYPE BIGINT;
@@ -61,6 +69,7 @@ ALTER TABLE clue ALTER COLUMN clue_id TYPE BIGINT;
 
 -- GAME_SESSION
 ALTER TABLE game_session ALTER COLUMN scenario_id TYPE BIGINT;
+ALTER TABLE game_session RENAME COLUMN evidence_seen_ids TO clue_seen_ids;
 
 -- CHAT_MESSAGE_EMBEDDING
 -- Note: id is SERIAL, we change it to BIGINT and update sequence
@@ -87,8 +96,8 @@ ALTER TABLE visibility_rule ADD CONSTRAINT visibility_rule_scenario_id_fkey
 ALTER TABLE access_rule ADD CONSTRAINT access_rule_scenario_id_fkey 
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE;
 
--- required_evidence
-ALTER TABLE required_evidence ADD CONSTRAINT required_evidence_scenario_id_fkey 
+-- required_clue
+ALTER TABLE required_clue ADD CONSTRAINT required_clue_scenario_id_fkey 
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE;
 
 -- suspect
