@@ -31,7 +31,7 @@ class Suspect(Base):
     emotional_tendency: Mapped[str] = mapped_column(String(100))
     lying_pattern: Mapped[str] = mapped_column(String(50))
 
-    critical_evidence_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    critical_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
     # Embedding for RAG (name + role + description)
     profile_embedding = mapped_column(Vector(1024), nullable=True)
@@ -51,7 +51,7 @@ class SuspectTimeline(Base):
     timeline_id: Mapped[int] = mapped_column(primary_key=True)
 
     time_range: Mapped[str] = mapped_column(String(50))
-    location: Mapped[str] = mapped_column(String(100))
+    location_id: Mapped[int] = mapped_column(Integer)
     activity: Mapped[str] = mapped_column(Text)
     can_prove: Mapped[bool] = mapped_column(Boolean, default=False)
     witness: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -60,11 +60,20 @@ class SuspectTimeline(Base):
     embedding = mapped_column(Vector(1024), nullable=True)
 
     suspect: Mapped["Suspect"] = relationship(back_populates="timeline")
+    location: Mapped["Location"] = relationship(
+        primaryjoin="and_(SuspectTimeline.scenario_id==Location.scenario_id, SuspectTimeline.location_id==Location.location_id)",
+        foreign_keys=[scenario_id, location_id]
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
             ["scenario_id", "suspect_id"],
             ["suspect.scenario_id", "suspect.suspect_id"],
+            ondelete="CASCADE"
+        ),
+        ForeignKeyConstraint(
+            ["scenario_id", "location_id"],
+            ["location.scenario_id", "location.location_id"],
             ondelete="CASCADE"
         ),
     )
@@ -80,7 +89,7 @@ class SuspectSecret(Base):
 
     threshold: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
-    trigger_evidence_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    trigger_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
     # Embedding for RAG (secret content)
     embedding = mapped_column(Vector(1024), nullable=True)

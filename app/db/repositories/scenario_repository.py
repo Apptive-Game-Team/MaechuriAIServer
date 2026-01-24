@@ -12,7 +12,7 @@ from app.db.models import (
     Location,
     VisibilityRule,
     AccessRule,
-    RequiredEvidence,
+    RequiredClue,
     Suspect,
     SuspectTimeline,
     SuspectSecret,
@@ -57,7 +57,7 @@ class ScenarioRepository:
                     selectinload(Scenario.locations),
                     selectinload(Scenario.visibility_rules),
                     selectinload(Scenario.access_rules),
-                    selectinload(Scenario.required_evidences),
+                    selectinload(Scenario.required_clues),
                     selectinload(Scenario.clues),
                     selectinload(Scenario.suspects)
                     .selectinload(Suspect.timeline),
@@ -76,9 +76,12 @@ class ScenarioRepository:
 
     def _scenario_to_dict(self, scenario: Scenario) -> dict:
         """Convert Scenario ORM object to dict"""
+        # Create ID -> Name map
+        loc_map = {loc.location_id: loc.name for loc in scenario.locations}
+
         locations = [loc.name for loc in scenario.locations]
-        suspects = [self._to_suspect_schema(s).model_dump() for s in scenario.suspects]
-        clues = [self._to_clue_schema(c).model_dump() for c in scenario.clues]
+        suspects = [self._to_suspect_schema(s, loc_map).model_dump() for s in scenario.suspects]
+        clues = [self._to_clue_schema(c, loc_map).model_dump() for c in scenario.clues]
 
         return {
             "meta": {
@@ -114,15 +117,15 @@ class ScenarioRepository:
                 "time_granularity_minutes": 30,
                 "visibility_rules": [
                     {
-                        "from_location": r.from_location,
-                        "can_see": r.can_see or [],
-                        "cannot_see": r.cannot_see or [],
-                        "evidence_type": r.evidence_type
+                        "from_location": loc_map.get(r.from_location_id, "Unknown"),
+                        "can_see": [loc_map.get(lid, "Unknown") for lid in r.can_see] if r.can_see else [],
+                        "cannot_see": [loc_map.get(lid, "Unknown") for lid in r.cannot_see] if r.cannot_see else [],
+                        "clue_type": r.clue_type
                     }
                     for r in scenario.visibility_rules
                 ],
                 "access_rules": [
-                    {"location": r.location, "requires": r.requires}
+                    {"location": loc_map.get(r.location_id, "Unknown"), "requires": r.requires}
                     for r in scenario.access_rules
                 ]
             },
@@ -135,9 +138,9 @@ class ScenarioRepository:
                 "crime_location": scenario.crime_location,
                 "culprit_ids": [s.suspect_id for s in scenario.suspects if s.is_culprit],
                 "method": scenario.crime_method,
-                "required_evidence": [
+                "required_clues": [
                     {"type": e.type, "min_count": e.min_count}
-                    for e in scenario.required_evidences
+                    for e in scenario.required_clues
                 ]
             },
             "constraints": {
@@ -160,6 +163,12 @@ class ScenarioRepository:
         Retrieves specific suspect profile, alibi, and persona info.
         """
         async with self._get_session() as session:
+            # Need to fetch locations to map names
+            loc_result = await session.execute(
+                select(Location).where(Location.scenario_id == scenario_id)
+            )
+            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
             stmt = (
                 select(Suspect)
                 .where(Suspect.scenario_id == scenario_id)
@@ -176,7 +185,7 @@ class ScenarioRepository:
             if not suspect:
                 return None
 
-            return self._to_suspect_schema(suspect)
+            return self._to_suspect_schema(suspect, loc_map)
 
     async def get_clue_info(
         self,
@@ -187,6 +196,12 @@ class ScenarioRepository:
         Retrieves detailed information about a specific clue.
         """
         async with self._get_session() as session:
+            # Need location map
+            loc_result = await session.execute(
+                select(Location).where(Location.scenario_id == scenario_id)
+            )
+            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
             stmt = (
                 select(Clue)
                 .where(Clue.scenario_id == scenario_id)
@@ -199,11 +214,16 @@ class ScenarioRepository:
             if not clue:
                 return None
 
-            return self._to_clue_schema(clue)
+            return self._to_clue_schema(clue, loc_map)
 
     async def get_all_clues(self, scenario_id: int) -> List[ClueItemSchema]:
         """Get all clues for a scenario"""
         async with self._get_session() as session:
+            loc_result = await session.execute(
+                select(Location).where(Location.scenario_id == scenario_id)
+            )
+            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
             stmt = (
                 select(Clue)
                 .where(Clue.scenario_id == scenario_id)
@@ -211,11 +231,16 @@ class ScenarioRepository:
             )
             result = await session.execute(stmt)
             clues = result.scalars().all()
-            return [self._to_clue_schema(c) for c in clues]
+            return [self._to_clue_schema(c, loc_map) for c in clues]
 
     async def get_all_suspects(self, scenario_id: int) -> List[SuspectSchema]:
         """Get all suspects for a scenario"""
         async with self._get_session() as session:
+            loc_result = await session.execute(
+                select(Location).where(Location.scenario_id == scenario_id)
+            )
+            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
             stmt = (
                 select(Suspect)
                 .where(Suspect.scenario_id == scenario_id)
@@ -227,10 +252,11 @@ class ScenarioRepository:
             )
             result = await session.execute(stmt)
             suspects = result.scalars().all()
-            return [self._to_suspect_schema(s) for s in suspects]
+            return [self._to_suspect_schema(s, loc_map) for s in suspects]
 
-    def _to_suspect_schema(self, suspect: Suspect) -> SuspectSchema:
+    def _to_suspect_schema(self, suspect: Suspect, loc_map: dict = None) -> SuspectSchema:
         """Convert Suspect ORM object to SuspectSchema"""
+        loc_map = loc_map or {}
         return SuspectSchema(
             suspect_id=suspect.suspect_id,
             name=suspect.name,
@@ -244,7 +270,7 @@ class ScenarioRepository:
             timeline=[
                 TimelineEntrySchema(
                     time=t.time_range,
-                    location=t.location,
+                    location=loc_map.get(t.location_id, f"Location_{t.location_id}"),
                     activity=t.activity,
                     can_prove=t.can_prove,
                     witness=t.witness
@@ -255,7 +281,7 @@ class ScenarioRepository:
                 SecretTierSchema(
                     threshold=s.threshold,
                     content=s.content,
-                    trigger_evidence_ids=s.trigger_evidence_ids or []
+                    trigger_clue_ids=s.trigger_clue_ids or []
                 )
                 for s in sorted(suspect.secrets, key=lambda x: x.threshold)
             ],
@@ -264,15 +290,16 @@ class ScenarioRepository:
                 emotional_tendency=suspect.emotional_tendency,
                 lying_pattern=suspect.lying_pattern
             ),
-            critical_evidence_ids=suspect.critical_evidence_ids or []
+            critical_clue_ids=suspect.critical_clue_ids or []
         )
 
-    def _to_clue_schema(self, clue: Clue) -> ClueItemSchema:
+    def _to_clue_schema(self, clue: Clue, loc_map: dict = None) -> ClueItemSchema:
         """Convert Clue ORM object to ClueItemSchema"""
+        loc_map = loc_map or {}
         return ClueItemSchema(
             id=clue.clue_id,
             name=clue.name,
-            found_at=clue.found_at,
+            found_at=loc_map.get(clue.location_id, f"Location_{clue.location_id}"),
             description=clue.description,
             related_suspect_ids=clue.related_suspect_ids or [],
             logic_explanation=clue.logic_explanation,
@@ -328,6 +355,7 @@ class ScenarioRepository:
             if not locations:
                 locations = scenario_data.get("world", {}).get("locations", [])
 
+            loc_map = {}  # name -> id mapping
             for idx, loc_name in enumerate(locations, start=1):
                 location = Location(
                     scenario_id=scenario_id,
@@ -335,41 +363,54 @@ class ScenarioRepository:
                     name=loc_name
                 )
                 session.add(location)
+                loc_map[loc_name] = idx
 
             # 3. Create Visibility Rules
             visibility_rules = scenario_data.get("world_detail", {}).get("visibility_rules", [])
             for idx, rule in enumerate(visibility_rules, start=1):
+                # Map names to IDs
+                from_loc_id = loc_map.get(rule["from_location"])
+                if from_loc_id is None:
+                    # Skip or handle error. For now, assuming generation is consistent.
+                    continue
+                
+                # Map lists of names to lists of IDs
+                can_see_ids = [loc_map[name] for name in rule.get("can_see", []) if name in loc_map]
+                cannot_see_ids = [loc_map[name] for name in rule.get("cannot_see", []) if name in loc_map]
+
                 vis_rule = VisibilityRule(
                     scenario_id=scenario_id,
                     rule_id=idx,
-                    from_location=rule["from_location"],
-                    can_see=rule.get("can_see", []),
-                    cannot_see=rule.get("cannot_see", []),
-                    evidence_type=rule.get("evidence_type")
+                    from_location_id=from_loc_id,
+                    can_see=can_see_ids,
+                    cannot_see=cannot_see_ids,
+                    clue_type=rule.get("clue_type")
                 )
                 session.add(vis_rule)
 
             # 4. Create Access Rules
-            access_rules = scenario_data.get("world_detail", {}).get("access_rules", [])
+            access_rules = scenario_data.get("world_detail", {}).get("access_rules") or []
             for idx, rule in enumerate(access_rules, start=1):
-                acc_rule = AccessRule(
-                    scenario_id=scenario_id,
-                    rule_id=idx,
-                    location=rule["location"],
-                    requires=rule["requires"]
-                )
-                session.add(acc_rule)
+                loc_id = loc_map.get(rule["location"])
+                if loc_id:
+                    acc_rule = AccessRule(
+                        scenario_id=scenario_id,
+                        rule_id=idx,
+                        location_id=loc_id,
+                        requires=rule["requires"]
+                    )
+                    session.add(acc_rule)
 
-            # 5. Create Required Evidence
-            required_evidence = scenario_data.get("ground_truth_detail", {}).get("required_evidence", [])
-            for idx, evidence in enumerate(required_evidence, start=1):
-                req_evidence = RequiredEvidence(
+            # 5. Create Required Clues
+            required_clues = scenario_data.get("ground_truth_detail", {}).get("required_clues", [])
+            for idx, clue_info in enumerate(required_clues, start=1):
+                req_clue = RequiredClue(
                     scenario_id=scenario_id,
-                    evidence_id=idx,
-                    type=evidence["type"],
-                    min_count=evidence["min_count"]
+                    clue_id=idx,
+                    type=clue_info["type"],
+                    min_count=clue_info["min_count"]
                 )
-                session.add(req_evidence)
+                session.add(req_clue)
 
             # 6. Create Suspects with Timeline and Secrets
             suspects = scenario_data.get("suspects", [])
@@ -394,23 +435,28 @@ class ScenarioRepository:
                     speech_style=suspect_data["personality"]["speech_style"],
                     emotional_tendency=suspect_data["personality"]["emotional_tendency"],
                     lying_pattern=suspect_data["personality"]["lying_pattern"],
-                    critical_evidence_ids=suspect_data.get("critical_evidence_ids", [])
+                    critical_clue_ids=suspect_data.get("critical_clue_ids", [])
                 )
                 session.add(suspect)
 
                 # Timeline
                 for t_idx, timeline in enumerate(suspect_data.get("timeline", []), start=1):
-                    timeline_entry = SuspectTimeline(
-                        scenario_id=scenario_id,
-                        suspect_id=suspect_id,
-                        timeline_id=t_idx,
-                        time_range=timeline["time"],
-                        location=timeline["location"],
-                        activity=timeline["activity"],
-                        can_prove=timeline["can_prove"],
-                        witness=timeline.get("witness")
-                    )
-                    session.add(timeline_entry)
+                    loc_id = loc_map.get(timeline["location"])
+                    # If location not found in map, we might need a fallback or skip.
+                    # Since schema requires NOT NULL, we must provide an ID.
+                    # Assuming generated scenarios are consistent.
+                    if loc_id: 
+                        timeline_entry = SuspectTimeline(
+                            scenario_id=scenario_id,
+                            suspect_id=suspect_id,
+                            timeline_id=t_idx,
+                            time_range=timeline["time"],
+                            location_id=loc_id,
+                            activity=timeline["activity"],
+                            can_prove=timeline["can_prove"],
+                            witness=timeline.get("witness")
+                        )
+                        session.add(timeline_entry)
 
                 # Secrets
                 for s_idx, secret in enumerate(suspect_data.get("secrets", []), start=1):
@@ -420,25 +466,27 @@ class ScenarioRepository:
                         secret_id=s_idx,
                         threshold=secret["threshold"],
                         content=secret["content"],
-                        trigger_evidence_ids=secret.get("trigger_evidence_ids", [])
+                        trigger_clue_ids=secret.get("trigger_clue_ids", [])
                     )
                     session.add(secret_entry)
 
             # 7. Create Clues
             clues = scenario_data.get("clues", {}).get("clues", [])
             for clue_data in clues:
-                clue = Clue(
-                    scenario_id=scenario_id,
-                    clue_id=clue_data["id"],
-                    name=clue_data["name"],
-                    found_at=clue_data["found_at"],
-                    description=clue_data["description"],
-                    related_suspect_ids=clue_data.get("related_suspect_ids", []),
-                    logic_explanation=clue_data["logic_explanation"],
-                    decoded_answer=clue_data.get("decoded_answer"),
-                    is_red_herring=clue_data.get("is_red_herring", False)
-                )
-                session.add(clue)
+                loc_id = loc_map.get(clue_data["found_at"])
+                if loc_id:
+                    clue = Clue(
+                        scenario_id=scenario_id,
+                        clue_id=clue_data["id"],
+                        name=clue_data["name"],
+                        location_id=loc_id,
+                        description=clue_data["description"],
+                        related_suspect_ids=clue_data.get("related_suspect_ids", []),
+                        logic_explanation=clue_data["logic_explanation"],
+                        decoded_answer=clue_data.get("decoded_answer"),
+                        is_red_herring=clue_data.get("is_red_herring", False)
+                    )
+                    session.add(clue)
 
             await session.commit()
             return scenario_id

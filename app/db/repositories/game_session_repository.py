@@ -39,7 +39,7 @@ class GameSessionRepository:
             scenario_id=scenario_id,
             current_pressure=0,
             suspect_pressures={},
-            evidence_seen_ids=[],
+            clue_seen_ids=[],
             suspect_interactions={},
             clue_interactions={}
         )
@@ -137,9 +137,9 @@ class GameSessionRepository:
         game_session.last_activity_at = datetime.now()
         await self.session.flush()
 
-    async def add_evidence_seen(self, session_id: str, scenario_id: int, evidence_id: int) -> None:
+    async def add_clue_seen(self, session_id: str, scenario_id: int, clue_id: int) -> None:
         """
-        Add evidence to seen list.
+        Add clue to seen list.
 
         Parameters
         ----------
@@ -147,12 +147,12 @@ class GameSessionRepository:
             The session ID (user identifier)
         scenario_id : int
             The scenario ID
-        evidence_id : int
-            The evidence ID shown to suspect
+        clue_id : int
+            The clue ID shown to suspect
         """
         game_session = await self.get_session(session_id, scenario_id)
-        if game_session and evidence_id not in game_session.evidence_seen_ids:
-            game_session.evidence_seen_ids.append(evidence_id)
+        if game_session and clue_id not in game_session.clue_seen_ids:
+            game_session.clue_seen_ids.append(clue_id)
             game_session.last_activity_at = datetime.now()
             await self.session.flush()
 

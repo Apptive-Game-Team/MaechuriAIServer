@@ -44,7 +44,7 @@ class Scenario(Base):
     locations: Mapped[List["Location"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     visibility_rules: Mapped[List["VisibilityRule"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     access_rules: Mapped[List["AccessRule"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
-    required_evidences: Mapped[List["RequiredEvidence"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
+    required_clues: Mapped[List["RequiredClue"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     suspects: Mapped[List["Suspect"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     clues: Mapped[List["Clue"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     game_sessions: Mapped[List["GameSession"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")

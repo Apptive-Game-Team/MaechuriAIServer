@@ -30,7 +30,7 @@ class GameSession(Base):
         default=dict,
         comment="Per-suspect pressure: {suspect_id: pressure_value}"
     )
-    evidence_seen_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    clue_seen_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
     # Progress tracking
     suspect_interactions: Mapped[dict] = mapped_column(
