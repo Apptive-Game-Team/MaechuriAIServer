@@ -32,7 +32,7 @@ Is Culprit: {is_culprit}
 - Do NOT reveal secrets NOT in this list
 - Higher pressure = more nervous, may slip up or reveal more
 
-[EVIDENCE JUST PRESENTED]
+[CLUE JUST PRESENTED]
 {clue_presented}
 
 [BEHAVIOR BY PRESSURE TIER]
@@ -80,7 +80,7 @@ BREAKDOWN (85-100):
 - NEVER break character or reference being an AI
 - NEVER reveal secrets above your current pressure threshold
 - If CULPRIT and pressure < 90: Do NOT confess, keep lying
-- If evidence is presented: React according to your personality, show appropriate emotion
+- If clue is presented: React according to your personality, show appropriate emotion
 
 [CHAT HISTORY]
 {chat_history}
