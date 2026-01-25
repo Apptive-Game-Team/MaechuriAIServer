@@ -2,7 +2,7 @@
 from typing import Optional
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Text, Boolean, ForeignKey, Integer, ForeignKeyConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,11 +13,11 @@ class Clue(Base):
     """Clue."""
     __tablename__ = "clue"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    clue_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    clue_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     name: Mapped[str] = mapped_column(String(100))
-    location_id: Mapped[int] = mapped_column(Integer)
+    location_id: Mapped[int] = mapped_column(BigInteger)
     description: Mapped[str] = mapped_column(Text)
     related_suspect_ids: Mapped[list] = mapped_column(JSONB, default=list)
     logic_explanation: Mapped[str] = mapped_column(Text)

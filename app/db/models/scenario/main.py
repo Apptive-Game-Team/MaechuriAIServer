@@ -2,7 +2,7 @@
 from datetime import time, datetime
 from typing import List
 
-from sqlalchemy import String, Text, Boolean, Time, CheckConstraint, DateTime, func
+from sqlalchemy import BigInteger, String, Text, Boolean, Time, CheckConstraint, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -12,7 +12,7 @@ class Scenario(Base):
     """Root scenario table."""
     __tablename__ = "scenario"
 
-    scenario_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    scenario_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, type_=BigInteger)
 
     # Meta
     difficulty: Mapped[str] = mapped_column(String(10))

@@ -2,7 +2,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Integer, ForeignKey, DateTime, func
+from sqlalchemy import BigInteger, String, Integer, ForeignKey, DateTime, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,7 +20,8 @@ class GameSession(Base):
     session_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     scenario_id: Mapped[int] = mapped_column(
         ForeignKey("scenario.scenario_id", ondelete="CASCADE"),
-        primary_key=True
+        primary_key=True,
+        type_=BigInteger
     )
 
     # Game state - suspect interrogation

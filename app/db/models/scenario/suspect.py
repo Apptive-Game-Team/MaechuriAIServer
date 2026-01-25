@@ -2,7 +2,7 @@
 from typing import List, Optional
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,8 +13,8 @@ class Suspect(Base):
     """Suspect."""
     __tablename__ = "suspect"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(100))
@@ -46,12 +46,12 @@ class SuspectTimeline(Base):
     """Suspect timeline."""
     __tablename__ = "suspect_timeline"
 
-    scenario_id: Mapped[int] = mapped_column(primary_key=True)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True)
-    timeline_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    timeline_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     time_range: Mapped[str] = mapped_column(String(50))
-    location_id: Mapped[int] = mapped_column(Integer)
+    location_id: Mapped[int] = mapped_column(BigInteger)
     activity: Mapped[str] = mapped_column(Text)
     can_prove: Mapped[bool] = mapped_column(Boolean, default=False)
     witness: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -83,9 +83,9 @@ class SuspectSecret(Base):
     """Suspect secret."""
     __tablename__ = "suspect_secret"
 
-    scenario_id: Mapped[int] = mapped_column(primary_key=True)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True)
-    secret_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    secret_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     threshold: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)

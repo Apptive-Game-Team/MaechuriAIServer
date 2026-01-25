@@ -1,7 +1,7 @@
 """World-related database models (locations, rules)."""
 from typing import Optional
 
-from sqlalchemy import String, ForeignKey, Integer, CheckConstraint, ForeignKeyConstraint
+from sqlalchemy import BigInteger, String, ForeignKey, Integer, CheckConstraint, ForeignKeyConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,8 +12,8 @@ class Location(Base):
     """Location in scenario."""
     __tablename__ = "location"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    location_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    location_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
     name: Mapped[str] = mapped_column(String(100))
 
     scenario: Mapped["Scenario"] = relationship(back_populates="locations")
@@ -23,9 +23,9 @@ class VisibilityRule(Base):
     """Visibility rules."""
     __tablename__ = "visibility_rule"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    rule_id: Mapped[int] = mapped_column(primary_key=True)
-    from_location_id: Mapped[int] = mapped_column(Integer)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    rule_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    from_location_id: Mapped[int] = mapped_column(BigInteger)
     can_see: Mapped[list] = mapped_column(JSONB, default=list) # List of location_ids
     cannot_see: Mapped[list] = mapped_column(JSONB, default=list) # List of location_ids
     clue_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -49,9 +49,9 @@ class AccessRule(Base):
     """Access rules."""
     __tablename__ = "access_rule"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    rule_id: Mapped[int] = mapped_column(primary_key=True)
-    location_id: Mapped[int] = mapped_column(Integer)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    rule_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    location_id: Mapped[int] = mapped_column(BigInteger)
     requires: Mapped[str] = mapped_column(String(100))
 
     scenario: Mapped["Scenario"] = relationship(back_populates="access_rules")
@@ -73,8 +73,8 @@ class RequiredClue(Base):
     """Required clue."""
     __tablename__ = "required_clue"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    clue_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    clue_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
     type: Mapped[str] = mapped_column(String(50))
     min_count: Mapped[int] = mapped_column(Integer)
 
