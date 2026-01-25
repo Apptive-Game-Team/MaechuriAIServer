@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db, async_session_factory
 from app.services.scenario.scenario_service import ScenarioService
+from app.services.scenario.solve_service import SolveService
 from app.services.rag import get_rag_service
-from app.api.dependencies.scenario_dependencies import get_scenario_service
+from app.api.dependencies.scenario_dependencies import get_scenario_service, get_solve_service
 from app.models.schemas.solve import ScenarioSolveRequest, ScenarioSolveResponse
 from app.models.schemas.scenario_task import (
     ScenarioStatus,
@@ -62,12 +63,13 @@ async def create_scenario_background(
             task_info.scenario_id = scenario_id
             task_info.status = ScenarioStatus.COMPLETED
 
-            logger.info(f"[{key}] ✅ Scenario generated successfully. ID: {scenario_id}")
+            logger.info(f"[{key}] Scenario generated successfully. ID: {scenario_id}")
 
     except Exception as e:
         task_info.status = ScenarioStatus.FAILED
         task_info.error = str(e)
-        logger.error(f"[{key}] ❌ Scenario generation failed: {e}", exc_info=True)
+        logger.error(f"[{key}] Scenario generation failed: {e}", exc_info=True)
+
 
 @router.post("/daily", response_model=ScenarioCreateResponse)
 async def create_daily_scenario(
@@ -92,7 +94,7 @@ async def create_daily_scenario(
     -----
     - 시나리오 생성은 백그라운드에서 진행됩니다
     - GET /api/scenarios/tasks/{key}로 진행 상태 및 결과를 확인할 수 있습니다
-    
+
     """
     key = request.key
     theme = request.theme
@@ -214,10 +216,10 @@ async def index_scenario(
         )
 
 
-@router.post("/solve")
+@router.post("/solve", response_model=ScenarioSolveResponse)
 async def solve_scenario(
         solution: ScenarioSolveRequest,
-        scenario_service: Annotated[ScenarioService, Depends(get_scenario_service)]
+        solve_service: Annotated[SolveService, Depends(get_solve_service)]
 ):
     """
     유저가 범인과 추리를 제시하여 시나리오를 해결합니다.
@@ -234,33 +236,48 @@ async def solve_scenario(
 
     Notes
     -----
-    TODO: 실제 정답 검증 로직 구현 필요
-    - 시나리오에서 정답 범인 조회
-    - 제시된 추리의 합리성 평가 (LLM 활용)
-    - 부분 점수 또는 힌트 제공
+    검증 흐름:
+    1. 범인 ID 검증 (필수 - 틀리면 바로 오답)
+    2. Ground truth 문장 생성 (범인명 + 동기 + 수법 + 시간 + 장소)
+    3. 임베딩 유사도 계산 (BGE-M3)
+    4. 유사도 >= 0.7 -> 정답
+    5. 유사도 < 0.7 -> LLM 추가 검증
+    6. 최종 점수 계산 및 응답
+
+    결과 상태:
+    - CORRECT: 범인 맞음 + 추리 점수 70점 이상
+    - PARTIAL: 범인 맞음 + 추리 점수 70점 미만
+    - INCORRECT: 범인 틀림
     """
     try:
-        # TODO: 실제 검증 로직 구현
-        # 1. scenario_id로 시나리오 데이터 조회
-        # 2. ground_truth와 비교
-        # 3. 추리 내용 평가 (LLM)
-        # 4. 결과 반환
-
         logger.info(f"[Scenario {solution.scenario_id}] Solve attempt received")
 
-        # 임시 구현 (항상 성공)
-        return ScenarioSolveResponse(
+        result = await solve_service.solve(
             scenario_id=solution.scenario_id,
-            success=True,
-            message="Solution evaluated (placeholder implementation)"
+            submitted_culprit_ids=solution.culprit_id,
+            user_solution=solution.user_solution
         )
 
+        logger.info(
+            f"[Scenario {solution.scenario_id}] Solve result: "
+            f"status={result.status}, total_score={result.total_score}"
+        )
+
+        return result
+
+    except ValueError as e:
+        logger.warning(f"[Scenario {solution.scenario_id}] Validation error: {e}")
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"[Scenario {solution.scenario_id}] Solve evaluation failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to evaluate solution: {str(e)}"
         )
+
 
 @router.get("/tasks", response_model=ScenarioTaskListResponse)
 async def get_all_tasks():
