@@ -31,7 +31,8 @@ class Clue(Base):
     scenario: Mapped["Scenario"] = relationship(back_populates="clues")
     location: Mapped["Location"] = relationship(
         primaryjoin="and_(Clue.scenario_id==Location.scenario_id, Clue.location_id==Location.location_id)",
-        foreign_keys=[scenario_id, location_id]
+        foreign_keys=[scenario_id, location_id],
+        overlaps="scenario,clues"
     )
 
     __table_args__ = (

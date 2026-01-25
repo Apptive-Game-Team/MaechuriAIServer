@@ -62,7 +62,8 @@ class SuspectTimeline(Base):
     suspect: Mapped["Suspect"] = relationship(back_populates="timeline")
     location: Mapped["Location"] = relationship(
         primaryjoin="and_(SuspectTimeline.scenario_id==Location.scenario_id, SuspectTimeline.location_id==Location.location_id)",
-        foreign_keys=[scenario_id, location_id]
+        foreign_keys=[scenario_id, location_id],
+        overlaps="scenario,timeline"
     )
 
     __table_args__ = (
