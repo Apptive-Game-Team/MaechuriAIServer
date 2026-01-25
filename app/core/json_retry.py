@@ -50,16 +50,15 @@ class JSONParseRetry:
                 logger.info(f"[{schema_name}] ✅ Success on attempt {attempt}")
                 return result
 
-            except ValueError as e:
-                # extract_json() 실패 (JSON 경계 못찾음)
-                logger.warning(f"[{schema_name}] ❌ Attempt {attempt} - ValueError: {e}")
-                last_error = e
-
             except json.JSONDecodeError as e:
                 # safe_json_load() 실패 (JSON 파싱 불가)
                 logger.warning(f"[{schema_name}] ❌ Attempt {attempt} - JSONDecodeError: {e}")
                 last_error = e
 
+            except ValueError as e:
+                # extract_json() 실패 (JSON 경계 못찾음)
+                logger.warning(f"[{schema_name}] ❌ Attempt {attempt} - ValueError: {e}")
+                last_error = e
             except ValidationError as e:
                 # Pydantic 검증 실패 (스키마 불일치)
                 error_count = len(e.errors())
