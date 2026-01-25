@@ -51,14 +51,16 @@ class ConsistencyValidator:
                 )
             )
 
-        for ev in truth.required_evidence:
-            if ev.type not in world.evidence_types:
-                issues.append(
-                    ValidationIssue(
-                        code="UNKNOWN_EVIDENCE_TYPE",
-                        message=f"evidence_type `{ev.type}` not allowed",
+        # 2. Check required clues vs world evidence types
+        if world.clue_types:
+            for ev in truth.required_clues:
+                if ev.type not in world.clue_types:
+                    issues.append(
+                        ValidationIssue(
+                            code="UNKNOWN_CLUE_TYPE",
+                            message=f"clue_type `{ev.type}` not allowed",
+                        )
                     )
-                )
 
         if config.suspect_count < truth.culprit_count:
             issues.append(

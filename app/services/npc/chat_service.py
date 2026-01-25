@@ -47,7 +47,7 @@ class ChatService:
         suspect_id: int,
         user_message: str,
         db: AsyncSession,
-        evidence_id: Optional[int] = None
+        clue_id: Optional[int] = None
     ) -> SuspectChatResponse:
         """용의자와 대화 (Stateful with GameSession).
 
@@ -57,7 +57,7 @@ class ChatService:
             suspect_id: 용의자 ID
             user_message: 유저 메시지
             db: 데이터베이스 세션 (필수)
-            evidence_id: 제시할 증거 ID (있다면)
+            clue_id: 제시할 단서 ID (있다면)
         """
         # 1. GameSession 로드 및 검증/생성
         session_repo = GameSessionRepository(db)
@@ -88,17 +88,17 @@ class ChatService:
         state = SuspectState(
             suspect_id=suspect_id,
             current_pressure=suspect_pressure,
-            evidence_seen_ids=list(game_session.evidence_seen_ids),
+            clue_seen_ids=list(game_session.clue_seen_ids),
             chat_history=[]  # 최근 대화는 RAG에서 가져옴
         )
 
-        # 4. 증거 처리 (있다면)
-        evidence = None
-        if evidence_id:
-            evidence = await self._get_evidence(scenario_id, evidence_id)
-            if evidence:
-                state.add_evidence(evidence_id)
-                await session_repo.add_evidence_seen(session_id, scenario_id, evidence_id)
+        # 4. 단서 처리 (있다면)
+        clue = None
+        if clue_id:
+            clue = await self._get_clue(scenario_id, clue_id)
+            if clue:
+                state.add_clue(clue_id)
+                await session_repo.add_clue_seen(session_id, scenario_id, clue_id)
 
         # 5. RAG 컨텍스트 검색
         rag_context = None
@@ -125,7 +125,7 @@ class ChatService:
             suspect_summary=self._create_suspect_summary(suspect),
             current_pressure=state.current_pressure,
             conversation_context=self._format_recent_context(state.chat_history),
-            evidence_presented=evidence,
+            clue_presented=clue,
             suspect_alibi=suspect.alibi_summary,
             suspect_timeline=self._format_timeline(suspect.timeline)
         )
@@ -139,7 +139,7 @@ class ChatService:
             suspect=suspect,
             state=state,
             user_message=user_message,
-            evidence_presented=evidence,
+            clue_presented=clue,
             rag_context=rag_context
         )
 
@@ -191,12 +191,12 @@ class ChatService:
         user_message: str,
         db: AsyncSession
     ) -> ClueChatResponse:
-        """증거와 대화 (Stateful with GameSession).
+        """단서와 대화 (Stateful with GameSession).
 
         Args:
             session_id: 게임 세션 ID (UUID)
             scenario_id: 시나리오 ID
-            clue_id: 증거 ID
+            clue_id: 단서 ID
             user_message: 유저 메시지
             db: 데이터베이스 세션 (필수)
         """
@@ -216,7 +216,7 @@ class ChatService:
         if not clue:
             return ClueChatResponse(
                 user_message=user_message,
-                answer="해당 증거를 찾을 수 없습니다."
+                answer="해당 단서를 찾을 수 없습니다."
             )
 
         clue_info = clue.model_dump()
@@ -306,9 +306,9 @@ class ChatService:
             return "(대화 시작)"
         return "\n".join([f"{h['role']}: {h['content']}" for h in recent])
 
-    async def _get_evidence(self, scenario_id: int, evidence_id: int) -> Optional[dict]:
-        """증거 정보 조회"""
-        clue = await self.scenario_repository.get_clue_info(scenario_id, evidence_id)
+    async def _get_clue(self, scenario_id: int, clue_id: int) -> Optional[dict]:
+        """단서 정보 조회"""
+        clue = await self.scenario_repository.get_clue_info(scenario_id, clue_id)
         if clue:
             return {
                 "id": clue.id,

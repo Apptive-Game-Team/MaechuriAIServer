@@ -2,7 +2,7 @@
 from typing import List, Optional
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,8 +13,8 @@ class Suspect(Base):
     """Suspect."""
     __tablename__ = "suspect"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     name: Mapped[str] = mapped_column(String(100))
     role: Mapped[str] = mapped_column(String(100))
@@ -31,7 +31,7 @@ class Suspect(Base):
     emotional_tendency: Mapped[str] = mapped_column(String(100))
     lying_pattern: Mapped[str] = mapped_column(String(50))
 
-    critical_evidence_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    critical_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
     # Embedding for RAG (name + role + description)
     profile_embedding = mapped_column(Vector(1024), nullable=True)
@@ -46,12 +46,12 @@ class SuspectTimeline(Base):
     """Suspect timeline."""
     __tablename__ = "suspect_timeline"
 
-    scenario_id: Mapped[int] = mapped_column(primary_key=True)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True)
-    timeline_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    timeline_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     time_range: Mapped[str] = mapped_column(String(50))
-    location: Mapped[str] = mapped_column(String(100))
+    location_id: Mapped[int] = mapped_column(BigInteger)
     activity: Mapped[str] = mapped_column(Text)
     can_prove: Mapped[bool] = mapped_column(Boolean, default=False)
     witness: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -60,11 +60,20 @@ class SuspectTimeline(Base):
     embedding = mapped_column(Vector(1024), nullable=True)
 
     suspect: Mapped["Suspect"] = relationship(back_populates="timeline")
+    location: Mapped["Location"] = relationship(
+        primaryjoin="and_(SuspectTimeline.scenario_id==Location.scenario_id, SuspectTimeline.location_id==Location.location_id)",
+        foreign_keys=[scenario_id, location_id]
+    )
 
     __table_args__ = (
         ForeignKeyConstraint(
             ["scenario_id", "suspect_id"],
             ["suspect.scenario_id", "suspect.suspect_id"],
+            ondelete="CASCADE"
+        ),
+        ForeignKeyConstraint(
+            ["scenario_id", "location_id"],
+            ["location.scenario_id", "location.location_id"],
             ondelete="CASCADE"
         ),
     )
@@ -74,13 +83,13 @@ class SuspectSecret(Base):
     """Suspect secret."""
     __tablename__ = "suspect_secret"
 
-    scenario_id: Mapped[int] = mapped_column(primary_key=True)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True)
-    secret_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    secret_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     threshold: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
-    trigger_evidence_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    trigger_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
     # Embedding for RAG (secret content)
     embedding = mapped_column(Vector(1024), nullable=True)

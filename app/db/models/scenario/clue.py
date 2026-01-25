@@ -2,7 +2,7 @@
 from typing import Optional
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Text, Boolean, ForeignKey
+from sqlalchemy import BigInteger, String, Text, Boolean, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,11 +13,11 @@ class Clue(Base):
     """Clue."""
     __tablename__ = "clue"
 
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True)
-    clue_id: Mapped[int] = mapped_column(primary_key=True)
+    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
+    clue_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     name: Mapped[str] = mapped_column(String(100))
-    found_at: Mapped[str] = mapped_column(String(100))
+    location_id: Mapped[int] = mapped_column(BigInteger)
     description: Mapped[str] = mapped_column(Text)
     related_suspect_ids: Mapped[list] = mapped_column(JSONB, default=list)
     logic_explanation: Mapped[str] = mapped_column(Text)
@@ -29,3 +29,15 @@ class Clue(Base):
     logic_embedding = mapped_column(Vector(1024), nullable=True)
 
     scenario: Mapped["Scenario"] = relationship(back_populates="clues")
+    location: Mapped["Location"] = relationship(
+        primaryjoin="and_(Clue.scenario_id==Location.scenario_id, Clue.location_id==Location.location_id)",
+        foreign_keys=[scenario_id, location_id]
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["scenario_id", "location_id"],
+            ["location.scenario_id", "location.location_id"],
+            ondelete="CASCADE"
+        ),
+    )

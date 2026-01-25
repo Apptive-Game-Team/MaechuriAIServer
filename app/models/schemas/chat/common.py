@@ -13,7 +13,7 @@ class SuspectChatHistorySchema(BaseModel):
     """Chat history for suspect conversations."""
     chat_history: List[ChatMessageSchema] = Field(default_factory=list)
     pressure: int = Field(default=0, ge=0, le=100)
-    evidence_seen_ids: List[int] = Field(default_factory=list)
+    clue_seen_ids: List[int] = Field(default_factory=list)
 
 
 class ClueChatHistorySchema(BaseModel):

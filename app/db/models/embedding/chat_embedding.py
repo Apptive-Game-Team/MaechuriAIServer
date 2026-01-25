@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, func
+from sqlalchemy import BigInteger, String, Text, Integer, ForeignKey, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -12,16 +12,17 @@ class ChatMessageEmbedding(Base):
     """Stores embeddings for chat messages to enable semantic search over conversation history."""
     __tablename__ = "chat_message_embedding"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, type_=BigInteger)
 
     scenario_id: Mapped[int] = mapped_column(
         ForeignKey("scenario.scenario_id", ondelete="CASCADE"),
-        index=True
+        index=True,
+        type_=BigInteger
     )
     session_id: Mapped[str] = mapped_column(String(36), index=True)  # UUID as string
 
-    suspect_id: Mapped[int] = mapped_column(Integer, nullable=True, index=True)  # NULL for clue chats
-    clue_id: Mapped[int] = mapped_column(Integer, nullable=True, index=True)  # NULL for suspect chats
+    suspect_id: Mapped[int] = mapped_column(BigInteger, nullable=True, index=True)  # NULL for clue chats
+    clue_id: Mapped[int] = mapped_column(BigInteger, nullable=True, index=True)  # NULL for suspect chats
 
     message_index: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(20))  # user, suspect, detective

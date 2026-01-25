@@ -12,6 +12,7 @@ from app.db.models import (
     SuspectSecret,
     Clue,
     ChatMessageEmbedding,
+    Location
 )
 from app.services.embedding import get_embedding_service, EmbeddingService
 
@@ -89,10 +90,16 @@ class RAGIndexer:
         dict
             Stats containing number of suspects, timelines, and secrets indexed.
         """
-        from sqlalchemy import select, bindparam
+        from sqlalchemy import select
         from sqlalchemy.orm import selectinload
 
-        # Load suspects with relationships
+        # 1. Load Locations for mapping IDs to Names
+        loc_result = await db.execute(
+            select(Location).where(Location.scenario_id == scenario_id)
+        )
+        loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
+        # 2. Load suspects with relationships
         result = await db.execute(
             select(Suspect)
             .where(Suspect.scenario_id == scenario_id)
@@ -113,6 +120,7 @@ class RAGIndexer:
                 age=suspect.age,
                 gender=suspect.gender,
             )
+            # Keys must match model attribute names for ORM bulk update
             suspect_updates.append({
                 "scenario_id": scenario_id,
                 "suspect_id": suspect.suspect_id,
@@ -121,9 +129,10 @@ class RAGIndexer:
 
             # Index timelines
             for timeline in suspect.timeline:
+                loc_name = loc_map.get(timeline.location_id, "Unknown")
                 timeline_embedding = self.embedding_service.embed_timeline_entry(
                     time_range=timeline.time_range,
-                    location=timeline.location,
+                    location=loc_name,
                     activity=timeline.activity,
                     suspect_name=suspect.name,
                 )
@@ -149,36 +158,19 @@ class RAGIndexer:
         # Bulk updates
         if suspect_updates:
             await db.execute(
-                update(Suspect)
-                .where(
-                    Suspect.scenario_id == bindparam("scenario_id"),
-                    Suspect.suspect_id == bindparam("suspect_id")
-                )
-                .values(profile_embedding=bindparam("profile_embedding")),
+                update(Suspect),
                 suspect_updates
             )
 
         if timeline_updates:
             await db.execute(
-                update(SuspectTimeline)
-                .where(
-                    SuspectTimeline.scenario_id == bindparam("scenario_id"),
-                    SuspectTimeline.suspect_id == bindparam("suspect_id"),
-                    SuspectTimeline.timeline_id == bindparam("timeline_id")
-                )
-                .values(embedding=bindparam("embedding")),
+                update(SuspectTimeline),
                 timeline_updates
             )
 
         if secret_updates:
             await db.execute(
-                update(SuspectSecret)
-                .where(
-                    SuspectSecret.scenario_id == bindparam("scenario_id"),
-                    SuspectSecret.suspect_id == bindparam("suspect_id"),
-                    SuspectSecret.secret_id == bindparam("secret_id")
-                )
-                .values(embedding=bindparam("embedding")),
+                update(SuspectSecret),
                 secret_updates
             )
 
@@ -203,16 +195,24 @@ class RAGIndexer:
         int
             Number of clues indexed.
         """
-        from sqlalchemy import select, bindparam
+        from sqlalchemy import select
 
+        # 1. Load Locations for mapping IDs to Names
+        loc_result = await db.execute(
+            select(Location).where(Location.scenario_id == scenario_id)
+        )
+        loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
+        # 2. Load clues
         result = await db.execute(select(Clue).where(Clue.scenario_id == scenario_id))
         clues = result.scalars().all()
 
         clue_updates = []
         for clue in clues:
             # Index description
+            loc_name = loc_map.get(clue.location_id, "Unknown")
             description_embedding = self.embedding_service.embed_clue_description(
-                name=clue.name, description=clue.description, found_at=clue.found_at
+                name=clue.name, description=clue.description, found_at=loc_name
             )
 
             # Index logic explanation
@@ -231,15 +231,7 @@ class RAGIndexer:
 
         if clue_updates:
             await db.execute(
-                update(Clue)
-                .where(
-                    Clue.scenario_id == bindparam("scenario_id"),
-                    Clue.clue_id == bindparam("clue_id")
-                )
-                .values(
-                    description_embedding=bindparam("description_embedding"),
-                    logic_embedding=bindparam("logic_embedding"),
-                ),
+                update(Clue),
                 clue_updates
             )
 

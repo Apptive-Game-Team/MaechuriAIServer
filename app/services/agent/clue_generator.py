@@ -22,15 +22,15 @@ class ClueGenerator(BaseGenerator):
         """
         Generates clues based on the provided ScenarioExpansion and optional MapSkeletonSchema.
         """
-        # Optimize Input: Select only necessary fields
-        optimized_input = {
-            "world": scenario.world_detail.model_dump(mode='json'),
-            "crime": scenario.ground_truth_detail.model_dump(mode='json'),
-            "target": scenario.generation_targets.evidence.model_dump(mode='json')
+        # Prepare prompt context
+        prompt_data = {
+            "case_context": scenario.incident.model_dump(mode='json'),
+            "world_context": scenario.world_detail.model_dump(mode='json'),
+            "target": scenario.generation_targets.clues.model_dump(mode='json')
         }
 
         # Add map skeleton if provided
         if map_skeleton:
-            optimized_input["map_skeleton"] = map_skeleton.model_dump(mode='json')
+            prompt_data["map_skeleton"] = map_skeleton.model_dump(mode='json')
 
-        return self._generate(optimized_input, ClueSetSchema)
+        return self._generate(prompt_data, ClueSetSchema)

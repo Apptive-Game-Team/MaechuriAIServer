@@ -7,7 +7,7 @@ class SuspectState:
     """용의자 런타임 상태 (세션별)"""
     suspect_id: int
     current_pressure: int = 0
-    evidence_seen_ids: List[int] = field(default_factory=list)
+    clue_seen_ids: List[int] = field(default_factory=list)
     chat_history: List[dict] = field(default_factory=list)
 
     def update_pressure(self, delta: int) -> int:
@@ -23,15 +23,15 @@ class SuspectState:
         self.current_pressure = max(0, min(100, self.current_pressure + delta))
         return self.current_pressure
 
-    def add_evidence(self, evidence_id: int) -> bool:
+    def add_clue(self, clue_id: int) -> bool:
         """
-        증거 추가 (중복 방지).
+        단서 추가 (중복 방지).
 
         Returns:
             True if newly added, False if already seen
         """
-        if evidence_id not in self.evidence_seen_ids:
-            self.evidence_seen_ids.append(evidence_id)
+        if clue_id not in self.clue_seen_ids:
+            self.clue_seen_ids.append(clue_id)
             return True
         return False
 
@@ -64,7 +64,7 @@ class SuspectState:
         return {
             "suspect_id": self.suspect_id,
             "current_pressure": self.current_pressure,
-            "evidence_seen_ids": self.evidence_seen_ids,
+            "clue_seen_ids": self.clue_seen_ids,
             "chat_history": self.chat_history
         }
 
@@ -74,6 +74,6 @@ class SuspectState:
         return cls(
             suspect_id=data.get("suspect_id", 0),
             current_pressure=data.get("current_pressure", 0),
-            evidence_seen_ids=data.get("evidence_seen_ids", []),
+            clue_seen_ids=data.get("clue_seen_ids", []),
             chat_history=data.get("chat_history", [])
         )

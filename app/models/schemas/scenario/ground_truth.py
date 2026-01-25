@@ -4,8 +4,8 @@ from pydantic import BaseModel, Field
 from .common import TimeRangeSchema
 
 
-class RequiredEvidenceSchema(BaseModel):
-    """Evidence required to solve the case."""
+class RequiredClueSchema(BaseModel):
+    """Clue required to solve the case."""
     type: str
     min_count: int = Field(ge=1)
 
@@ -18,7 +18,7 @@ class GroundTruthSkeletonSchema(BaseModel):
 
 
 class GroundTruthSchema(GroundTruthSkeletonSchema):
-    """Detailed ground truth including culprits, method, and required evidence."""
+    """Detailed ground truth including culprits, method, and required clues."""
     culprit_ids: List[int] = []
     method: str = ""
-    required_evidence: List[RequiredEvidenceSchema] = []
+    required_clues: List[RequiredClueSchema] = []
