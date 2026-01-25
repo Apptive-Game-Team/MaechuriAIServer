@@ -4,7 +4,7 @@ from typing import Annotated
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db
+from app.db.database import get_db, async_session_factory
 from app.services.scenario.scenario_service import ScenarioService
 from app.services.rag import get_rag_service
 from app.api.dependencies.scenario_dependencies import get_scenario_service
@@ -25,7 +25,6 @@ scenario_tasks: dict[str, ScenarioTaskInfo] = {}
 
 
 async def create_scenario_background(
-        db: AsyncSession,
         scenario_service: ScenarioService,
         key: str,
         theme: str = "random",
@@ -35,8 +34,6 @@ async def create_scenario_background(
 
     Parameters
     ----------
-    db : AsyncSession
-        데이터베이스 세션
     scenario_service : ScenarioService
         시나리오 서비스
     key : str
@@ -54,16 +51,18 @@ async def create_scenario_background(
     task_info.status = ScenarioStatus.PROCESSING
 
     try:
-        # 시나리오 생성 및 저장
-        scenario_data, scenario_id = await scenario_service.generate_and_save(
-            pre_input=theme,
-            db=db
-        )
+        # 독립적인 DB 세션 생성
+        async with async_session_factory() as db:
+            # 시나리오 생성 및 저장
+            scenario_data, scenario_id = await scenario_service.generate_and_save(
+                pre_input=theme,
+                db=db
+            )
 
-        task_info.scenario_id = scenario_id
-        task_info.status = ScenarioStatus.COMPLETED
+            task_info.scenario_id = scenario_id
+            task_info.status = ScenarioStatus.COMPLETED
 
-        logger.info(f"[{key}] ✅ Scenario generated successfully. ID: {scenario_id}")
+            logger.info(f"[{key}] ✅ Scenario generated successfully. ID: {scenario_id}")
 
     except Exception as e:
         task_info.status = ScenarioStatus.FAILED
@@ -120,7 +119,7 @@ async def create_daily_scenario(
     scenario_tasks[key] = task_info
 
     # 백그라운드 태스크 시작
-    background_tasks.add_task(create_scenario_background, db, scenario_service, key, theme)
+    background_tasks.add_task(create_scenario_background, scenario_service, key, theme)
 
     logger.info(f"[{key}] Scenario generation task queued with theme: {theme}")
 
