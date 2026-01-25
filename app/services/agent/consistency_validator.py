@@ -52,14 +52,15 @@ class ConsistencyValidator:
             )
 
         # 2. Check required clues vs world evidence types
-        for ev in truth.required_clues:
-            if ev.type not in world.clue_types:
-                errors.append(ValidationError(
-                    path="ground_truth.required_clues",
-                    code="UNKNOWN_CLUE_TYPE",
-                    message=f"clue_type `{ev.type}` not allowed",
-                    severity="error"
-                ))
+        if world.clue_types:
+            for ev in truth.required_clues:
+                if ev.type not in world.clue_types:
+                    issues.append(
+                        ValidationIssue(
+                            code="UNKNOWN_CLUE_TYPE",
+                            message=f"clue_type `{ev.type}` not allowed",
+                        )
+                    )
 
         if config.suspect_count < truth.culprit_count:
             issues.append(
