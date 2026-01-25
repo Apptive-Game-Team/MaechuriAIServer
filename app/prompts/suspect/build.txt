@@ -28,6 +28,7 @@ You receive JSON "input" containing:
 3. Timeline:
    - Cover the entire incident_time with entries
    - Format: {"time": "HH:MM-HH:MM", "location": "...", "activity": "...", "can_prove": bool, "witness": "..."}
+   - [STRICT LOCATION RULE]: Use ONLY location names provided in 'world_context.locations'. DO NOT create new locations like 'corridors', 'hallways', or 'stairs' if they are not in the list. Every timeline entry must occur in a pre-defined room.
    - CULPRIT: Must have gap or weak alibi during crime time
    - INNOCENT: At least one unprovable period for suspicion
 
