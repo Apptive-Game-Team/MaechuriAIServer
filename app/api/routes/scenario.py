@@ -92,8 +92,8 @@ async def create_daily_scenario(
     Notes
     -----
     - 시나리오 생성은 백그라운드에서 진행됩니다
-    - GET /api/scenarios/status?key={key}로 진행 상태 확인
-    - GET /api/scenarios/id?key={key}로 완료된 시나리오 ID 조회
+    - GET /api/scenarios/tasks/{key}로 진행 상태 및 결과를 확인할 수 있습니다
+    
     """
     key = request.key
     theme = request.theme
