@@ -1,4 +1,5 @@
 import time
+import asyncio
 import logging
 
 
@@ -188,7 +189,6 @@ class ScenarioService:
         """
         # Generate scenario (sync operation)
 
-        import asyncio
         scenario_data = await asyncio.to_thread(
             self.generate,
             pre_input,
