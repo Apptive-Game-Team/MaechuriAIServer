@@ -371,8 +371,10 @@ class ScenarioRepository:
                 # Map names to IDs
                 from_loc_id = loc_map.get(rule["from_location"])
                 if from_loc_id is None:
-                    # Skip or handle error. For now, assuming generation is consistent.
-                    continue
+                    raise ValueError(
+                        f"Visibility rule refers to unknown from_location "
+                        f"'{rule['from_location']}'. Known locations: {list(loc_map.keys())}"
+                    )
                 
                 # Map lists of names to lists of IDs
                 can_see_ids = [loc_map[name] for name in rule.get("can_see", []) if name in loc_map]
