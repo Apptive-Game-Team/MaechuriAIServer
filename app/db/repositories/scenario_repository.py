@@ -394,14 +394,16 @@ class ScenarioRepository:
             access_rules = scenario_data.get("world_detail", {}).get("access_rules") or []
             for idx, rule in enumerate(access_rules, start=1):
                 loc_id = loc_map.get(rule["location"])
-                if loc_id:
-                    acc_rule = AccessRule(
-                        scenario_id=scenario_id,
-                        rule_id=idx,
-                        location_id=loc_id,
-                        requires=rule["requires"]
-                    )
-                    session.add(acc_rule)
+                if loc_id is None:
+                    raise ValueError(f"Access rule refers to unknown location '{rule['location']}'")
+
+                acc_rule = AccessRule(
+                    scenario_id=scenario_id,
+                    rule_id=idx,
+                    location_id=loc_id,
+                    requires=rule["requires"]
+                )
+                session.add(acc_rule)
 
             # 5. Create Required Clues
             required_clues = scenario_data.get("ground_truth_detail", {}).get("required_clues", [])
@@ -444,21 +446,22 @@ class ScenarioRepository:
                 # Timeline
                 for t_idx, timeline in enumerate(suspect_data.get("timeline", []), start=1):
                     loc_id = loc_map.get(timeline["location"])
-                    # If location not found in map, we might need a fallback or skip.
-                    # Since schema requires NOT NULL, we must provide an ID.
-                    # Assuming generated scenarios are consistent.
-                    if loc_id: 
-                        timeline_entry = SuspectTimeline(
-                            scenario_id=scenario_id,
-                            suspect_id=suspect_id,
-                            timeline_id=t_idx,
-                            time_range=timeline["time"],
-                            location_id=loc_id,
-                            activity=timeline["activity"],
-                            can_prove=timeline["can_prove"],
-                            witness=timeline.get("witness")
+                    if loc_id is None:
+                        raise ValueError(
+                            f"Suspect {suspect_id} timeline refers to unknown location '{timeline['location']}'"
                         )
-                        session.add(timeline_entry)
+
+                    timeline_entry = SuspectTimeline(
+                        scenario_id=scenario_id,
+                        suspect_id=suspect_id,
+                        timeline_id=t_idx,
+                        time_range=timeline["time"],
+                        location_id=loc_id,
+                        activity=timeline["activity"],
+                        can_prove=timeline["can_prove"],
+                        witness=timeline.get("witness")
+                    )
+                    session.add(timeline_entry)
 
                 # Secrets
                 for s_idx, secret in enumerate(suspect_data.get("secrets", []), start=1):
@@ -475,20 +478,25 @@ class ScenarioRepository:
             # 7. Create Clues
             clues = scenario_data.get("clues", {}).get("clues", [])
             for clue_data in clues:
-                loc_id = loc_map.get(clue_data["found_at"])
-                if loc_id:
-                    clue = Clue(
-                        scenario_id=scenario_id,
-                        clue_id=clue_data["id"],
-                        name=clue_data["name"],
-                        location_id=loc_id,
-                        description=clue_data["description"],
-                        related_suspect_ids=clue_data.get("related_suspect_ids", []),
-                        logic_explanation=clue_data["logic_explanation"],
-                        decoded_answer=clue_data.get("decoded_answer"),
-                        is_red_herring=clue_data.get("is_red_herring", False)
+                found_at = clue_data["found_at"]
+                loc_id = loc_map.get(found_at)
+                if loc_id is None:
+                    raise ValueError(
+                        f"Unknown clue location '{found_at}' for clue ID {clue_data.get('id')}."
                     )
-                    session.add(clue)
+
+                clue = Clue(
+                    scenario_id=scenario_id,
+                    clue_id=clue_data["id"],
+                    name=clue_data["name"],
+                    location_id=loc_id,
+                    description=clue_data["description"],
+                    related_suspect_ids=clue_data.get("related_suspect_ids", []),
+                    logic_explanation=clue_data["logic_explanation"],
+                    decoded_answer=clue_data.get("decoded_answer"),
+                    is_red_herring=clue_data.get("is_red_herring", False)
+                )
+                session.add(clue)
 
             await session.commit()
             return scenario_id
