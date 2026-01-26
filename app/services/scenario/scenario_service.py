@@ -2,7 +2,7 @@ import time
 import asyncio
 import logging
 
-
+from app.models.schemas.clue import ClueGenerationRequest
 from app.models.schemas.scenario import ScenarioResult
 from app.models.schemas.suspect import SuspectGenerationRequest
 from app.services.agent.clue_generator import ClueGenerator
@@ -14,7 +14,7 @@ from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.rag import get_rag_service
 from app.core.json_retry import JSONParseRetry
-
+from app.services.scenario.scenario_generate_helper import inject_sequential_id, find_facts
 
 logger = logging.getLogger(__name__)
 
@@ -90,21 +90,9 @@ class ScenarioService:
         logger.info("Map skeleton generated successfully")
         time.sleep(3)
 
-        # 5. Clues 생성 (재시도 적용)
-        clue_result = self.json_retry.parse_with_retry(
-            parser_func=lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
-            schema_name="ClueSet"
-        )
-
-        if clue_result is None:
-            raise RuntimeError("Clue generation failed after retries")
-
-        logger.info("Clues generated successfully")
-        time.sleep(3)
-
-        # 6. Suspects 생성 (재시도 적용)
+        # 5. Suspects 생성 (재시도 적용)
         suspect_req = SuspectGenerationRequest.from_expansion(
-            expansion_result, clue_result.clues, map_skeleton
+            expansion_result, map_skeleton
         )
 
         suspects_result = self.json_retry.parse_with_retry(
@@ -115,7 +103,25 @@ class ScenarioService:
         if suspects_result is None:
             raise RuntimeError("Suspect generation failed after retries")
 
+        inject_sequential_id(suspects_result, "fact_id")
+
         logger.info("Suspects generated successfully")
+        time.sleep(3)
+
+        # 6. Clues 생성 (재시도 적용)
+        clue_result = ClueGenerationRequest.from_expansion(
+            expansion_result, find_facts(suspects_result)
+        )
+
+        clue_result = self.json_retry.parse_with_retry(
+            parser_func=lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
+            schema_name="ClueSet"
+        )
+
+        if clue_result is None:
+            raise RuntimeError("Clue generation failed after retries")
+
+        logger.info("Clues generated successfully")
         time.sleep(3)
 
         # 7. Map Detail 생성 (재시도 적용)

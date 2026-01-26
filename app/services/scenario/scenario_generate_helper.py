@@ -1,5 +1,16 @@
-from typing import Any
+from typing import Any, List
 
+from app.models.schemas.suspect import SuspectListSchema
+from app.models.schemas.suspect.common import FactEntrySchema
+
+
+def find_facts(suspect_list: SuspectListSchema) -> List[FactEntrySchema[Any]]:
+    suspect_facts: List[FactEntrySchema] = []
+    for suspect in suspect_list.suspects:
+        suspect_facts.extend(suspect.secrets)
+        suspect_facts.extend(suspect.facts)
+
+    return suspect_facts
 
 def inject_sequential_id(obj: Any, id_name: str):
     """Inject sequential id."""
