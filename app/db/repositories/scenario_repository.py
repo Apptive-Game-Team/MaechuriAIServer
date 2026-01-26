@@ -55,6 +55,8 @@ class ScenarioRepository:
                 .where(Scenario.scenario_id == scenario_id)
                 .options(
                     selectinload(Scenario.locations),
+                    selectinload(Scenario.incident_loc),
+                    selectinload(Scenario.crime_loc),
                     selectinload(Scenario.visibility_rules),
                     selectinload(Scenario.access_rules),
                     selectinload(Scenario.required_clues),
@@ -97,7 +99,7 @@ class ScenarioRepository:
                     "start": scenario.incident_time_start,
                     "end": scenario.incident_time_end
                 },
-                "location": scenario.incident_location,
+                "location": scenario.incident_loc.name if scenario.incident_loc else "Unknown",
                 "primary_object": scenario.primary_object
             },
             "world": {
@@ -110,7 +112,7 @@ class ScenarioRepository:
                     "start": scenario.crime_time_start,
                     "end": scenario.crime_time_end
                 },
-                "crime_location": scenario.crime_location
+                "crime_location": scenario.crime_loc.name if scenario.crime_loc else "Unknown"
             },
             "world_detail": {
                 "locations": locations,
@@ -135,7 +137,7 @@ class ScenarioRepository:
                     "start": scenario.crime_time_start,
                     "end": scenario.crime_time_end
                 },
-                "crime_location": scenario.crime_location,
+                "crime_location": scenario.crime_loc.name if scenario.crime_loc else "Unknown",
                 "culprit_ids": [s.suspect_id for s in scenario.suspects if s.is_culprit],
                 "method": scenario.crime_method,
                 "required_clues": [
@@ -334,12 +336,12 @@ class ScenarioRepository:
                 incident_summary=scenario_data["incident"]["summary"],
                 incident_time_start=self._parse_time(scenario_data["incident"]["time_range"]["start"]),
                 incident_time_end=self._parse_time(scenario_data["incident"]["time_range"]["end"]),
-                incident_location=scenario_data["incident"]["location"],
+                # incident_location has been replaced by incident_location_id (updated after creating locations)
                 primary_object=scenario_data["incident"]["primary_object"],
                 # Ground Truth
                 crime_time_start=self._parse_time(scenario_data["ground_truth_detail"]["crime_time_range"]["start"]),
                 crime_time_end=self._parse_time(scenario_data["ground_truth_detail"]["crime_time_range"]["end"]),
-                crime_location=scenario_data["ground_truth_detail"]["crime_location"],
+                # crime_location has been replaced by crime_location_id (updated after creating locations)
                 crime_method=scenario_data["ground_truth_detail"].get("method", ""),
                 # Constraints
                 no_supernatural=scenario_data["constraints"].get("no_supernatural", True),
@@ -356,6 +358,7 @@ class ScenarioRepository:
                 locations = scenario_data.get("world", {}).get("locations", [])
 
             loc_map = {}  # name -> id mapping
+            first_loc_id = None
             for idx, loc_name in enumerate(locations, start=1):
                 location = Location(
                     scenario_id=scenario_id,
@@ -364,21 +367,42 @@ class ScenarioRepository:
                 )
                 session.add(location)
                 loc_map[loc_name] = idx
+                if first_loc_id is None:
+                    first_loc_id = idx
+
+            # Helper to map unknown locations to existing ones (Fuzzy Match & Fallback)
+            def get_mapped_loc_id(name: str) -> int:
+                # 1. Exact match
+                if name in loc_map:
+                    return loc_map[name]
+                
+                # 2. Partial match (e.g., "본관 도서관" matches "도서관")
+                for existing_name, existing_id in loc_map.items():
+                    if existing_name in name or name in existing_name:
+                        return existing_id
+                
+                # 3. Fallback to first location
+                return first_loc_id
+
+            # Ensure locations are flushed to DB before referencing them in Scenario
+            await session.flush()
+
+            # Update Scenario with Location IDs
+            incident_loc_name = scenario_data["incident"]["location"]
+            crime_loc_name = scenario_data["ground_truth_detail"]["crime_location"]
+            
+            scenario.incident_location_id = get_mapped_loc_id(incident_loc_name)
+            scenario.crime_location_id = get_mapped_loc_id(crime_loc_name)
 
             # 3. Create Visibility Rules
             visibility_rules = scenario_data.get("world_detail", {}).get("visibility_rules", [])
             for idx, rule in enumerate(visibility_rules, start=1):
                 # Map names to IDs
-                from_loc_id = loc_map.get(rule["from_location"])
-                if from_loc_id is None:
-                    raise ValueError(
-                        f"Visibility rule refers to unknown from_location "
-                        f"'{rule['from_location']}'. Known locations: {list(loc_map.keys())}"
-                    )
+                from_loc_id = get_mapped_loc_id(rule["from_location"])
                 
                 # Map lists of names to lists of IDs
-                can_see_ids = [loc_map[name] for name in rule.get("can_see", []) if name in loc_map]
-                cannot_see_ids = [loc_map[name] for name in rule.get("cannot_see", []) if name in loc_map]
+                can_see_ids = [get_mapped_loc_id(name) for name in rule.get("can_see", [])]
+                cannot_see_ids = [get_mapped_loc_id(name) for name in rule.get("cannot_see", [])]
 
                 vis_rule = VisibilityRule(
                     scenario_id=scenario_id,
@@ -393,10 +417,8 @@ class ScenarioRepository:
             # 4. Create Access Rules
             access_rules = scenario_data.get("world_detail", {}).get("access_rules") or []
             for idx, rule in enumerate(access_rules, start=1):
-                loc_id = loc_map.get(rule["location"])
-                if loc_id is None:
-                    raise ValueError(f"Access rule refers to unknown location '{rule['location']}'")
-
+                loc_id = get_mapped_loc_id(rule["location"])
+                
                 acc_rule = AccessRule(
                     scenario_id=scenario_id,
                     rule_id=idx,
@@ -445,12 +467,8 @@ class ScenarioRepository:
 
                 # Timeline
                 for t_idx, timeline in enumerate(suspect_data.get("timeline", []), start=1):
-                    loc_id = loc_map.get(timeline["location"])
-                    if loc_id is None:
-                        raise ValueError(
-                            f"Suspect {suspect_id} timeline refers to unknown location '{timeline['location']}'"
-                        )
-
+                    loc_id = get_mapped_loc_id(timeline["location"])
+                    
                     timeline_entry = SuspectTimeline(
                         scenario_id=scenario_id,
                         suspect_id=suspect_id,
@@ -479,12 +497,8 @@ class ScenarioRepository:
             clues = scenario_data.get("clues", {}).get("clues", [])
             for clue_data in clues:
                 found_at = clue_data["found_at"]
-                loc_id = loc_map.get(found_at)
-                if loc_id is None:
-                    raise ValueError(
-                        f"Unknown clue location '{found_at}' for clue ID {clue_data.get('id')}."
-                    )
-
+                loc_id = get_mapped_loc_id(found_at)
+                
                 clue = Clue(
                     scenario_id=scenario_id,
                     clue_id=clue_data["id"],

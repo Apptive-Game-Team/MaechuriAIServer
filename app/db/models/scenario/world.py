@@ -33,7 +33,8 @@ class VisibilityRule(Base):
     scenario: Mapped["Scenario"] = relationship(back_populates="visibility_rules")
     from_location: Mapped["Location"] = relationship(
         primaryjoin="and_(VisibilityRule.scenario_id==Location.scenario_id, VisibilityRule.from_location_id==Location.location_id)",
-        foreign_keys=[scenario_id, from_location_id]
+        foreign_keys=[scenario_id, from_location_id],
+        overlaps="scenario,visibility_rules"
     )
 
     __table_args__ = (
@@ -57,7 +58,8 @@ class AccessRule(Base):
     scenario: Mapped["Scenario"] = relationship(back_populates="access_rules")
     target_location: Mapped["Location"] = relationship(
         primaryjoin="and_(AccessRule.scenario_id==Location.scenario_id, AccessRule.location_id==Location.location_id)",
-        foreign_keys=[scenario_id, location_id]
+        foreign_keys=[scenario_id, location_id],
+        overlaps="scenario,access_rules"
     )
 
     __table_args__ = (

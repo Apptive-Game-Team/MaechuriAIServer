@@ -25,13 +25,13 @@ class Scenario(Base):
     incident_summary: Mapped[str] = mapped_column(Text)
     incident_time_start: Mapped[time] = mapped_column(Time)
     incident_time_end: Mapped[time] = mapped_column(Time)
-    incident_location: Mapped[str] = mapped_column(String(100))
+    incident_location_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     primary_object: Mapped[str] = mapped_column(String(100))
 
     # Ground Truth
     crime_time_start: Mapped[time] = mapped_column(Time)
     crime_time_end: Mapped[time] = mapped_column(Time)
-    crime_location: Mapped[str] = mapped_column(String(100))
+    crime_location_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     crime_method: Mapped[str] = mapped_column(Text)
 
     # Constraints
@@ -41,7 +41,24 @@ class Scenario(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     # Relationships
-    locations: Mapped[List["Location"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
+    locations: Mapped[List["Location"]] = relationship(back_populates="scenario", cascade="all, delete-orphan", foreign_keys="Location.scenario_id")
+    
+    incident_loc: Mapped["Location"] = relationship(
+        "Location",
+        primaryjoin="and_(Scenario.scenario_id==Location.scenario_id, Scenario.incident_location_id==Location.location_id)",
+        foreign_keys="[Location.scenario_id, Location.location_id]",
+        viewonly=True,
+        post_update=True
+    )
+    
+    crime_loc: Mapped["Location"] = relationship(
+        "Location",
+        primaryjoin="and_(Scenario.scenario_id==Location.scenario_id, Scenario.crime_location_id==Location.location_id)",
+        foreign_keys="[Location.scenario_id, Location.location_id]",
+        viewonly=True,
+        post_update=True
+    )
+
     visibility_rules: Mapped[List["VisibilityRule"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     access_rules: Mapped[List["AccessRule"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     required_clues: Mapped[List["RequiredClue"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
@@ -51,4 +68,7 @@ class Scenario(Base):
 
     __table_args__ = (
         CheckConstraint("difficulty IN ('easy', 'mid', 'hard')", name="check_difficulty"),
+        # Foreign keys for location refs are handled via ALTER TABLE or explicit ForeignKeyConstraint if needed,
+        # but since it's a circular ref (Scenario needs Location, Location needs Scenario), we handle it carefully.
+        # Here we just define columns.
     )
