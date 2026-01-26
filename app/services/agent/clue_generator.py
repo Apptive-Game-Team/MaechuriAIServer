@@ -3,7 +3,7 @@ from typing import Optional
 from app.services.agent.base_generator import BaseGenerator
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.schemas.scenario import ScenarioExpansion
-from app.models.schemas.clue import ClueSetSchema
+from app.models.schemas import ClueSetSchema
 from app.models.schemas.map import MapSkeletonSchema
 
 
