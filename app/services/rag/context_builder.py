@@ -51,8 +51,15 @@ class ContextBuilder:
         self,
         timeline: dict,
     ) -> str:
-        return f"- {timeline["time"]}: {timeline["location"]}에서 {timeline["activity"]}"
+        time = timeline.get("time")
+        location = timeline.get("location")
+        activity = timeline.get("activity")
 
+        if time is None or location is None or activity is None:
+            # Fallback: show the raw timeline content if expected keys are missing
+            return f"- {timeline}"
+
+        return f"- {time}: {location}에서 {activity}"
     def _build_secret_context(
         self,
         fact: RetrievedFact
