@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SuspectRAGContext:
     """RAG context for suspect interrogation."""
-    relevant_timeline: str  # Formatted timeline entries
-    relevant_secrets: str   # Formatted secrets (within pressure threshold)
+    relevant_facts: str   # Formatted facts (within pressure threshold)
     relevant_history: str   # Formatted related past conversations
     full_context: str       # Combined context string
 
@@ -104,18 +103,9 @@ class RAGService:
         SuspectRAGContext
             Context containing relevant information.
         """
-        # Retrieve relevant timeline entries
-        timelines = await self.retriever.search_timelines(
-            db=db,
-            scenario_id=scenario_id,
-            suspect_id=suspect_id,
-            query=query,
-            top_k=top_k_timeline,
-            threshold=similarity_threshold
-        )
 
-        # Retrieve relevant secrets (only those within pressure threshold)
-        secrets = await self.retriever.search_secrets(
+        # Retrieve relevant facts (only those within pressure threshold)
+        facts = await self.retriever.search_facts(
             db=db,
             scenario_id=scenario_id,
             suspect_id=suspect_id,
@@ -139,19 +129,16 @@ class RAGService:
             )
 
         # Build context strings
-        timeline_str = self.context_builder.build_timeline_context(timelines)
-        secrets_str = self.context_builder.build_secret_context(secrets)
+        fact_str = self.context_builder.build_fact_context(facts)
         history_str = self.context_builder.build_chat_history_context(history)
 
         full_context = self.context_builder.build_suspect_interrogation_context(
-            timelines=timelines,
-            secrets=secrets,
+            facts=facts,
             chat_history=history
         )
 
         return SuspectRAGContext(
-            relevant_timeline=timeline_str,
-            relevant_secrets=secrets_str,
+            relevant_facts=fact_str,
             relevant_history=history_str,
             full_context=full_context
         )
