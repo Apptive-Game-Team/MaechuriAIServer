@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 from datetime import time
 
@@ -18,7 +18,6 @@ from app.db.models import (
     Clue
 )
 from app.models.schemas.suspect import (
-    SuspectGenerationSchema,
     PersonalitySchema,
     FactSchema,
     SuspectSchema
@@ -79,7 +78,7 @@ class ScenarioRepository:
         loc_map = {loc.location_id: loc.name for loc in scenario.locations}
 
         locations = [loc.name for loc in scenario.locations]
-        suspects = [self._to_suspect_schema(s, loc_map).model_dump() for s in scenario.suspects]
+        suspects = [self._to_suspect_schema(s).model_dump() for s in scenario.suspects]
         clues = [self._to_clue_schema(c, loc_map).model_dump() for c in scenario.clues]
 
         return {
@@ -157,16 +156,12 @@ class ScenarioRepository:
         self,
         scenario_id: int,
         suspect_id: int
-    ) -> Optional[SuspectGenerationSchema]:
+    ) -> Optional[SuspectSchema]:
         """
         Retrieves specific suspect profile, alibi, and persona info.
         """
         async with self._get_session() as session:
             # Need to fetch locations to map names
-            loc_result = await session.execute(
-                select(Location).where(Location.scenario_id == scenario_id)
-            )
-            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
 
             stmt = (
                 select(Suspect)
@@ -183,7 +178,7 @@ class ScenarioRepository:
             if not suspect:
                 return None
 
-            return self._to_suspect_schema(suspect, loc_map)
+            return self._to_suspect_schema(suspect)
 
     async def get_clue_info(
         self,
@@ -238,8 +233,7 @@ class ScenarioRepository:
                 select(Suspect)
                 .where(Suspect.scenario_id == scenario_id)
                 .options(
-                    selectinload(Suspect.timeline),
-                    selectinload(Suspect.secrets)
+                    selectinload(Suspect.facts)
                 )
                 .order_by(Suspect.suspect_id)
             )
@@ -247,7 +241,7 @@ class ScenarioRepository:
             suspects = result.scalars().all()
             return [self._to_suspect_schema(s) for s in suspects]
 
-    def _to_suspect_schema(self, suspect: Suspect, loc_map: dict = None) -> SuspectSchema:
+    def _to_suspect_schema(self, suspect: Suspect) -> SuspectSchema:
         """Convert Suspect ORM object to SuspectSchema"""
         return SuspectSchema(
             suspect_id=suspect.suspect_id,
@@ -451,6 +445,7 @@ class ScenarioRepository:
                         scenario_id=scenario_id,
                         suspect_id=suspect_id,
                         fact_id=fact["fact_id"],
+                        threshold=fact["threshold"],
                         content=fact["content"],
                         type=fact["type"],
                     )
@@ -506,3 +501,12 @@ class ScenarioRepository:
                 raise ValueError(f"Failed to parse time string '{time_value}': {str(e)}")
                 
         raise ValueError(f"Cannot parse time value: {time_value}")
+
+
+    async def get_location_dict(self, scenario_id: int) -> Dict[int, str]:
+        async with self._get_session() as session:
+            loc_result = await session.execute(
+                select(Location).where(Location.scenario_id == scenario_id)
+            )
+            locations = loc_result.scalars().all()
+            return {loc.location_id: loc.name for loc in locations}

@@ -5,7 +5,6 @@ import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding
 from app.services.embedding import get_embedding_service, EmbeddingService
 
@@ -33,7 +32,7 @@ class RetrievedClue:
     logic_explanation: str
     decoded_answer: Optional[str]
     is_red_herring: bool
-    related_suspect_ids: List[int]
+    related_fact_ids: List[int]
     similarity: float
 
 
@@ -76,9 +75,9 @@ class RAGRetriever:
             scenario_id: int,
             suspect_id: int,
             query: str,
-            current_pressure: int,
+            current_pressure: int = 0.1,
             top_k: int = 3,
-            threshold: float = 0.5
+            threshold: float = 0.1
     ) -> List[RetrievedFact]:
         """Search for relevant facts that can be revealed."""
         query_embedding = self.embedding_service.embed_query(query)
@@ -157,6 +156,10 @@ class RAGRetriever:
         result = await db.execute(stmt)
 
         clues = []
+
+        from app.api.dependencies import get_scenario_repository
+        location_dict = await get_scenario_repository().get_location_dict(scenario_id)
+
         for row in result:
             clue: Clue = row[0]
             similarity: float = row[1]
@@ -165,12 +168,12 @@ class RAGRetriever:
                 clues.append(RetrievedClue(
                     clue_id=clue.clue_id,
                     name=clue.name,
-                    found_at=clue.found_at,
+                    found_at=location_dict[clue.location_id],
                     description=clue.description,
                     logic_explanation=clue.logic_explanation,
                     decoded_answer=clue.decoded_answer,
                     is_red_herring=clue.is_red_herring,
-                    related_suspect_ids=clue.related_suspect_ids or [],
+                    related_fact_ids=clue.related_fact_ids or [],
                     similarity=similarity
                 ))
 

@@ -4,7 +4,7 @@ import logging
 import uuid
 
 from app.models.schemas.scenario import ScenarioResult
-from app.models.schemas.suspect import SuspectGenerationRequest
+from app.models.schemas.suspect import SuspectGenerationRequest, SuspectSchema
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
 from app.services.agent.consistency_validator import ConsistencyValidator
@@ -47,7 +47,7 @@ class ScenarioService:
             backoff_multiplier=1.5  # 2초 → 3초 → 4.5초
         )
 
-        self.state_manager = ScenarioStateManager(self.base_tmp_dir)
+        self.state_manager = ScenarioStateManager()
 
     def generate(self,
                  pre_input: str,
@@ -65,6 +65,7 @@ class ScenarioService:
         else:
             logger.info("Loaded case_state from intermediate file.")
 
+        time.sleep(3)
 
         # 2. Skeleton 생성 (재시도 적용)
         skeleton_result = self.state_manager.load_intermediate_state(request_id, "skeleton_result", "ScenarioSkeleton")
@@ -97,6 +98,8 @@ class ScenarioService:
 
         logger.info("Expansion generated successfully")
 
+        time.sleep(3)
+
         # 4. Map Skeleton 생성 (재시도 적용)
         map_skeleton = self.state_manager.load_intermediate_state(request_id, "map_skeleton", "MapSkeleton")
         if map_skeleton is None:
@@ -112,6 +115,7 @@ class ScenarioService:
 
         logger.info("Map skeleton generated successfully")
 
+        time.sleep(3)
 
         # 5. Suspects 생성 (재시도 적용)
         suspects_result = self.state_manager.load_intermediate_state(request_id, "suspects_result", "SuspectList")
@@ -132,6 +136,7 @@ class ScenarioService:
 
         logger.info("Suspects generated successfully")
 
+        time.sleep(3)
 
         # 6. Clues 생성 (재시도 적용)
         clue_result = self.state_manager.load_intermediate_state(request_id, "clue_result", "ClueSet")
@@ -147,6 +152,8 @@ class ScenarioService:
             logger.info("Loaded clue_result from intermediate file.")
 
         logger.info("Clues generated successfully")
+
+        time.sleep(3)
 
         # 7. Map Detail 생성 (재시도 적용)
         map_result = self.state_manager.load_intermediate_state(request_id, "map_detail", "MapDetail")
@@ -165,12 +172,14 @@ class ScenarioService:
 
         logger.info("Map detail generated successfully")
 
+        time.sleep(3)
+
         # 8. 최종 결과 조합
         final_scenario = ScenarioResult(
             **expansion_result.model_dump(),  # 본인
             clues=clue_result,  # 추가
             map=map_result,  # 추가
-            suspects=suspects_result.suspects  # 추가
+            suspects=[SuspectSchema.from_generation(generation) for generation in suspects_result.suspects]  # 추가
         )
 
         return final_scenario.model_dump(mode='json')

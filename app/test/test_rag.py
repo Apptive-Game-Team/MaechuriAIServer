@@ -25,6 +25,8 @@ import uuid
 import sys
 from datetime import datetime
 
+from app.db.models import Fact, Suspect
+
 # Windows 환경에서 ProactorEventLoop 이슈 방지 (Event loop is closed 에러 해결)
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -149,20 +151,31 @@ def check_embedding_service(model=None):
         print_info(f"프로필 임베딩 차원: {len(profile_embedding)}")
 
         # 2.3 타임라인 임베딩
-        print_subheader("2.3 타임라인 임베딩")
-        timeline_embedding = service.embed_timeline_entry(
-            time_range="23:00-23:30",
-            location="최교수 연구실",
-            activity="논문 작업",
-            suspect_name="최영진",
+        print_subheader("2.3 타임라인 사실 임베딩")
+        timeline_embedding = service.embed_fact(
+            Fact(
+                type="timeline",
+                content={
+                    "time": "23:00-23:30",
+                    "location": "최교수 연구실",
+                    "activity": "논문 작업",
+                },
+                suspect=Suspect(
+                    name="최영진"
+                )
+            )
         )
         print_info(f"타임라인 임베딩 차원: {len(timeline_embedding)}")
 
         # 2.4 비밀 임베딩
-        print_subheader("2.4 비밀 임베딩")
-        secret_embedding = service.embed_secret(
-            content="최근 박선우와 연구 방향 문제로 다툰 것은 사실입니다.",
-            suspect_name="최영진",
+        print_subheader("2.4 비밀 사실 임베딩")
+        secret_embedding = service.embed_fact(
+            Fact(
+                content={ "content": "최근 박선우와 연구 방향 문제로 다툰 것은 사실입니다." },
+                suspect=Suspect(
+                    name="최영진"
+                )
+            ),
         )
         print_info(f"비밀 임베딩 차원: {len(secret_embedding)}")
 
@@ -239,28 +252,15 @@ async def check_indexing():
                     """
                 SELECT COUNT(*) as total,
                        COUNT(embedding) as with_embedding
-                FROM suspect_timeline WHERE scenario_id = :sid
+                FROM fact WHERE scenario_id = :sid
             """
                 ),
                 {"sid": SCENARIO_ID},
             )
             row = result.fetchone()
             print_info(
-                f"타임라인: 총 {row.total}개, 임베딩 있음: {row.with_embedding}개"
+                f"사실: 총 {row.total}개, 임베딩 있음: {row.with_embedding}개"
             )
-
-            result = await db.execute(
-                text(
-                    """
-                SELECT COUNT(*) as total,
-                       COUNT(embedding) as with_embedding
-                FROM suspect_secret WHERE scenario_id = :sid
-            """
-                ),
-                {"sid": SCENARIO_ID},
-            )
-            row = result.fetchone()
-            print_info(f"비밀: 총 {row.total}개, 임베딩 있음: {row.with_embedding}개")
 
             result = await db.execute(
                 text(
@@ -293,12 +293,9 @@ async def check_indexing():
                     """
                 SELECT s.name, s.role,
                        CASE WHEN s.profile_embedding IS NOT NULL THEN 'O' ELSE 'X' END as profile,
-                       (SELECT COUNT(*) FROM suspect_timeline t
-                        WHERE t.scenario_id = s.scenario_id AND t.suspect_id = s.suspect_id
-                        AND t.embedding IS NOT NULL) as timeline_count,
-                       (SELECT COUNT(*) FROM suspect_secret sec
-                        WHERE sec.scenario_id = s.scenario_id AND sec.suspect_id = s.suspect_id
-                        AND sec.embedding IS NOT NULL) as secret_count
+                       (SELECT COUNT(*) FROM fact f
+                        WHERE f.scenario_id = s.scenario_id AND f.suspect_id = s.suspect_id
+                        AND f.embedding IS NOT NULL) as fact_count
                 FROM suspect s
                 WHERE s.scenario_id = :sid
             """
@@ -308,12 +305,12 @@ async def check_indexing():
 
             print("\n용의자별 인덱싱 상태:")
             print(
-                f"{ '이름':<10} {'역할':<15} {'프로필':<8} {'타임라인':<10} {'비밀':<8}"
+                f"{ '이름':<10} {'역할':<15} {'프로필':<8} {'사실':<18}"
             )
             print("-" * 55)
             for row in result:
                 print(
-                    f"{row.name:<10} {row.role:<15} {row.profile:<8} {row.timeline_count:<10} {row.secret_count:<8}"
+                    f"{row.name:<10} {row.role:<15} {row.profile:<8} {row.fact_count:<18}"
                 )
 
             result = await db.execute(
@@ -368,7 +365,7 @@ async def check_retrieval():
 
             for query, suspect_id in test_queries:
                 print(f"\n쿼리: '{query}' (용의자 ID: {suspect_id})")
-                results = await retriever.search_timelines(
+                results = await retriever.search_facts(
                     db=db,
                     scenario_id=SCENARIO_ID,
                     suspect_id=suspect_id,
@@ -380,7 +377,7 @@ async def check_retrieval():
                 if results:
                     for r in results:
                         print(
-                            f"  [{r.similarity:.3f}] {r.time_range} - {r.location}: {r.activity[:30]}..."
+                            f"  [{r.similarity:.3f}] (threshold {r.threshold}) {r.content}..."
                         )
                 else:
                     print("  (검색 결과 없음)")
@@ -395,7 +392,7 @@ async def check_retrieval():
 
             for query, suspect_id, pressure in secret_queries:
                 print(f"\n쿼리: '{query}' (pressure: {pressure})")
-                results = await retriever.search_secrets(
+                results = await retriever.search_facts(
                     db=db,
                     scenario_id=SCENARIO_ID,
                     suspect_id=suspect_id,
@@ -408,7 +405,7 @@ async def check_retrieval():
                 if results:
                     for r in results:
                         print(
-                            f"  [{r.similarity:.3f}] (threshold {r.threshold}) {r.content[:50]}..."
+                            f"  [{r.similarity:.3f}] (threshold {r.threshold}) {r.content}..."
                         )
                 else:
                     print("  (검색 결과 없음 - pressure 부족 또는 유사도 낮음)")
@@ -562,44 +559,29 @@ async def check_context_building():
             print(f"쿼리: '{query}'")
             print(f"용의자 ID: {suspect_id}, Pressure: {pressure}")
 
-            timelines = await retriever.search_timelines(
-                db=db,
-                scenario_id=SCENARIO_ID,
-                suspect_id=suspect_id,
-                query=query,
-                top_k=3,
-                threshold=0.3,
-            )
-            print(f"\n검색된 타임라인: {len(timelines)}개")
-
-            secrets = await retriever.search_secrets(
+            facts = await retriever.search_facts(
                 db=db,
                 scenario_id=SCENARIO_ID,
                 suspect_id=suspect_id,
                 query=query,
                 current_pressure=pressure,
-                top_k=2,
+                top_k=4,
                 threshold=0.3,
             )
-            print(f"검색된 비밀: {len(secrets)}개")
+            print(f"검색된 사실: {len(facts)}개")
 
             # 컨텍스트 빌딩
             print_subheader("6.2 빌드된 컨텍스트")
 
-            timeline_ctx = builder.build_timeline_context(timelines)
-            if timeline_ctx:
-                print("\n[타임라인 컨텍스트]")
-                print(timeline_ctx)
-
-            secret_ctx = builder.build_secret_context(secrets)
+            secret_ctx = builder.build_fact_context(facts)
             if secret_ctx:
-                print("\n[비밀 컨텍스트]")
+                print("\n[사실 컨텍스트]")
                 print(secret_ctx)
 
             # 전체 컨텍스트
             print_subheader("6.3 통합 컨텍스트")
             full_ctx = builder.build_suspect_interrogation_context(
-                timelines=timelines, secrets=secrets, chat_history=[]
+                facts=facts, chat_history=[]
             )
             if full_ctx:
                 print(full_ctx)

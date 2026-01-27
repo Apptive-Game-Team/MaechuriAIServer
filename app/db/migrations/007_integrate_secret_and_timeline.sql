@@ -19,4 +19,4 @@ CREATE INDEX IF NOT EXISTS idx_fact_embedding
 ON fact USING hnsw (embedding vector_cosine_ops);
 
 ALTER TABLE clue DROP COLUMN IF EXISTS related_suspect_ids;
-ALTER TABLE clue ADD COLUMN related_fact_ids BIGINT[];
+ALTER TABLE clue ADD COLUMN related_fact_ids JSONB;

@@ -35,8 +35,8 @@ class SuspectSchema(BaseModel):
 
     @classmethod
     def from_generation(cls, generation: "SuspectGenerationSchema") -> "SuspectSchema":
-        timeline = [FactSchema.from_timeline(t) for t in generation.timeline]
-        secrets = [FactSchema.from_secret(s) for s in generation.secrets]
+        timeline: List[FactSchema] = [FactSchema.from_timeline(t) for t in generation.timeline]
+        secrets: List[FactSchema] = [FactSchema.from_secret(s) for s in generation.secrets]
         return cls(
             suspect_id=generation.suspect_id,
             name=generation.name,
@@ -47,7 +47,7 @@ class SuspectSchema(BaseModel):
             is_culprit=generation.is_culprit,
             motive=generation.motive,
             alibi_summary=generation.alibi_summary,
-            facts=timeline.extend(secrets),
+            facts=timeline + secrets,
             personality=generation.personality,
             critical_clue_ids=generation.critical_clue_ids,
         )
@@ -56,3 +56,7 @@ class SuspectSchema(BaseModel):
 class SuspectListSchema(BaseModel):
     """List of suspects."""
     suspects: List[SuspectSchema]
+
+from app.models.schemas.suspect.common import PersonalitySchema
+from app.models.schemas.suspect.response import SuspectGenerationSchema
+SuspectSchema.model_rebuild()

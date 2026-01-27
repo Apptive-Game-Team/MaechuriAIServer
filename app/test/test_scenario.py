@@ -24,3 +24,24 @@ def test_scenario():
         json.dump(test_dict, f, indent=2, ensure_ascii=False, default=str)
 
     print(f"\nResult saved to: {file_path}")
+
+async def test_save_scenario():
+    agent = ScenarioService(GeminiClient())
+
+    from app.db.database import async_session_factory
+    import json, os
+    scenario_data = None
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(base_dir, 'result_20260127_173313.json')
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        scenario_data = json.load(f)
+
+    if scenario_data is None:
+        raise Exception("Scenario Data Not Found")
+
+    async with async_session_factory() as db:
+        await agent.save_to_db(scenario_data, db)
+
+        print("Successfully generated and saved scenario")

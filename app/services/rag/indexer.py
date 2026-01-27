@@ -64,8 +64,7 @@ class RAGIndexer:
         
         stats = {
             "suspects": suspect_stats["suspects"],
-            "timelines": suspect_stats["timelines"],
-            "secrets": suspect_stats["secrets"],
+            "facts": suspect_stats["facts"],
             "clues": clues_indexed,
         }
 
@@ -92,17 +91,12 @@ class RAGIndexer:
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
 
-        # 1. Load Locations for mapping IDs to Names
-        loc_result = await db.execute(
-            select(Location).where(Location.scenario_id == scenario_id)
-        )
-        loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
 
         # 2. Load suspects with relationships
         result = await db.execute(
             select(Suspect)
             .where(Suspect.scenario_id == scenario_id)
-            .options(selectinload(Suspect.timeline), selectinload(Suspect.secrets))
+            .options(selectinload(Suspect.facts))
         )
         suspects = result.scalars().all()
 
@@ -125,7 +119,7 @@ class RAGIndexer:
                 "profile_embedding": profile_embedding
             })
 
-            # Index timelines
+            # Index Facts
             for fact in suspect.facts:
                 fact_embedding = self.embedding_service.embed_fact(fact)
                 fact_updates.append({
