@@ -85,23 +85,45 @@ class EmbeddingService:
 
     def embed_fact(
         self,
-        fact: Fact
+        fact: Fact,
+        suspect_name: Optional[str] = None
     ) -> List[float]:
-        """Generate embedding for a fact."""
+        """Generate embedding for a fact.
+        
+        Parameters
+        ----------
+        fact : Fact
+            The fact to embed.
+        suspect_name : str, optional
+            The name of the suspect associated with the fact.
+            If not provided, will attempt to access fact.suspect.name.
+        
+        Returns
+        -------
+        List[float]
+            The fact embedding.
+        """
+        # Get suspect name - prefer the passed parameter to avoid lazy loading
+        name = suspect_name if suspect_name is not None else fact.suspect.name
+        
         text = None
         match fact.type:
             case "secret":
                 text = self._serialize_secret(
                     fact.content,
-                    fact.suspect.name)
+                    name)
             case "timeline":
                 text = self._serialize_timeline(
                     fact.content["time"],
                     fact.content["location"],
                     fact.content["activity"],
-                    fact.suspect.name)
+                    name)
             case _:
-                text = fact.to_string()
+                # For default case, use to_string() but pass suspect name if available
+                if suspect_name is not None:
+                    text = f"{suspect_name}의 사실 {fact.content}"
+                else:
+                    text = fact.to_string()
 
         return self.model.embed(text)
 

@@ -121,7 +121,8 @@ class RAGIndexer:
 
             # Index Facts
             for fact in suspect.facts:
-                fact_embedding = self.embedding_service.embed_fact(fact)
+                # Pass suspect name to avoid N+1 query from lazy loading
+                fact_embedding = self.embedding_service.embed_fact(fact, suspect_name=suspect.name)
                 fact_updates.append({
                     "scenario_id": scenario_id,
                     "suspect_id": suspect.suspect_id,
