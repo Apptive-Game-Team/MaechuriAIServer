@@ -58,14 +58,20 @@ class ContextBuilder:
 
         if time is None or location is None or activity is None:
             # Fallback: show the raw timeline content if expected keys are missing
-            return f"- {timeline}"
+            return f"- {str(timeline)}"
 
         return f"- {time}: {location}에서 {activity}"
     def _build_secret_context(
         self,
         fact: RetrievedFact
     ) -> str:
-        return f"- (압박 {fact.threshold}+) {fact.content["content"]}"
+        content = fact.content.get("content")
+        
+        if content is None:
+            # Fallback: show the raw fact content if expected key is missing
+            return f"- (압박 {fact.threshold}+) {str(fact.content)}"
+        
+        return f"- (압박 {fact.threshold}+) {content}"
 
     def build_clue_context(
         self,
