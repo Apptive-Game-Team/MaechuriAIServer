@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding
 from app.services.embedding import get_embedding_service, EmbeddingService
+from app.api.dependencies import get_scenario_repository
 
 
 logger = logging.getLogger(__name__)
@@ -157,7 +158,6 @@ class RAGRetriever:
 
         clues = []
 
-        from app.api.dependencies import get_scenario_repository
         location_dict = await get_scenario_repository().get_location_dict(scenario_id)
 
         for row in result:
