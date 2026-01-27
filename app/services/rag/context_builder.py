@@ -44,6 +44,7 @@ class ContextBuilder:
                     text = fact.content.to_string()
             if include_similarity:
                 text += f" [유사도: {fact.similarity:.2f}]"
+            lines.append(text)
 
         return "\n".join(lines)
 
