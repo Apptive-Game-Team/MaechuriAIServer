@@ -14,7 +14,7 @@ from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.rag import get_rag_service
 from app.core.json_retry import JSONParseRetry
-from app.services.scenario.scenario_generate_helper import inject_sequential_id, find_facts
+from app.services.scenario.scenario_generate_helper import inject_sequential_id
 from app.services.scenario.scenario_state_manager import ScenarioStateManager
 
 
