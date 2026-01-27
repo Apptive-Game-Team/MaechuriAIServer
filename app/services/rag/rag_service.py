@@ -129,7 +129,7 @@ class RAGService:
             )
 
         # Build context strings
-        fact_str = self.context_builder.build_fact_context(facts)
+        facts_str = self.context_builder.build_fact_context(facts)
         history_str = self.context_builder.build_chat_history_context(history)
 
         full_context = self.context_builder.build_suspect_interrogation_context(
@@ -138,7 +138,7 @@ class RAGService:
         )
 
         return SuspectRAGContext(
-            relevant_facts=fact_str,
+            relevant_facts=facts_str,
             relevant_history=history_str,
             full_context=full_context
         )
