@@ -65,7 +65,13 @@ class ContextBuilder:
         self,
         fact: RetrievedFact
     ) -> str:
-        return f"- (압박 {fact.threshold}+) {fact.content["content"]}"
+        content = fact.content.get("content")
+        
+        if content is None:
+            # Fallback: show the raw fact content if expected key is missing
+            return f"- (압박 {fact.threshold}+) {fact.content}"
+        
+        return f"- (압박 {fact.threshold}+) {content}"
 
     def build_clue_context(
         self,
