@@ -5,8 +5,7 @@ from app.db.models.scenario import (
     AccessRule,
     RequiredClue,
     Suspect,
-    SuspectTimeline,
-    SuspectSecret,
+    Fact,
     Clue
 )
 from app.db.models.embedding import ChatMessageEmbedding
@@ -19,8 +18,7 @@ __all__ = [
     "AccessRule",
     "RequiredClue",
     "Suspect",
-    "SuspectTimeline",
-    "SuspectSecret",
+    "Fact",
     "Clue",
     "ChatMessageEmbedding",
     "GameSession",

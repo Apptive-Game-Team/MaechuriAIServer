@@ -1,5 +1,5 @@
 """Suspect database models."""
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+from app.db.models.scenario.main import Scenario
 
 
 class Suspect(Base):
@@ -38,64 +39,26 @@ class Suspect(Base):
 
     # Relationships
     scenario: Mapped["Scenario"] = relationship(back_populates="suspects")
-    timeline: Mapped[List["SuspectTimeline"]] = relationship(back_populates="suspect", cascade="all, delete-orphan")
-    secrets: Mapped[List["SuspectSecret"]] = relationship(back_populates="suspect", cascade="all, delete-orphan")
+    facts: Mapped[List["Fact"]] = relationship(back_populates="suspect", cascade="all, delete-orphan")
 
-
-class SuspectTimeline(Base):
-    """Suspect timeline."""
-    __tablename__ = "suspect_timeline"
+class Fact(Base):
+    """Suspect fact."""
+    __tablename__ = "fact"
 
     scenario_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    timeline_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-
-    time_range: Mapped[str] = mapped_column(String(50))
-    location_id: Mapped[int] = mapped_column(BigInteger)
-    activity: Mapped[str] = mapped_column(Text)
-    can_prove: Mapped[bool] = mapped_column(Boolean, default=False)
-    witness: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-
-    # Embedding for RAG (time_range + location + activity)
-    embedding = mapped_column(Vector(1024), nullable=True)
-
-    suspect: Mapped["Suspect"] = relationship(back_populates="timeline")
-    location: Mapped["Location"] = relationship(
-        primaryjoin="and_(SuspectTimeline.scenario_id==Location.scenario_id, SuspectTimeline.location_id==Location.location_id)",
-        foreign_keys=[scenario_id, location_id],
-        overlaps="scenario,timeline"
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["scenario_id", "suspect_id"],
-            ["suspect.scenario_id", "suspect.suspect_id"],
-            ondelete="CASCADE"
-        ),
-        ForeignKeyConstraint(
-            ["scenario_id", "location_id"],
-            ["location.scenario_id", "location.location_id"],
-            ondelete="CASCADE"
-        ),
-    )
-
-
-class SuspectSecret(Base):
-    """Suspect secret."""
-    __tablename__ = "suspect_secret"
-
-    scenario_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    suspect_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    secret_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
+    fact_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
 
     threshold: Mapped[int] = mapped_column(Integer)
-    content: Mapped[str] = mapped_column(Text)
-    trigger_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    content: Mapped[Any] = mapped_column(JSONB)
+
+    type: Mapped[str] = mapped_column(String(50))
 
     # Embedding for RAG (secret content)
     embedding = mapped_column(Vector(1024), nullable=True)
 
-    suspect: Mapped["Suspect"] = relationship(back_populates="secrets")
+    suspect_id: Mapped[int] = mapped_column(BigInteger)
+
+    suspect: Mapped[Suspect] = relationship(back_populates="facts")
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -105,3 +68,7 @@ class SuspectSecret(Base):
         ),
         CheckConstraint("threshold >= 0 AND threshold <= 100", name="check_threshold"),
     )
+
+    def to_string(self) -> str:
+        return f"{self.suspect.name}의 사실 {self.content}"
+
