@@ -9,7 +9,7 @@ def test_scenario():
     print("SCENARIO TEST START")
 
     agent = ScenarioService(GeminiClient())
-    test_dict = agent.generate("밀실 방화 사망 사건")
+    test_dict = agent.generate("test_generation_1", "밀실 방화 사망 사건")
 
     print(test_dict)
     # 결과 저장 (현재 시각 기준 파일명)
