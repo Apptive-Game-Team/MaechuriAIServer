@@ -6,8 +6,8 @@ from app.core.utils import extract_json, safe_json_load
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.schemas.suspect import (
     SuspectGenerationRequest,
-    SuspectListSchema,
-    SuspectSchema
+    SuspectGenerationListSchema,
+    SuspectGenerationSchema
 )
 
 
@@ -21,7 +21,7 @@ class SuspectGenerator:
             "app/prompts/suspect/build.txt"
         )
 
-    def generate(self, request: SuspectGenerationRequest) -> SuspectListSchema:
+    def generate(self, request: SuspectGenerationRequest) -> SuspectGenerationListSchema:
         """
         용의자를 1명씩 청크 단위로 생성하여 결과를 합침.
 
@@ -29,12 +29,12 @@ class SuspectGenerator:
             request: 용의자 생성 요청
 
         Returns:
-            SuspectListSchema: 생성된 용의자 목록
+            SuspectGenerationListSchema: 생성된 용의자 목록
         """
         suspect_count = request.generation_config.count
         culprit_ids = request.ground_truth.culprit_ids
 
-        suspects: List[SuspectSchema] = []
+        suspects: List[SuspectGenerationSchema] = []
 
         for i in range(suspect_count):
             suspect_id = i + 1
@@ -67,15 +67,15 @@ class SuspectGenerator:
             if i < suspect_count - 1:
                 time.sleep(2)
 
-        return SuspectListSchema(suspects=suspects)
+        return SuspectGenerationListSchema(suspects=suspects)
 
     def _generate_single(
         self,
         request: SuspectGenerationRequest,
         suspect_id: int,
         is_culprit: bool,
-        already_generated: List[SuspectSchema]
-    ) -> SuspectSchema:
+        already_generated: List[SuspectGenerationSchema]
+    ) -> SuspectGenerationSchema:
         """
         단일 용의자 생성.
 
@@ -86,7 +86,7 @@ class SuspectGenerator:
             already_generated: 이미 생성된 용의자들 (중복 방지용)
 
         Returns:
-            SuspectSchema: 생성된 용의자
+            SuspectGenerationSchema: 생성된 용의자
         """
         prompt = self._build_single_prompt(
             request=request,
@@ -96,7 +96,7 @@ class SuspectGenerator:
         )
 
         # 단일 용의자 스키마로 요청
-        single_schema = SuspectSchema.model_json_schema()
+        single_schema = SuspectGenerationSchema.model_json_schema()
 
         raw = self.llm.complete(
             system=self.system_prompt,
@@ -107,14 +107,14 @@ class SuspectGenerator:
         json_text = extract_json(raw)
         data = safe_json_load(json_text)
 
-        return SuspectSchema.model_validate(data)
+        return SuspectGenerationSchema.model_validate(data)
 
     def _build_single_prompt(
         self,
         request: SuspectGenerationRequest,
         suspect_id: int,
         is_culprit: bool,
-        already_generated: List[SuspectSchema]
+        already_generated: List[SuspectGenerationSchema]
     ) -> str:
         """단일 용의자 생성용 프롬프트 구성"""
 
