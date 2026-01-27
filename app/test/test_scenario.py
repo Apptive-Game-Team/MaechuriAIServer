@@ -29,7 +29,7 @@ async def test_save_scenario():
     agent = ScenarioService(GeminiClient())
 
     from app.db.database import async_session_factory
-    import json, os
+
     scenario_data = None
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
