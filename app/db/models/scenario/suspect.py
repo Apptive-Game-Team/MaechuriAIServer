@@ -69,6 +69,13 @@ class Fact(Base):
         CheckConstraint("threshold >= 0 AND threshold <= 100", name="check_threshold"),
     )
 
-    def to_string(self) -> str:
-        return f"{self.suspect.name}의 사실 {self.content}"
+    def to_string(self, suspect_name: Optional[str] = None) -> str:
+        """Return a human-readable representation of this fact.
 
+        The suspect's name can be provided explicitly via `suspect_name` to
+        avoid accessing the `suspect` relationship (and thus avoid lazy-loading).
+        If no name is provided, the method falls back to using `suspect_id`.
+        """
+        if suspect_name is not None:
+            return f"{suspect_name}의 사실 {self.content}"
+        return f"용의자 {self.suspect_id}의 사실 {self.content}"
