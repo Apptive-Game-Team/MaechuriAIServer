@@ -75,7 +75,7 @@ class RAGRetriever:
             scenario_id: int,
             suspect_id: int,
             query: str,
-            current_pressure: int = 0.1,
+            current_pressure: int = 0,
             top_k: int = 3,
             threshold: float = 0.1
     ) -> List[RetrievedFact]:
