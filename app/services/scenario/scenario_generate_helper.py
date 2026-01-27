@@ -1,14 +1,14 @@
 from typing import Any, List
 
-from app.models.schemas.suspect import SuspectListSchema
+from app.models.schemas.suspect import SuspectGenerationListSchema
 from app.models.schemas.suspect.common import FactEntrySchema
 
 
-def find_facts(suspect_list: SuspectListSchema) -> List[FactEntrySchema[Any]]:
+def find_facts(suspect_list: SuspectGenerationListSchema) -> List[FactEntrySchema[Any]]:
     suspect_facts: List[FactEntrySchema] = []
     for suspect in suspect_list.suspects:
         suspect_facts.extend(suspect.secrets)
-        suspect_facts.extend(suspect.facts)
+        suspect_facts.extend(suspect.timeline)
 
     return suspect_facts
 

@@ -1,7 +1,13 @@
 """Suspect schema modules organized by purpose."""
+from .main import (
+    SuspectSchema,
+    SuspectListSchema
+)
 from .common import (
-    TimelineEntrySchema,
-    SecretTierSchema,
+    FactSchema,
+    FactEntrySchema,
+    TimelineContentSchema,
+    SecretContentSchema,
     PersonalitySchema
 )
 from .request import (
@@ -9,19 +15,24 @@ from .request import (
     SuspectGenerationRequest
 )
 from .response import (
-    SuspectSchema,
-    SuspectListSchema
+    SuspectGenerationSchema,
+    SuspectGenerationListSchema
 )
 
 __all__ = [
+    # Main
+    "SuspectSchema",
+    "SuspectListSchema",
     # Common
-    "TimelineEntrySchema",
-    "SecretTierSchema",
+    "FactSchema",
+    "TimelineContentSchema",
+    "SecretContentSchema",
     "PersonalitySchema",
+    "FactEntrySchema",
     # Request
     "CaseContextSchema",
     "SuspectGenerationRequest",
     # Response
-    "SuspectSchema",
-    "SuspectListSchema",
+    "SuspectGenerationSchema",
+    "SuspectGenerationListSchema",
 ]

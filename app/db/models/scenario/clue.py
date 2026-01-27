@@ -1,5 +1,5 @@
 """Clue database model."""
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import BigInteger, String, Text, Boolean, ForeignKey, ForeignKeyConstraint
@@ -7,7 +7,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
-from app.db.models import Location, Scenario
+
+if TYPE_CHECKING:
+    from app.db.models import Location, Scenario
 
 
 class Clue(Base):
