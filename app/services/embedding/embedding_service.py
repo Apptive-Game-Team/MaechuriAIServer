@@ -119,11 +119,8 @@ class EmbeddingService:
                     fact.content["activity"],
                     name)
             case _:
-                # For default case, use to_string() but pass suspect name if available
-                if suspect_name is not None:
-                    text = f"{suspect_name}의 사실 {fact.content}"
-                else:
-                    text = fact.to_string()
+                # Default serialization format matches Fact.to_string()
+                text = f"{name}의 사실 {fact.content}"
 
         return self.model.embed(text)
 
