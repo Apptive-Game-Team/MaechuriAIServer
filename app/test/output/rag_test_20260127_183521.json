@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-01-27T18:34:58.160912",
+  "scenario_id": 1,
+  "tests": {
+    "model_loading": true,
+    "embedding_service": true,
+    "indexing": true,
+    "retrieval": true,
+    "chat_history": true,
+    "context_building": true,
+    "integration": true
+  }
+}

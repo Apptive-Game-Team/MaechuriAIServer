@@ -1,7 +1,7 @@
 """Scenario database models organized by entity."""
 from .main import Scenario
 from .world import Location, VisibilityRule, AccessRule, RequiredClue
-from .suspect import Suspect, SuspectTimeline, SuspectSecret
+from .suspect import Suspect, Fact
 from .clue import Clue
 
 __all__ = [
@@ -11,7 +11,6 @@ __all__ = [
     "AccessRule",
     "RequiredClue",
     "Suspect",
-    "SuspectTimeline",
-    "SuspectSecret",
+    "Fact",
     "Clue",
 ]

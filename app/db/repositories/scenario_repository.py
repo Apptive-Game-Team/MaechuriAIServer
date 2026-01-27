@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 from contextlib import asynccontextmanager
 from datetime import time
 
@@ -14,15 +14,13 @@ from app.db.models import (
     AccessRule,
     RequiredClue,
     Suspect,
-    SuspectTimeline,
-    SuspectSecret,
+    Fact,
     Clue
 )
 from app.models.schemas.suspect import (
-    SuspectSchema,
-    TimelineEntrySchema,
-    SecretTierSchema,
-    PersonalitySchema
+    PersonalitySchema,
+    FactSchema,
+    SuspectSchema
 )
 from app.models.schemas.clue import ClueItemSchema
 
@@ -62,9 +60,7 @@ class ScenarioRepository:
                     selectinload(Scenario.required_clues),
                     selectinload(Scenario.clues),
                     selectinload(Scenario.suspects)
-                    .selectinload(Suspect.timeline),
-                    selectinload(Scenario.suspects)
-                    .selectinload(Suspect.secrets),
+                    .selectinload(Suspect.facts),
                 )
             )
 
@@ -82,7 +78,7 @@ class ScenarioRepository:
         loc_map = {loc.location_id: loc.name for loc in scenario.locations}
 
         locations = [loc.name for loc in scenario.locations]
-        suspects = [self._to_suspect_schema(s, loc_map).model_dump() for s in scenario.suspects]
+        suspects = [self._to_suspect_schema(s).model_dump() for s in scenario.suspects]
         clues = [self._to_clue_schema(c, loc_map).model_dump() for c in scenario.clues]
 
         return {
@@ -166,18 +162,13 @@ class ScenarioRepository:
         """
         async with self._get_session() as session:
             # Need to fetch locations to map names
-            loc_result = await session.execute(
-                select(Location).where(Location.scenario_id == scenario_id)
-            )
-            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
 
             stmt = (
                 select(Suspect)
                 .where(Suspect.scenario_id == scenario_id)
                 .where(Suspect.suspect_id == suspect_id)
                 .options(
-                    selectinload(Suspect.timeline),
-                    selectinload(Suspect.secrets)
+                    selectinload(Suspect.facts)
                 )
             )
 
@@ -187,7 +178,7 @@ class ScenarioRepository:
             if not suspect:
                 return None
 
-            return self._to_suspect_schema(suspect, loc_map)
+            return self._to_suspect_schema(suspect)
 
     async def get_clue_info(
         self,
@@ -238,27 +229,20 @@ class ScenarioRepository:
     async def get_all_suspects(self, scenario_id: int) -> List[SuspectSchema]:
         """Get all suspects for a scenario"""
         async with self._get_session() as session:
-            loc_result = await session.execute(
-                select(Location).where(Location.scenario_id == scenario_id)
-            )
-            loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
-
             stmt = (
                 select(Suspect)
                 .where(Suspect.scenario_id == scenario_id)
                 .options(
-                    selectinload(Suspect.timeline),
-                    selectinload(Suspect.secrets)
+                    selectinload(Suspect.facts)
                 )
                 .order_by(Suspect.suspect_id)
             )
             result = await session.execute(stmt)
             suspects = result.scalars().all()
-            return [self._to_suspect_schema(s, loc_map) for s in suspects]
+            return [self._to_suspect_schema(s) for s in suspects]
 
-    def _to_suspect_schema(self, suspect: Suspect, loc_map: dict = None) -> SuspectSchema:
+    def _to_suspect_schema(self, suspect: Suspect) -> SuspectSchema:
         """Convert Suspect ORM object to SuspectSchema"""
-        loc_map = loc_map or {}
         return SuspectSchema(
             suspect_id=suspect.suspect_id,
             name=suspect.name,
@@ -269,23 +253,14 @@ class ScenarioRepository:
             is_culprit=suspect.is_culprit,
             motive=suspect.motive,
             alibi_summary=suspect.alibi_summary,
-            timeline=[
-                TimelineEntrySchema(
-                    time=t.time_range,
-                    location=loc_map.get(t.location_id, f"Location_{t.location_id}"),
-                    activity=t.activity,
-                    can_prove=t.can_prove,
-                    witness=t.witness
+            facts=[
+                FactSchema(
+                    fact_id=fact.fact_id,
+                    threshold=fact.threshold,
+                    content=fact.content,
+                    type=fact.type,
                 )
-                for t in sorted(suspect.timeline, key=lambda x: x.timeline_id)
-            ],
-            secrets=[
-                SecretTierSchema(
-                    threshold=s.threshold,
-                    content=s.content,
-                    trigger_clue_ids=s.trigger_clue_ids or []
-                )
-                for s in sorted(suspect.secrets, key=lambda x: x.threshold)
+                for fact in sorted(suspect.facts, key=lambda x: x.fact_id)
             ],
             personality=PersonalitySchema(
                 speech_style=suspect.speech_style,
@@ -465,33 +440,16 @@ class ScenarioRepository:
                 )
                 session.add(suspect)
 
-                # Timeline
-                for t_idx, timeline in enumerate(suspect_data.get("timeline", []), start=1):
-                    loc_id = get_mapped_loc_id(timeline["location"])
-                    
-                    timeline_entry = SuspectTimeline(
+                for t_idx, fact in enumerate(suspect_data.get("facts", []), start=1):
+                    fact_entry = Fact(
                         scenario_id=scenario_id,
                         suspect_id=suspect_id,
-                        timeline_id=t_idx,
-                        time_range=timeline["time"],
-                        location_id=loc_id,
-                        activity=timeline["activity"],
-                        can_prove=timeline["can_prove"],
-                        witness=timeline.get("witness")
+                        fact_id=fact["fact_id"],
+                        threshold=fact["threshold"],
+                        content=fact["content"],
+                        type=fact["type"],
                     )
-                    session.add(timeline_entry)
-
-                # Secrets
-                for s_idx, secret in enumerate(suspect_data.get("secrets", []), start=1):
-                    secret_entry = SuspectSecret(
-                        scenario_id=scenario_id,
-                        suspect_id=suspect_id,
-                        secret_id=s_idx,
-                        threshold=secret["threshold"],
-                        content=secret["content"],
-                        trigger_clue_ids=secret.get("trigger_clue_ids", [])
-                    )
-                    session.add(secret_entry)
+                    session.add(fact_entry)
 
             # 7. Create Clues
             clues = scenario_data.get("clues", {}).get("clues", [])
@@ -505,7 +463,7 @@ class ScenarioRepository:
                     name=clue_data["name"],
                     location_id=loc_id,
                     description=clue_data["description"],
-                    related_suspect_ids=clue_data.get("related_suspect_ids", []),
+                    related_fact_ids=clue_data.get("related_fact_ids", []),
                     logic_explanation=clue_data["logic_explanation"],
                     decoded_answer=clue_data.get("decoded_answer"),
                     is_red_herring=clue_data.get("is_red_herring", False)
@@ -543,3 +501,12 @@ class ScenarioRepository:
                 raise ValueError(f"Failed to parse time string '{time_value}': {str(e)}")
                 
         raise ValueError(f"Cannot parse time value: {time_value}")
+
+
+    async def get_location_dict(self, scenario_id: int) -> Dict[int, str]:
+        async with self._get_session() as session:
+            loc_result = await session.execute(
+                select(Location).where(Location.scenario_id == scenario_id)
+            )
+            locations = loc_result.scalars().all()
+            return {loc.location_id: loc.name for loc in locations}

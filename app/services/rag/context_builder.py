@@ -3,18 +3,15 @@ from typing import List, Optional
 from dataclasses import dataclass
 
 from app.services.rag.retriever import (
-    RetrievedTimeline,
-    RetrievedSecret,
+    RetrievedFact,
     RetrievedClue,
     RetrievedChatMessage
 )
 
-
 @dataclass
 class RAGContext:
     """Container for RAG-retrieved context."""
-    timelines: str
-    secrets: str
+    facts: str
     clues: str
     chat_history: str
     has_content: bool
@@ -26,72 +23,55 @@ class ContextBuilder:
     Converts retrieved data into formatted text suitable for LLM prompts.
     """
 
-    def build_timeline_context(
+    def build_fact_context(
         self,
-        timelines: List[RetrievedTimeline],
+        facts: List[RetrievedFact],
         include_similarity: bool = False
     ) -> str:
-        """Build context string from retrieved timelines.
-
-        Parameters
-        ----------
-        timelines : List[RetrievedTimeline]
-            Retrieved timeline entries.
-        include_similarity : bool, optional
-            Whether to include similarity scores. Defaults to False.
-
-        Returns
-        -------
-        str
-            Formatted timeline context.
-        """
-        if not timelines:
+        """Build context string from retrieved facts."""
+        if not facts:
             return ""
 
-        lines = ["[관련 행적 정보]"]
-        for t in timelines:
-            line = f"- {t.time_range}: {t.location}에서 {t.activity}"
-            if t.can_prove:
-                line += f" (증명 가능"
-                if t.witness:
-                    line += f", 목격자: {t.witness}"
-                line += ")"
+        lines = ["[관련 사실]"]
+        for fact in facts:
+            text = None
+            match fact.type:
+                case "timeline":
+                    text = self._build_timeline_context(fact.content)
+                case "secret":
+                    text = self._build_secret_context(fact)
+                case _:
+                    text = fact.content.to_string()
             if include_similarity:
-                line += f" [유사도: {t.similarity:.2f}]"
-            lines.append(line)
+                text += f" [유사도: {fact.similarity:.2f}]"
+            lines.append(text)
 
         return "\n".join(lines)
 
-    def build_secret_context(
+    def _build_timeline_context(
         self,
-        secrets: List[RetrievedSecret],
-        include_similarity: bool = False
+        timeline: dict,
     ) -> str:
-        """Build context string from retrieved secrets.
+        time = timeline.get("time")
+        location = timeline.get("location")
+        activity = timeline.get("activity")
 
-        Parameters
-        ----------
-        secrets : List[RetrievedSecret]
-            Retrieved secrets.
-        include_similarity : bool, optional
-            Whether to include similarity scores. Defaults to False.
+        if time is None or location is None or activity is None:
+            # Fallback: show the raw timeline content if expected keys are missing
+            return f"- {str(timeline)}"
 
-        Returns
-        -------
-        str
-            Formatted secret context.
-        """
-        if not secrets:
-            return ""
-
-        lines = ["[공개 가능한 비밀]"]
-        for s in secrets:
-            line = f"- (압박 {s.threshold}+) {s.content}"
-            if include_similarity:
-                line += f" [유사도: {s.similarity:.2f}]"
-            lines.append(line)
-
-        return "\n".join(lines)
+        return f"- {time}: {location}에서 {activity}"
+    def _build_secret_context(
+        self,
+        fact: RetrievedFact
+    ) -> str:
+        content = fact.content.get("content")
+        
+        if content is None:
+            # Fallback: show the raw fact content if expected key is missing
+            return f"- (압박 {fact.threshold}+) {str(fact.content)}"
+        
+        return f"- (압박 {fact.threshold}+) {content}"
 
     def build_clue_context(
         self,
@@ -170,8 +150,7 @@ class ContextBuilder:
 
     def build_full_context(
         self,
-        timelines: Optional[List[RetrievedTimeline]] = None,
-        secrets: Optional[List[RetrievedSecret]] = None,
+        facts: Optional[List[RetrievedFact]] = None,
         clues: Optional[List[RetrievedClue]] = None,
         chat_history: Optional[List[RetrievedChatMessage]] = None,
         include_similarity: bool = False
@@ -180,10 +159,8 @@ class ContextBuilder:
 
         Parameters
         ----------
-        timelines : List[RetrievedTimeline], optional
-            Retrieved timeline entries.
-        secrets : List[RetrievedSecret], optional
-            Retrieved secrets.
+        facts : List[RetrievedFact], optional
+            Retrieved facts.
         clues : List[RetrievedClue], optional
             Retrieved clues.
         chat_history : List[RetrievedChatMessage], optional
@@ -196,16 +173,14 @@ class ContextBuilder:
         RAGContext
             Container with all formatted context strings.
         """
-        timeline_ctx = self.build_timeline_context(timelines or [], include_similarity)
-        secret_ctx = self.build_secret_context(secrets or [], include_similarity)
+        facts_ctx = self.build_fact_context(facts or [], include_similarity)
         clue_ctx = self.build_clue_context(clues or [], include_similarity=include_similarity)
         chat_ctx = self.build_chat_history_context(chat_history or [], include_similarity)
 
-        has_content = any([timeline_ctx, secret_ctx, clue_ctx, chat_ctx])
+        has_content = any([facts_ctx, clue_ctx, chat_ctx])
 
         return RAGContext(
-            timelines=timeline_ctx,
-            secrets=secret_ctx,
+            facts=facts_ctx,
             clues=clue_ctx,
             chat_history=chat_ctx,
             has_content=has_content
@@ -213,8 +188,7 @@ class ContextBuilder:
 
     def build_suspect_interrogation_context(
         self,
-        timelines: List[RetrievedTimeline],
-        secrets: List[RetrievedSecret],
+        facts: List[RetrievedFact],
         chat_history: List[RetrievedChatMessage],
         include_similarity: bool = False
     ) -> str:
@@ -241,13 +215,9 @@ class ContextBuilder:
         """
         sections = []
 
-        timeline_ctx = self.build_timeline_context(timelines, include_similarity)
-        if timeline_ctx:
-            sections.append(timeline_ctx)
-
-        secret_ctx = self.build_secret_context(secrets, include_similarity)
-        if secret_ctx:
-            sections.append(secret_ctx)
+        fact_ctx = self.build_fact_context(facts, include_similarity)
+        if fact_ctx:
+            sections.append(fact_ctx)
 
         chat_ctx = self.build_chat_history_context(chat_history, include_similarity)
         if chat_ctx:

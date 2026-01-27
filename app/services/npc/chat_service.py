@@ -1,14 +1,16 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.repositories.scenario_repository import ScenarioRepository
+if TYPE_CHECKING:
+    from app.db.repositories.scenario_repository import ScenarioRepository
+    from app.services.rag import RAGService
 from app.db.repositories.game_session_repository import GameSessionRepository
 from app.services.agent.pressure_judge import PressureJudge
 from app.services.agent.suspect_actor import SuspectActor
 from app.services.agent.clue_agent import ClueAgent
-from app.services.rag import RAGService, get_rag_service
+from app.services.rag import get_rag_service
 from app.models.domain.suspect_state import SuspectState
 from app.models.schemas.suspect import SuspectSchema
 from app.models.schemas.chat import (
@@ -28,11 +30,11 @@ class ChatService:
 
     def __init__(
         self,
-        scenario_repository: ScenarioRepository,
+        scenario_repository: "ScenarioRepository",
         pressure_judge: PressureJudge,
         suspect_actor: SuspectActor,
         clue_agent: ClueAgent,
-        rag_service: Optional[RAGService] = None
+        rag_service: Optional["RAGService"] = None
     ):
         self.scenario_repository = scenario_repository
         self.judge = pressure_judge

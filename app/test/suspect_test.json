@@ -1,0 +1,115 @@
+{
+  "suspect_id": 1,
+  "name": "이수진",
+  "role": "박사의 수제자이자 공동 연구원",
+  "age": 32,
+  "gender": "여성",
+  "description": "날카로운 인상의 젊은 연구원. 한태준 박사의 연구에 깊이 관여했으나, 그의 독단적인 방식에 불만을 품고 있었다. 항상 냉철하고 이성적으로 보이려 노력한다.",
+  "is_culprit": true,
+  "motive": "이수진은 한태준 박사의 논란 많은 이론에 회의적이었으나, 박사가 자신의 핵심 연구 성과를 가로채고 명예를 독점하려 하자 분노하여 살해했다. 특히 박사가 자신의 개조된 망원경 부품을 이용해 중요한 발견을 가로채려 했다는 사실이 결정적이었다.",
+  "alibi_summary": "사건 당시 자신의 연구실에서 논문 작업을 하거나 휴식을 취했다고 주장한다.",
+  "timeline": [
+    {
+      "fact_id": 1,
+      "threshold": 0,
+      "content": {
+        "time": "20:00-21:00",
+        "location": "혜성 관측소 본관",
+        "activity": "자신의 연구실에서 연구 자료 정리"
+      }
+    },
+    {
+      "fact_id": 2,
+      "threshold": 0,
+      "content": {
+        "time": "21:00-22:00",
+        "location": "혜성 관측소 본관",
+        "activity": "휴게실에서 차를 마시며 잠시 휴식"
+      }
+    },
+    {
+      "fact_id": 3,
+      "threshold": 0,
+      "content": {
+        "time": "22:00-23:00",
+        "location": "혜성 관측소 본관",
+        "activity": "자신의 연구실에서 논문 작업"
+      }
+    },
+    {
+      "fact_id": 4,
+      "threshold": 0,
+      "content": {
+        "time": "23:00-01:00",
+        "location": "혜성 관측소 본관",
+        "activity": "자신의 연구실에서 논문 작업 (실제로는 범행)"
+      }
+    },
+    {
+      "fact_id": 5,
+      "threshold": 0,
+      "content": {
+        "time": "01:00-02:00",
+        "location": "혜성 관측소 본관",
+        "activity": "자신의 연구실에서 논문 작업 (실제로는 범행 흔적 정리)"
+      }
+    },
+    {
+      "fact_id": 6,
+      "threshold": 0,
+      "content": {
+        "time": "02:00-08:00",
+        "location": "혜성 관측소 본관",
+        "activity": "수면을 취하며 휴식"
+      }
+    }
+  ],
+  "secrets": [
+    {
+      "fact_id": 7,
+      "threshold": 0,
+      "content": {
+        "content": "나는 사건 당일 밤 내내 내 연구실에 있었고, 박사님 연구실에는 가지 않았다. 박사님과는 최근 연구 방향에 대한 이견이 있었을 뿐이다."
+      }
+    },
+    {
+      "fact_id": 8,
+      "threshold": 30,
+      "content": {
+        "content": "박사님과 연구 성과 배분 문제로 언쟁이 있었던 것은 사실이다. 박사님이 내 아이디어를 가로채려 했지만, 살인과는 무관하다."
+      }
+    },
+    {
+      "fact_id": 9,
+      "threshold": 50,
+      "content": {
+        "content": "사건 당일 밤 11시경, 박사님 연구실 근처를 지나가다 희미한 인기척을 느꼈다. 하지만 대수롭지 않게 생각하고 내 연구실로 돌아왔다."
+      }
+    },
+    {
+      "fact_id": 10,
+      "threshold": 70,
+      "content": {
+        "content": "사실 그날 밤, 박사님 연구실에 잠시 들어갔었다. 박사님이 쓰러져 있는 것을 보고 너무 놀라 도망쳤다. 내가 범인으로 몰릴까 봐 두려웠다."
+      }
+    },
+    {
+      "fact_id": 11,
+      "threshold": 90,
+      "content": {
+        "content": "맞다, 내가 박사님을 죽였다. 내 연구를 가로채고 내 이름을 지우려 했기 때문이다. 망원경 부품은 내가 개조한 것이었다."
+      }
+    }
+  ],
+  "personality": {
+    "speech_style": "차갑게",
+    "emotional_tendency": "침착함",
+    "lying_pattern": "partial_truth"
+  },
+  "critical_clue_ids": [
+    101,
+    102,
+    103,
+    104
+  ]
+}

@@ -1,8 +1,7 @@
 """Request schemas for suspect generation."""
 from __future__ import annotations
-from typing import List, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 from pydantic import BaseModel
-from app.models.schemas.clue import ClueItemSchema
 from app.models.schemas.map import MapSkeletonSchema
 from app.models.schemas.scenario import (
     TimeRangeSchema,
@@ -30,7 +29,6 @@ class SuspectGenerationRequest(BaseModel):
     world_context: WorldContextSchema
     ground_truth: GroundTruthSchema
     generation_config: SuspectGenConfig
-    clues: List[ClueItemSchema] = []
     constraints: Optional[ConstraintsSchema] = None
     map_skeleton: Optional[MapSkeletonSchema] = None
 
@@ -38,7 +36,6 @@ class SuspectGenerationRequest(BaseModel):
     def from_expansion(
         cls,
         expansion: ScenarioExpansion,
-        clues: List[ClueItemSchema] = [],
         map_skeleton: Optional[MapSkeletonSchema] = None
     ) -> SuspectGenerationRequest:
         """Create request from ScenarioExpansion."""
@@ -52,7 +49,6 @@ class SuspectGenerationRequest(BaseModel):
             world_context=expansion.world_detail,
             ground_truth=expansion.ground_truth_detail,
             generation_config=expansion.generation_targets.suspects,
-            clues=clues,
             constraints=expansion.constraints,
             map_skeleton=map_skeleton
         )

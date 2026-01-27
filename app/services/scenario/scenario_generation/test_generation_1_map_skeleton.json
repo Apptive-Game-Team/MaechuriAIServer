@@ -1,0 +1,59 @@
+{
+  "rooms": [
+    {
+      "id": 1,
+      "name": "혜성 관측소 입구",
+      "width": 18,
+      "height": 16,
+      "mood": "어둡고 긴장감 넘치는"
+    },
+    {
+      "id": 2,
+      "name": "관측소 본관 홀",
+      "width": 20,
+      "height": 18,
+      "mood": "어둡고 긴장감 넘치는"
+    },
+    {
+      "id": 3,
+      "name": "한태준 박사 개인 연구실",
+      "width": 12,
+      "height": 10,
+      "mood": "어둡고 긴장감 넘치는"
+    }
+  ],
+  "corridors": [
+    {
+      "id": 1,
+      "name": "주요 연결 복도",
+      "connections": [
+        {
+          "room_id": 1,
+          "direction": "east"
+        },
+        {
+          "room_id": 2,
+          "direction": "west"
+        }
+      ],
+      "width_hint": 4,
+      "length_hint": 6
+    },
+    {
+      "id": 2,
+      "name": "연구실 전용 통로",
+      "connections": [
+        {
+          "room_id": 2,
+          "direction": "north"
+        },
+        {
+          "room_id": 3,
+          "direction": "south"
+        }
+      ],
+      "width_hint": 3,
+      "length_hint": 4
+    }
+  ]
+}

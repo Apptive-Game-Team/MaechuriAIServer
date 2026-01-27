@@ -1,10 +1,10 @@
 """Suspect response schemas."""
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from .common import TimelineEntrySchema, SecretTierSchema, PersonalitySchema
+from .common import PersonalitySchema, FactEntrySchema, TimelineContentSchema, SecretContentSchema
 
 
-class SuspectSchema(BaseModel):
+class SuspectGenerationSchema(BaseModel):
     """Complete suspect information for API responses and game state."""
     # Basic info
     suspect_id: int = Field(description="용의자 고유 ID (1, 2, 3...)")
@@ -20,10 +20,10 @@ class SuspectSchema(BaseModel):
     alibi_summary: str = Field(description="알리바이 요약 (한 문장)")
 
     # Timeline
-    timeline: List[TimelineEntrySchema] = Field(description="시간대별 행적")
+    timeline: List[FactEntrySchema[TimelineContentSchema]] = Field(description="시간대별 행적")
 
     # Secrets by pressure threshold
-    secrets: List[SecretTierSchema] = Field(
+    secrets: List[FactEntrySchema[SecretContentSchema]] = Field(
         description="pressure threshold 순으로 정렬된 비밀 목록 (최소 5개: 0, 30, 50, 70, 90)"
     )
 
@@ -37,6 +37,6 @@ class SuspectSchema(BaseModel):
     )
 
 
-class SuspectListSchema(BaseModel):
+class SuspectGenerationListSchema(BaseModel):
     """List of suspects."""
-    suspects: List[SuspectSchema]
+    suspects: List[SuspectGenerationSchema]

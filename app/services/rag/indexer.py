@@ -8,8 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     Suspect,
-    SuspectTimeline,
-    SuspectSecret,
+    Fact,
     Clue,
     ChatMessageEmbedding,
     Location
@@ -65,8 +64,7 @@ class RAGIndexer:
         
         stats = {
             "suspects": suspect_stats["suspects"],
-            "timelines": suspect_stats["timelines"],
-            "secrets": suspect_stats["secrets"],
+            "facts": suspect_stats["facts"],
             "clues": clues_indexed,
         }
 
@@ -93,23 +91,17 @@ class RAGIndexer:
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
 
-        # 1. Load Locations for mapping IDs to Names
-        loc_result = await db.execute(
-            select(Location).where(Location.scenario_id == scenario_id)
-        )
-        loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
 
         # 2. Load suspects with relationships
         result = await db.execute(
             select(Suspect)
             .where(Suspect.scenario_id == scenario_id)
-            .options(selectinload(Suspect.timeline), selectinload(Suspect.secrets))
+            .options(selectinload(Suspect.facts))
         )
         suspects = result.scalars().all()
 
         suspect_updates = []
-        timeline_updates = []
-        secret_updates = []
+        fact_updates = []
         
         for suspect in suspects:
             # Index suspect profile
@@ -127,32 +119,14 @@ class RAGIndexer:
                 "profile_embedding": profile_embedding
             })
 
-            # Index timelines
-            for timeline in suspect.timeline:
-                loc_name = loc_map.get(timeline.location_id, "Unknown")
-                timeline_embedding = self.embedding_service.embed_timeline_entry(
-                    time_range=timeline.time_range,
-                    location=loc_name,
-                    activity=timeline.activity,
-                    suspect_name=suspect.name,
-                )
-                timeline_updates.append({
+            # Index Facts
+            for fact in suspect.facts:
+                fact_embedding = self.embedding_service.embed_fact(fact)
+                fact_updates.append({
                     "scenario_id": scenario_id,
                     "suspect_id": suspect.suspect_id,
-                    "timeline_id": timeline.timeline_id,
-                    "embedding": timeline_embedding
-                })
-
-            # Index secrets
-            for secret in suspect.secrets:
-                secret_embedding = self.embedding_service.embed_secret(
-                    content=secret.content, suspect_name=suspect.name
-                )
-                secret_updates.append({
-                    "scenario_id": scenario_id,
-                    "suspect_id": suspect.suspect_id,
-                    "secret_id": secret.secret_id,
-                    "embedding": secret_embedding
+                    "fact_id": fact.fact_id,
+                    "embedding": fact_embedding
                 })
 
         # Bulk updates
@@ -162,22 +136,15 @@ class RAGIndexer:
                 suspect_updates
             )
 
-        if timeline_updates:
+        if fact_updates:
             await db.execute(
-                update(SuspectTimeline),
-                timeline_updates
-            )
-
-        if secret_updates:
-            await db.execute(
-                update(SuspectSecret),
-                secret_updates
+                update(Fact),
+                fact_updates
             )
 
         return {
             "suspects": len(suspect_updates),
-            "timelines": len(timeline_updates),
-            "secrets": len(secret_updates)
+            "facts": len(fact_updates),
         }
 
     async def index_clues(self, db: AsyncSession, scenario_id: int) -> int:

@@ -1,43 +1,26 @@
 """RAG Retriever for semantic search over embeddings."""
-from typing import List, Optional
+from typing import List, Optional, Any
 from dataclasses import dataclass
 import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.models import Suspect, SuspectTimeline, SuspectSecret, Clue, ChatMessageEmbedding
+from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding
 from app.services.embedding import get_embedding_service, EmbeddingService
 
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
-class RetrievedTimeline:
-    """Retrieved timeline entry with similarity score."""
+class RetrievedFact:
+    """Retrieved fact with similarity score."""
     suspect_id: int
     suspect_name: str
-    timeline_id: int
-    time_range: str
-    location: str
-    activity: str
-    can_prove: bool
-    witness: Optional[str]
-    similarity: float
-
-
-@dataclass
-class RetrievedSecret:
-    """Retrieved secret with similarity score."""
-    suspect_id: int
-    suspect_name: str
-    secret_id: int
+    fact_id: int
     threshold: int
-    content: str
-    trigger_evidence_ids: List[int]
+    content: Any
+    type: str
     similarity: float
-
 
 @dataclass
 class RetrievedClue:
@@ -49,7 +32,7 @@ class RetrievedClue:
     logic_explanation: str
     decoded_answer: Optional[str]
     is_red_herring: bool
-    related_suspect_ids: List[int]
+    related_fact_ids: List[int]
     similarity: float
 
 
@@ -86,116 +69,60 @@ class RAGRetriever:
         """
         self.embedding_service = embedding_service or get_embedding_service()
 
-    async def search_timelines(
-        self,
-        db: AsyncSession,
-        scenario_id: int,
-        suspect_id: int,
-        query: str,
-        top_k: int = 3,
-        threshold: float = 0.5
-    ) -> List[RetrievedTimeline]:
-        """Search for relevant timeline entries."""
+    async def search_facts(
+            self,
+            db: AsyncSession,
+            scenario_id: int,
+            suspect_id: int,
+            query: str,
+            current_pressure: int = 0,
+            top_k: int = 3,
+            threshold: float = 0.1
+    ) -> List[RetrievedFact]:
+        """Search for relevant facts that can be revealed."""
         query_embedding = self.embedding_service.embed_query(query)
 
-        # Get suspect name
         suspect_result = await db.execute(
             select(Suspect.name).where(
                 Suspect.scenario_id == scenario_id,
                 Suspect.suspect_id == suspect_id
             )
         )
+
         suspect_name = suspect_result.scalar_one_or_none() or "Unknown"
 
-        # Using pgvector ORM operator <=> (cosine distance)
-        # Similarity = 1 - Cosine Distance
-        distance_expr = SuspectTimeline.embedding.cosine_distance(query_embedding)
+        distance_expr = Fact.embedding.cosine_distance(query_embedding)
         similarity_expr = (1 - distance_expr).label("similarity")
 
         stmt = (
-            select(SuspectTimeline, similarity_expr)
-            .where(SuspectTimeline.scenario_id == scenario_id)
-            .where(SuspectTimeline.suspect_id == suspect_id)
-            .where(SuspectTimeline.embedding.is_not(None))
+            select(Fact, similarity_expr)
+            .where(Fact.scenario_id == scenario_id)
+            .where(Fact.suspect_id == suspect_id)
+            .where(Fact.threshold <= current_pressure)
+            .where(Fact.embedding.is_not(None))
             .order_by(distance_expr)
             .limit(top_k)
         )
 
         result = await db.execute(stmt)
 
-        timelines = []
+        facts: List[RetrievedFact] = []
         for row in result:
-            timeline: SuspectTimeline = row[0]
+            fact: Fact = row[0]
             similarity: float = row[1]
             
             if similarity >= threshold:
-                timelines.append(RetrievedTimeline(
+                facts.append(RetrievedFact(
                     suspect_id=suspect_id,
                     suspect_name=suspect_name,
-                    timeline_id=timeline.timeline_id,
-                    time_range=timeline.time_range,
-                    location=timeline.location,
-                    activity=timeline.activity,
-                    can_prove=timeline.can_prove,
-                    witness=timeline.witness,
+                    fact_id=fact.fact_id,
+                    threshold=fact.threshold,
+                    content=fact.content,
+                    type=fact.type,
                     similarity=similarity
                 ))
 
-        return timelines
-
-    async def search_secrets(
-        self,
-        db: AsyncSession,
-        scenario_id: int,
-        suspect_id: int,
-        query: str,
-        current_pressure: int,
-        top_k: int = 3,
-        threshold: float = 0.5
-    ) -> List[RetrievedSecret]:
-        """Search for relevant secrets that can be revealed."""
-        query_embedding = self.embedding_service.embed_query(query)
-
-        suspect_result = await db.execute(
-            select(Suspect.name).where(
-                Suspect.scenario_id == scenario_id,
-                Suspect.suspect_id == suspect_id
-            )
-        )
-        suspect_name = suspect_result.scalar_one_or_none() or "Unknown"
-
-        distance_expr = SuspectSecret.embedding.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
-
-        stmt = (
-            select(SuspectSecret, similarity_expr)
-            .where(SuspectSecret.scenario_id == scenario_id)
-            .where(SuspectSecret.suspect_id == suspect_id)
-            .where(SuspectSecret.threshold <= current_pressure)
-            .where(SuspectSecret.embedding.is_not(None))
-            .order_by(distance_expr)
-            .limit(top_k)
-        )
-
-        result = await db.execute(stmt)
-
-        secrets = []
-        for row in result:
-            secret: SuspectSecret = row[0]
-            similarity: float = row[1]
-
-            if similarity >= threshold:
-                secrets.append(RetrievedSecret(
-                    suspect_id=suspect_id,
-                    suspect_name=suspect_name,
-                    secret_id=secret.secret_id,
-                    threshold=secret.threshold,
-                    content=secret.content,
-                    trigger_evidence_ids=secret.trigger_evidence_ids or [],
-                    similarity=similarity
-                ))
-
-        return secrets
+        return facts
 
     async def search_clues(
         self,
@@ -229,6 +156,10 @@ class RAGRetriever:
         result = await db.execute(stmt)
 
         clues = []
+
+        from app.api.dependencies import get_scenario_repository
+        location_dict = await get_scenario_repository().get_location_dict(scenario_id)
+
         for row in result:
             clue: Clue = row[0]
             similarity: float = row[1]
@@ -237,12 +168,12 @@ class RAGRetriever:
                 clues.append(RetrievedClue(
                     clue_id=clue.clue_id,
                     name=clue.name,
-                    found_at=clue.found_at,
+                    found_at=location_dict[clue.location_id],
                     description=clue.description,
                     logic_explanation=clue.logic_explanation,
                     decoded_answer=clue.decoded_answer,
                     is_red_herring=clue.is_red_herring,
-                    related_suspect_ids=clue.related_suspect_ids or [],
+                    related_fact_ids=clue.related_fact_ids or [],
                     similarity=similarity
                 ))
 

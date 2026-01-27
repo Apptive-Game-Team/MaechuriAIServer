@@ -1,6 +1,7 @@
 """Embedding service for generating and managing embeddings."""
 from typing import List, Optional
 
+from app.db.models import Fact
 from app.services.embedding.bge_m3_model import get_embedding_model, BGEM3Model
 
 
@@ -82,57 +83,45 @@ class EmbeddingService:
         text = f"이름: {name}, 직업/역할: {role}, 나이: {age}세, 성별: {gender}. 외모: {description}"
         return self.model.embed(text)
 
-    def embed_timeline_entry(
+    def embed_fact(
         self,
-        time_range: str,
+        fact: Fact
+    ) -> List[float]:
+        """Generate embedding for a fact."""
+        text = None
+        match fact.type:
+            case "secret":
+                text = self._serialize_secret(
+                    fact.content,
+                    fact.suspect.name)
+            case "timeline":
+                text = self._serialize_timeline(
+                    fact.content["time"],
+                    fact.content["location"],
+                    fact.content["activity"],
+                    fact.suspect.name)
+            case _:
+                text = fact.to_string()
+
+        return self.model.embed(text)
+
+    def _serialize_timeline(
+        self,
+        time: str,
         location: str,
         activity: str,
         suspect_name: str = ""
-    ) -> List[float]:
-        """Generate embedding for a timeline entry.
-
-        Parameters
-        ----------
-        time_range : str
-            Time range (e.g., "22:00-23:00").
-        location : str
-            Location name.
-        activity : str
-            Activity description.
-        suspect_name : str, optional
-            Suspect name for context.
-
-        Returns
-        -------
-        List[float]
-            The timeline embedding.
-        """
+    ) -> str:
         if suspect_name:
-            text = f"{suspect_name}의 행적: {time_range}에 {location}에서 {activity}"
+            return f"{suspect_name}의 행적: {time}에 {location}에서 {activity}"
         else:
-            text = f"시간: {time_range}, 장소: {location}, 행동: {activity}"
-        return self.model.embed(text)
+            return f"시간: {time}, 장소: {location}, 행동: {activity}"
 
-    def embed_secret(self, content: str, suspect_name: str = "") -> List[float]:
-        """Generate embedding for a suspect's secret.
-
-        Parameters
-        ----------
-        content : str
-            The secret content.
-        suspect_name : str, optional
-            Suspect name for context.
-
-        Returns
-        -------
-        List[float]
-            The secret embedding.
-        """
+    def _serialize_secret(self, content: str, suspect_name: str = "") -> str:
         if suspect_name:
-            text = f"{suspect_name}의 비밀: {content}"
+            return f"{suspect_name}의 비밀: {content}"
         else:
-            text = f"비밀: {content}"
-        return self.model.embed(text)
+            return f"비밀: {content}"
 
     def embed_clue_description(
         self,
