@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS fact (
     content JSONB NOT NULL,
     embedding vector(1024),
 
+    FOREIGN KEY (scenario_id, suspect_id)
+        REFERENCES suspect(scenario_id, suspect_id)
+        ON DELETE CASCADE,
     PRIMARY KEY (scenario_id, fact_id)
 );
 
