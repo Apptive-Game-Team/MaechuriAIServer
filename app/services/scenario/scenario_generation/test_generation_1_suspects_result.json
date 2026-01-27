@@ -1,0 +1,494 @@
+{
+  "suspects": [
+    {
+      "suspect_id": 1,
+      "name": "이수진",
+      "role": "박사의 수제자이자 공동 연구원",
+      "age": 32,
+      "gender": "여성",
+      "description": "날카로운 인상의 젊은 연구원. 한태준 박사의 연구에 깊이 관여했으나, 그의 독단적인 방식에 불만을 품고 있었다. 항상 냉철하고 이성적으로 보이려 노력한다.",
+      "is_culprit": true,
+      "motive": "이수진은 한태준 박사의 논란 많은 이론에 회의적이었으나, 박사가 자신의 핵심 연구 성과를 가로채고 명예를 독점하려 하자 분노하여 살해했다. 특히 박사가 자신의 개조된 망원경 부품을 이용해 중요한 발견을 가로채려 했다는 사실이 결정적이었다.",
+      "alibi_summary": "사건 당시 자신의 연구실에서 논문 작업을 하거나 휴식을 취했다고 주장한다.",
+      "timeline": [
+        {
+          "fact_id": 1,
+          "threshold": 0,
+          "content": {
+            "time": "20:00-21:00",
+            "location": "혜성 관측소 본관",
+            "activity": "자신의 연구실에서 연구 자료 정리"
+          }
+        },
+        {
+          "fact_id": 2,
+          "threshold": 0,
+          "content": {
+            "time": "21:00-22:00",
+            "location": "혜성 관측소 본관",
+            "activity": "휴게실에서 차를 마시며 잠시 휴식"
+          }
+        },
+        {
+          "fact_id": 3,
+          "threshold": 0,
+          "content": {
+            "time": "22:00-23:00",
+            "location": "혜성 관측소 본관",
+            "activity": "자신의 연구실에서 논문 작업"
+          }
+        },
+        {
+          "fact_id": 4,
+          "threshold": 0,
+          "content": {
+            "time": "23:00-01:00",
+            "location": "혜성 관측소 본관",
+            "activity": "자신의 연구실에서 논문 작업 (실제로는 범행)"
+          }
+        },
+        {
+          "fact_id": 5,
+          "threshold": 0,
+          "content": {
+            "time": "01:00-02:00",
+            "location": "혜성 관측소 본관",
+            "activity": "자신의 연구실에서 논문 작업 (실제로는 범행 흔적 정리)"
+          }
+        },
+        {
+          "fact_id": 6,
+          "threshold": 0,
+          "content": {
+            "time": "02:00-08:00",
+            "location": "혜성 관측소 본관",
+            "activity": "수면을 취하며 휴식"
+          }
+        }
+      ],
+      "secrets": [
+        {
+          "fact_id": 7,
+          "threshold": 0,
+          "content": {
+            "content": "나는 사건 당일 밤 내내 내 연구실에 있었고, 박사님 연구실에는 가지 않았다. 박사님과는 최근 연구 방향에 대한 이견이 있었을 뿐이다."
+          }
+        },
+        {
+          "fact_id": 8,
+          "threshold": 30,
+          "content": {
+            "content": "박사님과 연구 성과 배분 문제로 언쟁이 있었던 것은 사실이다. 박사님이 내 아이디어를 가로채려 했지만, 살인과는 무관하다."
+          }
+        },
+        {
+          "fact_id": 9,
+          "threshold": 50,
+          "content": {
+            "content": "사건 당일 밤 11시경, 박사님 연구실 근처를 지나가다 희미한 인기척을 느꼈다. 하지만 대수롭지 않게 생각하고 내 연구실로 돌아왔다."
+          }
+        },
+        {
+          "fact_id": 10,
+          "threshold": 70,
+          "content": {
+            "content": "사실 그날 밤, 박사님 연구실에 잠시 들어갔었다. 박사님이 쓰러져 있는 것을 보고 너무 놀라 도망쳤다. 내가 범인으로 몰릴까 봐 두려웠다."
+          }
+        },
+        {
+          "fact_id": 11,
+          "threshold": 90,
+          "content": {
+            "content": "맞다, 내가 박사님을 죽였다. 내 연구를 가로채고 내 이름을 지우려 했기 때문이다. 망원경 부품은 내가 개조한 것이었다."
+          }
+        }
+      ],
+      "personality": {
+        "speech_style": "차갑게",
+        "emotional_tendency": "침착함",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_clue_ids": [
+        101,
+        102,
+        103,
+        104
+      ]
+    },
+    {
+      "suspect_id": 2,
+      "name": "김민철",
+      "role": "관측소 행정 소장",
+      "age": 52,
+      "gender": "남성",
+      "description": "중년의 남성으로, 깔끔한 정장 차림이지만 피곤한 기색이 역력하다. 관측소의 재정 문제로 늘 골머리를 앓고 있다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 관측소 본관 사무실에서 서류 작업을 하다가 잠들었다고 주장한다.",
+      "timeline": [
+        {
+          "fact_id": 12,
+          "threshold": 0,
+          "content": {
+            "time": "20:00-21:00",
+            "location": "혜성 관측소 본관",
+            "activity": "사무실에서 밀린 행정 업무 처리"
+          }
+        },
+        {
+          "fact_id": 13,
+          "threshold": 0,
+          "content": {
+            "time": "21:00-22:00",
+            "location": "혜성 관측소 본관",
+            "activity": "휴게실에서 간단히 저녁 식사 및 휴식"
+          }
+        },
+        {
+          "fact_id": 14,
+          "threshold": 0,
+          "content": {
+            "time": "22:00-00:00",
+            "location": "혜성 관측소 본관",
+            "activity": "사무실에서 다시 업무를 보다가 잠이 듦"
+          }
+        },
+        {
+          "fact_id": 15,
+          "threshold": 0,
+          "content": {
+            "time": "00:00-02:00",
+            "location": "혜성 관측소 본관",
+            "activity": "사무실에서 잠들어 있었다고 주장"
+          }
+        },
+        {
+          "fact_id": 16,
+          "threshold": 0,
+          "content": {
+            "time": "02:00-04:00",
+            "location": "혜성 관측소 본관",
+            "activity": "사무실에서 잠에서 깨어나 잠시 휴식"
+          }
+        },
+        {
+          "fact_id": 17,
+          "threshold": 0,
+          "content": {
+            "time": "04:00-06:00",
+            "location": "혜성 관측소 본관",
+            "activity": "관측소 시설 점검 (일상적인 업무)"
+          }
+        },
+        {
+          "fact_id": 18,
+          "threshold": 0,
+          "content": {
+            "time": "06:00-08:00",
+            "location": "혜성 관측소 본관",
+            "activity": "아침 식사 준비 및 직원들과 대화"
+          }
+        }
+      ],
+      "secrets": [
+        {
+          "fact_id": 19,
+          "threshold": 0,
+          "content": {
+            "content": "저는 사건 당일 밤 내내 본관 사무실에 있었습니다. 박사님과는 재정 문제로 의견 차이가 있었지만, 살해할 정도는 아니었습니다."
+          }
+        },
+        {
+          "fact_id": 20,
+          "threshold": 30,
+          "content": {
+            "content": "사실, 박사님 연구실에서 불이 나기 직전, 저는 본관에서 이상한 소리를 들었습니다. 하지만 폭설 때문이라고 생각하고 대수롭지 않게 여겼습니다."
+          }
+        },
+        {
+          "fact_id": 21,
+          "threshold": 50,
+          "content": {
+            "content": "박사님이 최근 거액의 연구 자금을 횡령했다는 소문이 돌았습니다. 제가 직접 확인하려 했지만, 박사님은 늘 저를 피했습니다. 그 문제로 크게 다툰 적도 있습니다."
+          }
+        },
+        {
+          "fact_id": 22,
+          "threshold": 70,
+          "content": {
+            "content": "사건 당일 밤 11시경, 저는 박사님 연구실 문 앞에서 박사님과 격렬하게 다퉜습니다. 연구 자금 횡령 문제로 따지러 갔다가, 박사님이 저를 모욕해서 화가 나서 돌아왔습니다. 문은 제가 떠날 때 잠겨 있지 않았습니다."
+          }
+        },
+        {
+          "fact_id": 23,
+          "threshold": 90,
+          "content": {
+            "content": "제가 박사님 연구실을 떠난 직후, 저는 본관으로 돌아와 제 사무실에서 잠들었습니다. 그리고 새벽 2시경, 저는 잠결에 누군가 관측소 외부로 나가는 발자국 소리를 들었습니다. 폭설 때문에 정확히 누구인지는 알 수 없었지만, 분명히 사람이었습니다."
+          }
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말",
+        "emotional_tendency": "방어적",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_clue_ids": []
+    },
+    {
+      "suspect_id": 3,
+      "name": "박선영",
+      "role": "기자",
+      "age": 28,
+      "gender": "여성",
+      "description": "날카로운 눈빛과 단정한 차림의 젊은 기자. 특종을 위해서라면 물불 가리지 않는 열정적인 성격으로 알려져 있다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당일 밤, 관측소 본관에서 기사를 작성하며 밤을 새웠다고 주장합니다.",
+      "timeline": [
+        {
+          "fact_id": 24,
+          "threshold": 0,
+          "content": {
+            "time": "20:00-21:00",
+            "location": "혜성 관측소 본관",
+            "activity": "저녁 식사 후 취재 자료 정리"
+          }
+        },
+        {
+          "fact_id": 25,
+          "threshold": 0,
+          "content": {
+            "time": "21:00-22:00",
+            "location": "혜성 관측소 본관",
+            "activity": "한태준 박사 연구실 앞에서 인터뷰 요청 시도. 문을 두드렸으나 응답이 없어 본관으로 돌아옴."
+          }
+        },
+        {
+          "fact_id": 26,
+          "threshold": 0,
+          "content": {
+            "time": "22:00-00:00",
+            "location": "혜성 관측소 본관",
+            "activity": "폭설 관련 기사 작성에 몰두"
+          }
+        },
+        {
+          "fact_id": 27,
+          "threshold": 30,
+          "content": {
+            "time": "00:00-01:00",
+            "location": "혜성 관측소 본관",
+            "activity": "잠시 휴식을 취하며 복도를 서성임"
+          }
+        },
+        {
+          "fact_id": 28,
+          "threshold": 70,
+          "content": {
+            "time": "01:00-03:00",
+            "location": "혜성 관측소 본관",
+            "activity": "다시 기사 작성에 집중. 희미한 타는 냄새를 맡았으나 대수롭지 않게 여김."
+          }
+        },
+        {
+          "fact_id": 29,
+          "threshold": 0,
+          "content": {
+            "time": "03:00-07:00",
+            "location": "혜성 관측소 본관",
+            "activity": "피로로 인해 책상에서 잠시 쪽잠을 자거나 기사 마무리 작업"
+          }
+        },
+        {
+          "fact_id": 30,
+          "threshold": 0,
+          "content": {
+            "time": "07:00-08:00",
+            "location": "혜성 관측소 본관",
+            "activity": "아침 식사를 위해 식당으로 이동"
+          }
+        }
+      ],
+      "secrets": [
+        {
+          "fact_id": 31,
+          "threshold": 0,
+          "content": {
+            "content": "저는 그날 밤 내내 관측소 본관에서 기사를 쓰고 있었습니다. 박사님 연구실 근처에는 가지도 않았습니다."
+          }
+        },
+        {
+          "fact_id": 32,
+          "threshold": 30,
+          "content": {
+            "content": "솔직히 말씀드리면, 밤 9시쯤 박사님 연구실 문을 두드렸습니다. 인터뷰 요청을 하려구요. 하지만 박사님은 대답이 없으셨습니다. 그때 문이 잠겨 있었는지는 확실히 기억나지 않습니다."
+          }
+        },
+        {
+          "fact_id": 33,
+          "threshold": 50,
+          "content": {
+            "content": "사실, 자정쯤 잠시 복도를 서성일 때, 김민철 소장님이 박사님 연구실 쪽에서 나오는 것을 봤습니다. 저를 보더니 황급히 본관 쪽으로 돌아가시더군요. 뭔가 숨기는 것 같았습니다."
+          }
+        },
+        {
+          "fact_id": 34,
+          "threshold": 70,
+          "content": {
+            "content": "새벽 1시쯤, 저는 잠시 잠이 들었다 깼습니다. 그때 희미하게 타는 냄새를 맡은 것 같기도 합니다. 하지만 폭설 때문에 난방 기구에서 나는 냄새려니 하고 대수롭지 않게 여겼습니다. 그 후로는 아무것도 듣거나 보지 못했습니다."
+          }
+        },
+        {
+          "fact_id": 35,
+          "threshold": 90,
+          "content": {
+            "content": "제가 그날 밤 박사님 연구실 문을 두드렸을 때, 문틈으로 희미하게 박사님의 목소리가 들렸습니다. 누군가와 통화하는 듯한 소리였는데, '그 망원경 부품은 절대 넘겨줄 수 없다'는 내용이었습니다. 그 후로는 아무 소리도 들리지 않았습니다."
+          }
+        }
+      ],
+      "personality": {
+        "speech_style": "객관적이고 질문이 많음",
+        "emotional_tendency": "침착함",
+        "lying_pattern": "partial_truth"
+      },
+      "critical_clue_ids": []
+    },
+    {
+      "suspect_id": 4,
+      "name": "최영호",
+      "role": "관측소 경비원",
+      "age": 55,
+      "gender": "남성",
+      "description": "키가 크고 건장한 체격의 중년 남성. 항상 무뚝뚝한 표정을 짓고 있으며, 관측소의 안전을 최우선으로 생각하는 듯 보인다. 제복을 단정하게 입고 있다.",
+      "is_culprit": false,
+      "motive": null,
+      "alibi_summary": "사건 당시 관측소 본관과 외부를 순찰 중이었다고 주장한다.",
+      "timeline": [
+        {
+          "fact_id": 36,
+          "threshold": 0,
+          "content": {
+            "time": "20:00-21:00",
+            "location": "혜성 관측소 본관",
+            "activity": "야간 순찰 시작, CCTV 점검"
+          }
+        },
+        {
+          "fact_id": 37,
+          "threshold": 0,
+          "content": {
+            "time": "21:00-22:00",
+            "location": "관측소 외부 (산 정상)",
+            "activity": "외부 시설 점검 및 순찰"
+          }
+        },
+        {
+          "fact_id": 38,
+          "threshold": 0,
+          "content": {
+            "time": "22:00-23:00",
+            "location": "혜성 관측소 본관",
+            "activity": "본관 내부 순찰, 이상 없음 확인"
+          }
+        },
+        {
+          "fact_id": 39,
+          "threshold": 0,
+          "content": {
+            "time": "23:00-00:00",
+            "location": "관측소 외부 (산 정상)",
+            "activity": "폭설로 인한 외부 순찰 강화"
+          }
+        },
+        {
+          "fact_id": 40,
+          "threshold": 0,
+          "content": {
+            "time": "00:00-01:00",
+            "location": "혜성 관측소 본관",
+            "activity": "휴게실에서 잠시 휴식"
+          }
+        },
+        {
+          "fact_id": 41,
+          "threshold": 0,
+          "content": {
+            "time": "01:00-02:00",
+            "location": "관측소 외부 (산 정상)",
+            "activity": "다시 외부 순찰"
+          }
+        },
+        {
+          "fact_id": 42,
+          "threshold": 0,
+          "content": {
+            "time": "02:00-03:00",
+            "location": "혜성 관측소 본관",
+            "activity": "본관 내부 순찰"
+          }
+        },
+        {
+          "fact_id": 43,
+          "threshold": 0,
+          "content": {
+            "time": "03:00-04:00",
+            "location": "혜성 관측소 본관",
+            "activity": "경비실에서 보고서 작성"
+          }
+        },
+        {
+          "fact_id": 44,
+          "threshold": 0,
+          "content": {
+            "time": "04:00-08:00",
+            "location": "혜성 관측소 본관",
+            "activity": "정기 순찰 및 아침 교대 준비"
+          }
+        }
+      ],
+      "secrets": [
+        {
+          "fact_id": 45,
+          "threshold": 0,
+          "content": {
+            "content": "저는 그날 밤 내내 제 할 일을 했을 뿐입니다. 관측소 본관과 외부를 순찰하며 아무런 특이사항도 발견하지 못했습니다."
+          }
+        },
+        {
+          "fact_id": 46,
+          "threshold": 30,
+          "content": {
+            "content": "밤 11시쯤 외부 순찰을 돌 때, 박사님 연구실 쪽에서 희미하게 불빛이 새어 나오는 것을 본 것 같기도 합니다. 하지만 곧 사라져서 대수롭지 않게 생각했습니다."
+          }
+        },
+        {
+          "fact_id": 47,
+          "threshold": 50,
+          "content": {
+            "content": "사실 박사님은 최근 경비 시스템 강화에 대해 불만이 많으셨습니다. 자신의 연구에 방해가 된다며 저와 몇 번 언쟁이 있었습니다."
+          }
+        },
+        {
+          "fact_id": 48,
+          "threshold": 70,
+          "content": {
+            "content": "새벽 1시경, 본관 휴게실에서 잠시 쉬고 있을 때, 누군가 본관 입구 통로를 통해 외부로 나갔다가 다시 들어오는 소리를 들었습니다. 하지만 폭설 때문에 정확히 누구인지는 확인하지 못했습니다."
+          }
+        },
+        {
+          "fact_id": 49,
+          "threshold": 90,
+          "content": {
+            "content": "제가 휴게실에서 쉬던 중 들었던 소리는, 사실 김민철 소장이었습니다. 그는 박사님 연구실 쪽에서 급하게 본관으로 돌아오는 모습이었습니다. 저는 그가 박사님과 무슨 일이 있었는지 알지 못했지만, 괜한 오해를 살까 봐 말하지 못했습니다."
+          }
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말, 다소 딱딱하게",
+        "emotional_tendency": "침착함, 방어적",
+        "lying_pattern": "deny"
+      },
+      "critical_clue_ids": []
+    }
+  ]
+}

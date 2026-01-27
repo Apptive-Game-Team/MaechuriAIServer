@@ -1,8 +1,7 @@
-import os
 import time
 import asyncio
 import logging
-from pathlib import Path
+import uuid
 
 from app.models.schemas.scenario import ScenarioResult
 from app.models.schemas.suspect import SuspectGenerationRequest
@@ -51,8 +50,12 @@ class ScenarioService:
         self.state_manager = ScenarioStateManager(self.base_tmp_dir)
 
     def generate(self,
-                 request_id: str,
-                 pre_input: str) -> dict:
+                 pre_input: str,
+                 request_id: str = None) -> dict:
+
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+
         # 생성 시작
         # 1. 평서문 생성
         case_state = self.state_manager.load_intermediate_state(request_id, "case_state")
@@ -202,7 +205,7 @@ class ScenarioService:
 
         return scenario_id
 
-    async def generate_and_save(self, request_id: str, pre_input: str, db=None) -> tuple[dict, int]:
+    async def generate_and_save(self, pre_input: str, request_id: str = None, db=None) -> tuple[dict, int]:
         """
         Generate scenario and save to database with RAG indexing.
 
@@ -222,10 +225,13 @@ class ScenarioService:
         """
         # Generate scenario (sync operation)
 
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+
         scenario_data = await asyncio.to_thread(
             self.generate,
-            request_id,
             pre_input,
+            request_id
         )
 
         # Save to DB and index for RAG
