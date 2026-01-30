@@ -1,6 +1,7 @@
 """Main scenario schema compositions."""
+from typing import List
 from pydantic import BaseModel
-from ..clue import ClueSetSchema
+from ..clue import ClueItemSchema
 from ..map import MapOutputSchema
 from .meta import MetaSchema
 from .incident import IncidentSchema
@@ -48,6 +49,6 @@ class ExpansionPart2(BaseModel):
 
 class ScenarioResult(ScenarioExpansion):
     """Complete scenario result with clues, map, and suspects."""
-    clues: ClueSetSchema
+    clues: List[ClueItemSchema]
     map: MapOutputSchema | dict = {}
     suspects: dict | list = []

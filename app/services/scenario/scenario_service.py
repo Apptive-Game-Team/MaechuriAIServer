@@ -177,7 +177,7 @@ class ScenarioService:
         # 8. 최종 결과 조합
         final_scenario = ScenarioResult(
             **expansion_result.model_dump(),  # 본인
-            clues=clue_result,  # 추가
+            clues=clue_result.clues,  # List[ClueItemSchema]
             map=map_result,  # 추가
             suspects=[SuspectSchema.from_generation(generation) for generation in suspects_result.suspects]  # 추가
         )

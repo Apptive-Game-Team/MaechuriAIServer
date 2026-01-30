@@ -136,9 +136,7 @@ class ScenarioRepository:
                 "no_supernatural": scenario.no_supernatural,
                 "no_time_travel": scenario.no_time_travel
             },
-            "clues": {
-                "clues": clues
-            },
+            "clues": clues,
             "suspects": suspects
         }
 
@@ -421,7 +419,7 @@ class ScenarioRepository:
                     session.add(fact_entry)
 
             # 4. Create Clues
-            clues = scenario_data.get("clues", {}).get("clues", [])
+            clues = scenario_data.get("clues", [])
             for clue_data in clues:
                 found_at = clue_data["found_at"]
                 loc_id = get_mapped_loc_id(found_at)
