@@ -1,7 +1,7 @@
-"""World-related database models (locations, rules)."""
-from typing import Optional
+"""World-related database models (locations)."""
+from typing import Optional, List
 
-from sqlalchemy import BigInteger, String, ForeignKey, Integer, CheckConstraint, ForeignKeyConstraint
+from sqlalchemy import BigInteger, String, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -9,79 +9,14 @@ from app.db.database import Base
 
 
 class Location(Base):
-    """Location in scenario."""
+    """Location in scenario with visibility and access rules."""
     __tablename__ = "location"
 
     scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
     location_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
     name: Mapped[str] = mapped_column(String(100))
+    can_see: Mapped[Optional[List]] = mapped_column(JSONB, default=list)  # List of location_ids visible from here
+    cannot_see: Mapped[Optional[List]] = mapped_column(JSONB, default=list)  # List of location_ids not visible from here
+    access_requires: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Access requirement
 
     scenario: Mapped["Scenario"] = relationship(back_populates="locations")
-
-
-class VisibilityRule(Base):
-    """Visibility rules."""
-    __tablename__ = "visibility_rule"
-
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
-    rule_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    from_location_id: Mapped[int] = mapped_column(BigInteger)
-    can_see: Mapped[list] = mapped_column(JSONB, default=list) # List of location_ids
-    cannot_see: Mapped[list] = mapped_column(JSONB, default=list) # List of location_ids
-    clue_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-
-    scenario: Mapped["Scenario"] = relationship(back_populates="visibility_rules")
-    from_location: Mapped["Location"] = relationship(
-        primaryjoin="and_(VisibilityRule.scenario_id==Location.scenario_id, VisibilityRule.from_location_id==Location.location_id)",
-        foreign_keys=[scenario_id, from_location_id],
-        overlaps="scenario,visibility_rules"
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["scenario_id", "from_location_id"],
-            ["location.scenario_id", "location.location_id"],
-            ondelete="CASCADE"
-        ),
-    )
-
-
-class AccessRule(Base):
-    """Access rules."""
-    __tablename__ = "access_rule"
-
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
-    rule_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    location_id: Mapped[int] = mapped_column(BigInteger)
-    requires: Mapped[str] = mapped_column(String(100))
-
-    scenario: Mapped["Scenario"] = relationship(back_populates="access_rules")
-    target_location: Mapped["Location"] = relationship(
-        primaryjoin="and_(AccessRule.scenario_id==Location.scenario_id, AccessRule.location_id==Location.location_id)",
-        foreign_keys=[scenario_id, location_id],
-        overlaps="scenario,access_rules"
-    )
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["scenario_id", "location_id"],
-            ["location.scenario_id", "location.location_id"],
-            ondelete="CASCADE"
-        ),
-    )
-
-
-class RequiredClue(Base):
-    """Required clue."""
-    __tablename__ = "required_clue"
-
-    scenario_id: Mapped[int] = mapped_column(ForeignKey("scenario.scenario_id", ondelete="CASCADE"), primary_key=True, type_=BigInteger)
-    clue_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
-    type: Mapped[str] = mapped_column(String(50))
-    min_count: Mapped[int] = mapped_column(Integer)
-
-    scenario: Mapped["Scenario"] = relationship(back_populates="required_clues")
-
-    __table_args__ = (
-        CheckConstraint("min_count >= 1", name="check_min_count"),
-    )

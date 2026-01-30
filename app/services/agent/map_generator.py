@@ -78,7 +78,9 @@ class MapGenerator:
             "meta": scenario.meta.model_dump(mode='json'),
             "incident": scenario.incident.model_dump(mode='json'),
             "world": {
-                "locations": scenario.world.locations,
+                "locations": scenario.world_detail.locations,
+                "visibility_rules": [x.model_dump(mode='json') for x in scenario.world_detail.visibility_rules],
+                "access_rules": [x.model_dump(mode='json') for x in scenario.world_detail.access_rules],
                 "time_granularity_minutes": scenario.world.time_granularity_minutes,
             },
         }

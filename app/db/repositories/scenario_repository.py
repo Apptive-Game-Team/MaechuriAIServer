@@ -10,9 +10,6 @@ from app.db.database import async_session_factory
 from app.db.models import (
     Scenario,
     Location,
-    VisibilityRule,
-    AccessRule,
-    RequiredClue,
     Suspect,
     Fact,
     Clue
@@ -55,9 +52,6 @@ class ScenarioRepository:
                     selectinload(Scenario.locations),
                     selectinload(Scenario.incident_loc),
                     selectinload(Scenario.crime_loc),
-                    selectinload(Scenario.visibility_rules),
-                    selectinload(Scenario.access_rules),
-                    selectinload(Scenario.required_clues),
                     selectinload(Scenario.clues),
                     selectinload(Scenario.suspects)
                     .selectinload(Suspect.facts),
@@ -115,16 +109,17 @@ class ScenarioRepository:
                 "time_granularity_minutes": 30,
                 "visibility_rules": [
                     {
-                        "from_location": loc_map.get(r.from_location_id, "Unknown"),
-                        "can_see": [loc_map.get(lid, "Unknown") for lid in r.can_see] if r.can_see else [],
-                        "cannot_see": [loc_map.get(lid, "Unknown") for lid in r.cannot_see] if r.cannot_see else [],
-                        "clue_type": r.clue_type
+                        "from_location": loc.name,
+                        "can_see": [loc_map.get(lid, "Unknown") for lid in loc.can_see] if loc.can_see else [],
+                        "cannot_see": [loc_map.get(lid, "Unknown") for lid in loc.cannot_see] if loc.cannot_see else [],
                     }
-                    for r in scenario.visibility_rules
+                    for loc in scenario.locations
+                    if loc.can_see or loc.cannot_see
                 ],
                 "access_rules": [
-                    {"location": loc_map.get(r.location_id, "Unknown"), "requires": r.requires}
-                    for r in scenario.access_rules
+                    {"location": loc.name, "requires": loc.access_requires}
+                    for loc in scenario.locations
+                    if loc.access_requires
                 ]
             },
             "ground_truth_detail": {
@@ -135,11 +130,7 @@ class ScenarioRepository:
                 },
                 "crime_location": scenario.crime_loc.name if scenario.crime_loc else "Unknown",
                 "culprit_ids": [s.suspect_id for s in scenario.suspects if s.is_culprit],
-                "method": scenario.crime_method,
-                "required_clues": [
-                    {"type": e.type, "min_count": e.min_count}
-                    for e in scenario.required_clues
-                ]
+                "method": scenario.crime_method
             },
             "constraints": {
                 "no_supernatural": scenario.no_supernatural,
@@ -327,7 +318,7 @@ class ScenarioRepository:
 
             scenario_id = scenario.scenario_id
 
-            # 2. Create Locations
+            # 2. Create Locations with visibility and access rules
             locations = scenario_data.get("world_detail", {}).get("locations", [])
             if not locations:
                 locations = scenario_data.get("world", {}).get("locations", [])
@@ -335,12 +326,6 @@ class ScenarioRepository:
             loc_map = {}  # name -> id mapping
             first_loc_id = None
             for idx, loc_name in enumerate(locations, start=1):
-                location = Location(
-                    scenario_id=scenario_id,
-                    location_id=idx,
-                    name=loc_name
-                )
-                session.add(location)
                 loc_map[loc_name] = idx
                 if first_loc_id is None:
                     first_loc_id = idx
@@ -350,14 +335,42 @@ class ScenarioRepository:
                 # 1. Exact match
                 if name in loc_map:
                     return loc_map[name]
-                
+
                 # 2. Partial match (e.g., "본관 도서관" matches "도서관")
                 for existing_name, existing_id in loc_map.items():
                     if existing_name in name or name in existing_name:
                         return existing_id
-                
+
                 # 3. Fallback to first location
                 return first_loc_id
+
+            # Build visibility and access rule maps by location name
+            visibility_rules = scenario_data.get("world_detail", {}).get("visibility_rules", [])
+            access_rules = scenario_data.get("world_detail", {}).get("access_rules") or []
+
+            # visibility_rule: from_location -> {can_see, cannot_see}
+            visibility_map = {}
+            for rule in visibility_rules:
+                from_loc = rule["from_location"]
+                can_see_ids = [get_mapped_loc_id(name) for name in rule.get("can_see", [])]
+                cannot_see_ids = [get_mapped_loc_id(name) for name in rule.get("cannot_see", [])]
+                visibility_map[from_loc] = {"can_see": can_see_ids, "cannot_see": cannot_see_ids}
+
+            # access_rule: location -> requires
+            access_map = {rule["location"]: rule["requires"] for rule in access_rules}
+
+            # Create Location objects with integrated rules
+            for loc_name, loc_id in loc_map.items():
+                vis_data = visibility_map.get(loc_name, {})
+                location = Location(
+                    scenario_id=scenario_id,
+                    location_id=loc_id,
+                    name=loc_name,
+                    can_see=vis_data.get("can_see", []),
+                    cannot_see=vis_data.get("cannot_see", []),
+                    access_requires=access_map.get(loc_name)
+                )
+                session.add(location)
 
             # Ensure locations are flushed to DB before referencing them in Scenario
             await session.flush()
@@ -369,51 +382,7 @@ class ScenarioRepository:
             scenario.incident_location_id = get_mapped_loc_id(incident_loc_name)
             scenario.crime_location_id = get_mapped_loc_id(crime_loc_name)
 
-            # 3. Create Visibility Rules
-            visibility_rules = scenario_data.get("world_detail", {}).get("visibility_rules", [])
-            for idx, rule in enumerate(visibility_rules, start=1):
-                # Map names to IDs
-                from_loc_id = get_mapped_loc_id(rule["from_location"])
-                
-                # Map lists of names to lists of IDs
-                can_see_ids = [get_mapped_loc_id(name) for name in rule.get("can_see", [])]
-                cannot_see_ids = [get_mapped_loc_id(name) for name in rule.get("cannot_see", [])]
-
-                vis_rule = VisibilityRule(
-                    scenario_id=scenario_id,
-                    rule_id=idx,
-                    from_location_id=from_loc_id,
-                    can_see=can_see_ids,
-                    cannot_see=cannot_see_ids,
-                    clue_type=rule.get("clue_type")
-                )
-                session.add(vis_rule)
-
-            # 4. Create Access Rules
-            access_rules = scenario_data.get("world_detail", {}).get("access_rules") or []
-            for idx, rule in enumerate(access_rules, start=1):
-                loc_id = get_mapped_loc_id(rule["location"])
-                
-                acc_rule = AccessRule(
-                    scenario_id=scenario_id,
-                    rule_id=idx,
-                    location_id=loc_id,
-                    requires=rule["requires"]
-                )
-                session.add(acc_rule)
-
-            # 5. Create Required Clues
-            required_clues = scenario_data.get("ground_truth_detail", {}).get("required_clues", [])
-            for idx, clue_info in enumerate(required_clues, start=1):
-                req_clue = RequiredClue(
-                    scenario_id=scenario_id,
-                    clue_id=idx,
-                    type=clue_info["type"],
-                    min_count=clue_info["min_count"]
-                )
-                session.add(req_clue)
-
-            # 6. Create Suspects with Timeline and Secrets
+            # 3. Create Suspects with Facts
             suspects = scenario_data.get("suspects", [])
             culprit_ids = scenario_data.get("ground_truth_detail", {}).get("culprit_ids", [])
 
@@ -451,7 +420,7 @@ class ScenarioRepository:
                     )
                     session.add(fact_entry)
 
-            # 7. Create Clues
+            # 4. Create Clues
             clues = scenario_data.get("clues", {}).get("clues", [])
             for clue_data in clues:
                 found_at = clue_data["found_at"]

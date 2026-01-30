@@ -4,6 +4,9 @@
 -- ID 체계: 모든 테이블에서 1, 2, 3... 단순 시퀀스 사용
 -- ============================================================
 
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- ============================================================
 -- SCENARIO (루트 테이블)
 -- ============================================================
@@ -21,13 +24,13 @@ CREATE TABLE scenario (
     incident_summary    TEXT NOT NULL,
     incident_time_start TIME NOT NULL,
     incident_time_end   TIME NOT NULL,
-    incident_location   VARCHAR(100) NOT NULL,
+    incident_location_id BIGINT,  -- FK to location (nullable for circular dep)
     primary_object      VARCHAR(100) NOT NULL,
 
     -- Ground Truth
     crime_time_start    TIME NOT NULL,
     crime_time_end      TIME NOT NULL,
-    crime_location      VARCHAR(100) NOT NULL,
+    crime_location_id   BIGINT,  -- FK to location (nullable for circular dep)
     crime_method        TEXT NOT NULL,
 
     -- Constraints
@@ -39,58 +42,32 @@ CREATE TABLE scenario (
 
 -- ============================================================
 -- LOCATION (시나리오 내 장소 목록)
+-- visibility_rule, access_rule 통합
 -- ============================================================
 CREATE TABLE location (
     scenario_id         BIGINT NOT NULL,
     location_id         BIGINT NOT NULL,
     name                VARCHAR(100) NOT NULL,
+    can_see             JSONB DEFAULT '[]',      -- List of location_ids visible from here
+    cannot_see          JSONB DEFAULT '[]',      -- List of location_ids not visible from here
+    access_requires     VARCHAR(100),            -- Access requirement (e.g., key name)
 
     PRIMARY KEY (scenario_id, location_id),
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
 );
 
--- ============================================================
--- VISIBILITY_RULE
--- ============================================================
-CREATE TABLE visibility_rule (
-    scenario_id         BIGINT NOT NULL,
-    rule_id             BIGINT NOT NULL,
-    from_location_id    BIGINT NOT NULL, -- FK
-    can_see             JSONB NOT NULL DEFAULT '[]', -- List of location_ids
-    cannot_see          JSONB NOT NULL DEFAULT '[]', -- List of location_ids
-    clue_type           VARCHAR(50),
+-- Add FKs for scenario location references (after location table exists)
+ALTER TABLE scenario
+    ADD CONSTRAINT fk_scenario_incident_location
+    FOREIGN KEY (scenario_id, incident_location_id)
+    REFERENCES location(scenario_id, location_id)
+    ON DELETE SET NULL;
 
-    PRIMARY KEY (scenario_id, rule_id),
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE,
-    FOREIGN KEY (scenario_id, from_location_id) REFERENCES location(scenario_id, location_id) ON DELETE CASCADE
-);
-
--- ============================================================
--- ACCESS_RULE
--- ============================================================
-CREATE TABLE access_rule (
-    scenario_id         BIGINT NOT NULL,
-    rule_id             BIGINT NOT NULL,
-    location_id         BIGINT NOT NULL, -- FK
-    requires            VARCHAR(100) NOT NULL,
-
-    PRIMARY KEY (scenario_id, rule_id),
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE,
-    FOREIGN KEY (scenario_id, location_id) REFERENCES location(scenario_id, location_id) ON DELETE CASCADE
-);
-
--- ============================================================
--- REQUIRED_CLUE (정답 판정용 필수 단서)
--- ============================================================
-CREATE TABLE required_clue (
-    scenario_id         BIGINT NOT NULL,
-    clue_id             BIGINT NOT NULL,
-    type                VARCHAR(50) NOT NULL,
-    min_count           INT NOT NULL CHECK (min_count >= 1),
-
-    PRIMARY KEY (scenario_id, clue_id),
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
-);
+ALTER TABLE scenario
+    ADD CONSTRAINT fk_scenario_crime_location
+    FOREIGN KEY (scenario_id, crime_location_id)
+    REFERENCES location(scenario_id, location_id)
+    ON DELETE SET NULL;
 
 -- ============================================================
 -- SUSPECT (용의자)
@@ -117,42 +94,28 @@ CREATE TABLE suspect (
     -- 자백 트리거 단서 IDs (local clue_id 배열)
     critical_clue_ids   JSONB NOT NULL DEFAULT '[]',
 
+    -- Embedding for RAG
+    profile_embedding   vector(1024),
+
     PRIMARY KEY (scenario_id, suspect_id),
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
 );
 
 -- ============================================================
--- SUSPECT_TIMELINE (용의자 타임라인)
+-- FACT (용의자 타임라인 + 비밀 통합)
 -- ============================================================
-CREATE TABLE suspect_timeline (
+CREATE TABLE fact (
     scenario_id         BIGINT NOT NULL,
     suspect_id          BIGINT NOT NULL,
-    timeline_id         BIGINT NOT NULL,
+    fact_id             BIGINT NOT NULL,
 
-    time_range          VARCHAR(50) NOT NULL,
-    location_id         BIGINT NOT NULL, -- FK
-    activity            TEXT NOT NULL,
-    can_prove           BOOLEAN NOT NULL DEFAULT FALSE,
-    witness             VARCHAR(100),
+    threshold           INT NOT NULL DEFAULT 0,
+    type                VARCHAR(50) NOT NULL,  -- e.g., "secret", "timeline"
+    content             JSONB NOT NULL,
+    embedding           vector(1024),
 
-    PRIMARY KEY (scenario_id, suspect_id, timeline_id),
-    FOREIGN KEY (scenario_id, suspect_id) REFERENCES suspect(scenario_id, suspect_id) ON DELETE CASCADE,
-    FOREIGN KEY (scenario_id, location_id) REFERENCES location(scenario_id, location_id) ON DELETE CASCADE
-);
-
--- ============================================================
--- SUSPECT_SECRET (용의자 비밀 - 압박 단계별)
--- ============================================================
-CREATE TABLE suspect_secret (
-    scenario_id         BIGINT NOT NULL,
-    suspect_id          BIGINT NOT NULL,
-    secret_id           BIGINT NOT NULL,
-
-    threshold           INT NOT NULL CHECK (threshold >= 0 AND threshold <= 100),
-    content             TEXT NOT NULL,
-    trigger_clue_ids    JSONB NOT NULL DEFAULT '[]',
-
-    PRIMARY KEY (scenario_id, suspect_id, secret_id),
+    PRIMARY KEY (scenario_id, fact_id),
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE,
     FOREIGN KEY (scenario_id, suspect_id) REFERENCES suspect(scenario_id, suspect_id) ON DELETE CASCADE
 );
 
@@ -164,12 +127,16 @@ CREATE TABLE clue (
     clue_id             BIGINT NOT NULL,
 
     name                VARCHAR(100) NOT NULL,
-    location_id         BIGINT NOT NULL, -- FK (formerly found_at)
+    location_id         BIGINT NOT NULL,  -- FK to location
     description         TEXT NOT NULL,
-    related_suspect_ids JSONB NOT NULL DEFAULT '[]',
+    related_fact_ids    JSONB DEFAULT '[]',
     logic_explanation   TEXT NOT NULL,
     decoded_answer      TEXT,  -- 단서 분석 시 형사가 알려줄 해독된 답 (nullable)
     is_red_herring      BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Embeddings for RAG
+    description_embedding vector(1024),
+    logic_embedding       vector(1024),
 
     PRIMARY KEY (scenario_id, clue_id),
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE,
@@ -177,9 +144,77 @@ CREATE TABLE clue (
 );
 
 -- ============================================================
--- INDEXES (조회 성능)
+-- GAME_SESSION (게임 세션)
 -- ============================================================
+CREATE TABLE game_session (
+    session_id          VARCHAR(36) PRIMARY KEY,
+    scenario_id         BIGINT NOT NULL,
+
+    -- Game State
+    current_pressure    INT DEFAULT 0,
+    suspect_pressures   JSONB DEFAULT '{}'::jsonb,
+    evidence_seen_ids   JSONB DEFAULT '[]'::jsonb,
+
+    -- Progress Tracking
+    suspect_interactions JSONB DEFAULT '{}'::jsonb,
+    clue_interactions    JSONB DEFAULT '{}'::jsonb,
+
+    -- Timestamps
+    created_at          TIMESTAMP DEFAULT NOW(),
+    last_activity_at    TIMESTAMP DEFAULT NOW(),
+    completed_at        TIMESTAMP,
+
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- CHAT_MESSAGE_EMBEDDING (대화 기록 임베딩)
+-- ============================================================
+CREATE TABLE chat_message_embedding (
+    id                  SERIAL PRIMARY KEY,
+    scenario_id         BIGINT NOT NULL,
+    session_id          VARCHAR(36) NOT NULL,
+    suspect_id          BIGINT,
+    clue_id             BIGINT,
+    message_index       INT NOT NULL,
+    role                VARCHAR(20) NOT NULL,
+    content             TEXT NOT NULL,
+    embedding           vector(1024),
+    created_at          TIMESTAMP DEFAULT NOW(),
+
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
+);
+
+-- ============================================================
+-- INDEXES
+-- ============================================================
+
+-- Suspect indexes
 CREATE INDEX idx_suspect_culprit ON suspect(scenario_id, is_culprit);
+CREATE INDEX idx_suspect_profile_embedding ON suspect USING hnsw (profile_embedding vector_cosine_ops);
+
+-- Fact indexes
+CREATE INDEX idx_fact_embedding ON fact USING hnsw (embedding vector_cosine_ops);
+
+-- Clue indexes
 CREATE INDEX idx_clue_location ON clue(scenario_id, location_id);
 CREATE INDEX idx_clue_red_herring ON clue(scenario_id, is_red_herring);
-CREATE INDEX idx_secret_threshold ON suspect_secret(scenario_id, suspect_id, threshold);
+CREATE INDEX idx_clue_description_embedding ON clue USING hnsw (description_embedding vector_cosine_ops);
+CREATE INDEX idx_clue_logic_embedding ON clue USING hnsw (logic_embedding vector_cosine_ops);
+
+-- Game session indexes
+CREATE INDEX idx_game_session_scenario_id ON game_session(scenario_id);
+
+-- Chat message indexes
+CREATE INDEX idx_chat_message_embedding ON chat_message_embedding USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX idx_chat_message_scenario_session ON chat_message_embedding(scenario_id, session_id);
+CREATE INDEX idx_chat_message_suspect ON chat_message_embedding(scenario_id, suspect_id) WHERE suspect_id IS NOT NULL;
+CREATE INDEX idx_chat_message_clue ON chat_message_embedding(scenario_id, clue_id) WHERE clue_id IS NOT NULL;
+
+-- ============================================================
+-- COMMENTS
+-- ============================================================
+COMMENT ON TABLE game_session IS 'Game session tracking player progress and state.';
+COMMENT ON COLUMN game_session.suspect_interactions IS 'Track interactions per suspect: {suspect_id: interaction_count}';
+COMMENT ON COLUMN game_session.clue_interactions IS 'Track clue analysis: {clue_id: analyzed_count}';
+COMMENT ON COLUMN game_session.suspect_pressures IS 'Per-suspect pressure: {suspect_id: pressure_value}';
