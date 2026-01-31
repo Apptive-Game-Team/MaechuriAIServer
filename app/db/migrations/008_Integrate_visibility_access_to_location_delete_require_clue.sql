@@ -1,4 +1,4 @@
--- Locaiton에 can_see와 cannot_see를 location_id를 스스로 참조하는 col 생성
+-- Location에 can_see와 cannot_see를 location_id를 스스로 참조하는 col 생성
 -- access_rule 생성
 -- 이후 visibility_rule에서 참조하여 기존에 있던 자료들 넘길 수 있도록 수정
 -- 동일하게 access_rule에도 적용

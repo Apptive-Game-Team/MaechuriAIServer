@@ -16,7 +16,6 @@ from app.db.models import (
     ScenarioContext,
     Map
 )
-from app.models.schemas.map import MapOutputSchema
 from app.models.schemas.scenario import ScenarioResult
 from app.core.map_position import calculate_map_positions
 from app.models.schemas.suspect import (

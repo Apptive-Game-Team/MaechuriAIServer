@@ -3,7 +3,6 @@ import logging
 import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing_extensions import deprecated
 
 if TYPE_CHECKING:
     from app.db.repositories.scenario_repository import ScenarioRepository
@@ -164,7 +163,6 @@ class ChatService:
             )
 
             # general 상호작용 카운트 증가
-            session_repo = GameSessionRepository(db)
             new_interactions = game_session.suspect_interactions.copy()
             new_interactions["general"] = general_interactions + 1
             game_session.suspect_interactions = new_interactions
