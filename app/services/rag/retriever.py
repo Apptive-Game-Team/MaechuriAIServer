@@ -1,15 +1,19 @@
 """RAG Retriever for semantic search over embeddings."""
-from typing import List, Optional, Any
+from typing import List, Optional, Any, TypeVar, Callable, Type
 from dataclasses import dataclass
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import select, Select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding, ScenarioContext
 from app.services.embedding import get_embedding_service, EmbeddingService
 
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")  # Result dataclass type
+M = TypeVar("M")  # SQLAlchemy model type
 
 @dataclass
 class RetrievedFact:
@@ -79,6 +83,8 @@ class RAGRetriever:
     - Finding relevant secrets based on user queries
     - Finding relevant clues based on user queries
     - Finding relevant chat history based on user queries
+
+    Uses a generic search engine pattern internally to reduce code duplication.
     """
 
     def __init__(self, embedding_service: Optional[EmbeddingService] = None):
@@ -91,60 +97,110 @@ class RAGRetriever:
         """
         self.embedding_service = embedding_service or get_embedding_service()
 
-    async def search_facts(
-            self,
-            db: AsyncSession,
-            scenario_id: int,
-            suspect_id: int,
-            query: str,
-            current_pressure: int = 0,
-            top_k: int = 3,
-            threshold: float = 0.1
-    ) -> List[RetrievedFact]:
-        """Search for relevant facts that can be revealed."""
+    async def _search(
+        self,
+        db: AsyncSession,
+        query: str,
+        model: Type[M],
+        embedding_col: InstrumentedAttribute,
+        mapper: Callable[[M, float], T],
+        base_filters: List,
+        top_k: int = 5,
+        threshold: float = 0.5
+    ) -> List[T]:
+        """Generic search engine for semantic similarity search.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        query : str
+            The search query.
+        model : Type[M]
+            SQLAlchemy model class to search.
+        embedding_col : InstrumentedAttribute
+            The embedding column to search against.
+        mapper : Callable[[M, float], T]
+            Function to convert (model_instance, similarity) to result dataclass.
+        base_filters : List
+            List of SQLAlchemy filter conditions.
+        top_k : int
+            Maximum number of results.
+        threshold : float
+            Minimum similarity threshold.
+
+        Returns
+        -------
+        List[T]
+            List of mapped results above threshold.
+        """
         query_embedding = self.embedding_service.embed_query(query)
 
+        distance_expr = embedding_col.cosine_distance(query_embedding)
+        similarity_expr = (1 - distance_expr).label("similarity")
+
+        stmt = (
+            select(model, similarity_expr)
+            .where(embedding_col.is_not(None))
+        )
+
+        for condition in base_filters:
+            stmt = stmt.where(condition)
+
+        stmt = stmt.order_by(distance_expr).limit(top_k)
+
+        result = await db.execute(stmt)
+
+        return [
+            mapper(row[0], row[1])
+            for row in result
+            if row[1] >= threshold
+        ]
+
+    async def search_facts(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        suspect_id: int,
+        query: str,
+        current_pressure: int = 0,
+        top_k: int = 3,
+        threshold: float = 0.1
+    ) -> List[RetrievedFact]:
+        """Search for relevant facts that can be revealed."""
         suspect_result = await db.execute(
             select(Suspect.name).where(
                 Suspect.scenario_id == scenario_id,
                 Suspect.suspect_id == suspect_id
             )
         )
-
         suspect_name = suspect_result.scalar_one_or_none() or "Unknown"
 
-        distance_expr = Fact.embedding.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
+        def mapper(fact: Fact, similarity: float) -> RetrievedFact:
+            return RetrievedFact(
+                suspect_id=suspect_id,
+                suspect_name=suspect_name,
+                fact_id=fact.fact_id,
+                threshold=fact.threshold,
+                content=fact.content,
+                type=fact.type,
+                similarity=similarity
+            )
 
-        stmt = (
-            select(Fact, similarity_expr)
-            .where(Fact.scenario_id == scenario_id)
-            .where(Fact.suspect_id == suspect_id)
-            .where(Fact.threshold <= current_pressure)
-            .where(Fact.embedding.is_not(None))
-            .order_by(distance_expr)
-            .limit(top_k)
+        return await self._search(
+            db=db,
+            query=query,
+            model=Fact,
+            embedding_col=Fact.embedding,
+            mapper=mapper,
+            base_filters=[
+                Fact.scenario_id == scenario_id,
+                Fact.suspect_id == suspect_id,
+                Fact.threshold <= current_pressure,
+            ],
+            top_k=top_k,
+            threshold=threshold
         )
-
-        result = await db.execute(stmt)
-
-        facts: List[RetrievedFact] = []
-        for row in result:
-            fact: Fact = row[0]
-            similarity: float = row[1]
-            
-            if similarity >= threshold:
-                facts.append(RetrievedFact(
-                    suspect_id=suspect_id,
-                    suspect_name=suspect_name,
-                    fact_id=fact.fact_id,
-                    threshold=fact.threshold,
-                    content=fact.content,
-                    type=fact.type,
-                    similarity=similarity
-                ))
-
-        return facts
 
     async def search_clues(
         self,
@@ -156,50 +212,34 @@ class RAGRetriever:
         search_type: str = "description"
     ) -> List[RetrievedClue]:
         """Search for relevant clues."""
-        query_embedding = self.embedding_service.embed_query(query)
-
-        # Select embedding column based on search_type
-        if search_type == "description":
-            embedding_col = Clue.description_embedding
-        else:
-            embedding_col = Clue.logic_embedding
-
-        distance_expr = embedding_col.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
-
-        stmt = (
-            select(Clue, similarity_expr)
-            .where(Clue.scenario_id == scenario_id)
-            .where(embedding_col.is_not(None))
-            .order_by(distance_expr)
-            .limit(top_k)
-        )
-
-        result = await db.execute(stmt)
-
-        clues = []
+        embedding_col = Clue.description_embedding if search_type == "description" else Clue.logic_embedding
 
         from app.api.dependencies import get_scenario_repository
         location_dict = await get_scenario_repository().get_location_dict(scenario_id)
 
-        for row in result:
-            clue: Clue = row[0]
-            similarity: float = row[1]
+        def mapper(clue: Clue, similarity: float) -> RetrievedClue:
+            return RetrievedClue(
+                clue_id=clue.clue_id,
+                name=clue.name,
+                found_at=location_dict.get(clue.location_id, "Unknown"),
+                description=clue.description,
+                logic_explanation=clue.logic_explanation,
+                decoded_answer=clue.decoded_answer,
+                is_red_herring=clue.is_red_herring,
+                related_fact_ids=clue.related_fact_ids or [],
+                similarity=similarity
+            )
 
-            if similarity >= threshold:
-                clues.append(RetrievedClue(
-                    clue_id=clue.clue_id,
-                    name=clue.name,
-                    found_at=location_dict[clue.location_id],
-                    description=clue.description,
-                    logic_explanation=clue.logic_explanation,
-                    decoded_answer=clue.decoded_answer,
-                    is_red_herring=clue.is_red_herring,
-                    related_fact_ids=clue.related_fact_ids or [],
-                    similarity=similarity
-                ))
-
-        return clues
+        return await self._search(
+            db=db,
+            query=query,
+            model=Clue,
+            embedding_col=embedding_col,
+            mapper=mapper,
+            base_filters=[Clue.scenario_id == scenario_id],
+            top_k=top_k,
+            threshold=threshold
+        )
 
     async def search_chat_history(
         self,
@@ -213,46 +253,37 @@ class RAGRetriever:
         clue_id: Optional[int] = None
     ) -> List[RetrievedChatMessage]:
         """Search for relevant chat messages in history."""
-        query_embedding = self.embedding_service.embed_query(query)
+        def mapper(msg: ChatMessageEmbedding, similarity: float) -> RetrievedChatMessage:
+            return RetrievedChatMessage(
+                id=msg.id,
+                session_id=msg.session_id,
+                message_index=msg.message_index,
+                role=msg.role,
+                content=msg.content,
+                suspect_id=msg.suspect_id,
+                clue_id=msg.clue_id,
+                similarity=similarity
+            )
 
-        distance_expr = ChatMessageEmbedding.embedding.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
-
-        stmt = (
-            select(ChatMessageEmbedding, similarity_expr)
-            .where(ChatMessageEmbedding.scenario_id == scenario_id)
-            .where(ChatMessageEmbedding.session_id == session_id)
-            .where(ChatMessageEmbedding.embedding.is_not(None))
-        )
-
+        filters = [
+            ChatMessageEmbedding.scenario_id == scenario_id,
+            ChatMessageEmbedding.session_id == session_id,
+        ]
         if suspect_id is not None:
-            stmt = stmt.where(ChatMessageEmbedding.suspect_id == suspect_id)
-        
+            filters.append(ChatMessageEmbedding.suspect_id == suspect_id)
         if clue_id is not None:
-            stmt = stmt.where(ChatMessageEmbedding.clue_id == clue_id)
+            filters.append(ChatMessageEmbedding.clue_id == clue_id)
 
-        stmt = stmt.order_by(distance_expr).limit(top_k)
-
-        result = await db.execute(stmt)
-
-        messages = []
-        for row in result:
-            msg: ChatMessageEmbedding = row[0]
-            similarity: float = row[1]
-
-            if similarity >= threshold:
-                messages.append(RetrievedChatMessage(
-                    id=msg.id,
-                    session_id=msg.session_id,
-                    message_index=msg.message_index,
-                    role=msg.role,
-                    content=msg.content,
-                    suspect_id=msg.suspect_id,
-                    clue_id=msg.clue_id,
-                    similarity=similarity
-                ))
-
-        return messages
+        return await self._search(
+            db=db,
+            query=query,
+            model=ChatMessageEmbedding,
+            embedding_col=ChatMessageEmbedding.embedding,
+            mapper=mapper,
+            base_filters=filters,
+            top_k=top_k,
+            threshold=threshold
+        )
 
     async def search_all_sessions_history(
         self,
@@ -264,42 +295,32 @@ class RAGRetriever:
         suspect_id: Optional[int] = None
     ) -> List[RetrievedChatMessage]:
         """Search for relevant chat messages across all sessions."""
-        query_embedding = self.embedding_service.embed_query(query)
+        def mapper(msg: ChatMessageEmbedding, similarity: float) -> RetrievedChatMessage:
+            return RetrievedChatMessage(
+                id=msg.id,
+                session_id=msg.session_id,
+                message_index=msg.message_index,
+                role=msg.role,
+                content=msg.content,
+                suspect_id=msg.suspect_id,
+                clue_id=msg.clue_id,
+                similarity=similarity
+            )
 
-        distance_expr = ChatMessageEmbedding.embedding.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
-
-        stmt = (
-            select(ChatMessageEmbedding, similarity_expr)
-            .where(ChatMessageEmbedding.scenario_id == scenario_id)
-            .where(ChatMessageEmbedding.embedding.is_not(None))
-        )
-
+        filters = [ChatMessageEmbedding.scenario_id == scenario_id]
         if suspect_id is not None:
-            stmt = stmt.where(ChatMessageEmbedding.suspect_id == suspect_id)
+            filters.append(ChatMessageEmbedding.suspect_id == suspect_id)
 
-        stmt = stmt.order_by(distance_expr).limit(top_k)
-
-        result = await db.execute(stmt)
-
-        messages = []
-        for row in result:
-            msg: ChatMessageEmbedding = row[0]
-            similarity: float = row[1]
-
-            if similarity >= threshold:
-                messages.append(RetrievedChatMessage(
-                    id=msg.id,
-                    session_id=msg.session_id,
-                    message_index=msg.message_index,
-                    role=msg.role,
-                    content=msg.content,
-                    suspect_id=msg.suspect_id,
-                    clue_id=msg.clue_id,
-                    similarity=similarity
-                ))
-
-        return messages
+        return await self._search(
+            db=db,
+            query=query,
+            model=ChatMessageEmbedding,
+            embedding_col=ChatMessageEmbedding.embedding,
+            mapper=mapper,
+            base_filters=filters,
+            top_k=top_k,
+            threshold=threshold
+        )
 
     async def search_suspect_profiles(
         self,
@@ -310,64 +331,33 @@ class RAGRetriever:
         threshold: float = 0.5,
         suspect_ids: Optional[List[int]] = None
     ) -> List[RetrievedSuspectProfile]:
-        """Search for relevant suspect profiles based on query.
+        """Search for relevant suspect profiles based on query."""
+        def mapper(suspect: Suspect, similarity: float) -> RetrievedSuspectProfile:
+            return RetrievedSuspectProfile(
+                suspect_id=suspect.suspect_id,
+                name=suspect.name,
+                role=suspect.role,
+                age=suspect.age,
+                gender=suspect.gender,
+                description=suspect.description,
+                alibi_summary=suspect.alibi_summary,
+                similarity=similarity
+            )
 
-        Parameters
-        ----------
-        db : AsyncSession
-            Database session.
-        scenario_id : int
-            The scenario ID.
-        query : str
-            The search query.
-        top_k : int, optional
-            Number of results to return. Defaults to 3.
-        threshold : float, optional
-            Minimum similarity threshold. Defaults to 0.5.
-        suspect_ids : List[int], optional
-            If provided, only search these specific suspects.
-
-        Returns
-        -------
-        List[RetrievedSuspectProfile]
-            List of matching suspect profiles.
-        """
-        query_embedding = self.embedding_service.embed_query(query)
-
-        distance_expr = Suspect.profile_embedding.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
-
-        stmt = (
-            select(Suspect, similarity_expr)
-            .where(Suspect.scenario_id == scenario_id)
-            .where(Suspect.profile_embedding.is_not(None))
-        )
-
+        filters = [Suspect.scenario_id == scenario_id]
         if suspect_ids:
-            stmt = stmt.where(Suspect.suspect_id.in_(suspect_ids))
+            filters.append(Suspect.suspect_id.in_(suspect_ids))
 
-        stmt = stmt.order_by(distance_expr).limit(top_k)
-
-        result = await db.execute(stmt)
-
-        profiles = []
-        for row in result:
-            suspect: Suspect = row[0]
-            similarity: float = row[1]
-
-            if similarity >= threshold:
-                profiles.append(RetrievedSuspectProfile(
-                    suspect_id=suspect.suspect_id,
-                    name=suspect.name,
-                    role=suspect.role,
-                    age=suspect.age,
-                    gender=suspect.gender,
-                    description=suspect.description,
-                    alibi_summary=suspect.alibi_summary,
-                    similarity=similarity
-                ))
-
-        return profiles
+        return await self._search(
+            db=db,
+            query=query,
+            model=Suspect,
+            embedding_col=Suspect.profile_embedding,
+            mapper=mapper,
+            base_filters=filters,
+            top_k=top_k,
+            threshold=threshold
+        )
 
     async def search_contexts(
         self,
@@ -378,60 +368,29 @@ class RAGRetriever:
         threshold: float = 0.5,
         context_types: Optional[List[str]] = None
     ) -> List[RetrievedContext]:
-        """Search for relevant scenario contexts.
+        """Search for relevant scenario contexts."""
+        def mapper(ctx: ScenarioContext, similarity: float) -> RetrievedContext:
+            return RetrievedContext(
+                context_id=ctx.context_id,
+                type=ctx.type,
+                content=ctx.content,
+                similarity=similarity
+            )
 
-        Parameters
-        ----------
-        db : AsyncSession
-            Database session.
-        scenario_id : int
-            The scenario ID.
-        query : str
-            The search query.
-        top_k : int, optional
-            Number of results to return. Defaults to 5.
-        threshold : float, optional
-            Minimum similarity threshold. Defaults to 0.5.
-        context_types : List[str], optional
-            Filter by context types ('incident', 'location', 'world').
-
-        Returns
-        -------
-        List[RetrievedContext]
-            List of matching contexts.
-        """
-        query_embedding = self.embedding_service.embed_query(query)
-
-        distance_expr = ScenarioContext.embedding.cosine_distance(query_embedding)
-        similarity_expr = (1 - distance_expr).label("similarity")
-
-        stmt = (
-            select(ScenarioContext, similarity_expr)
-            .where(ScenarioContext.scenario_id == scenario_id)
-            .where(ScenarioContext.embedding.is_not(None))
-        )
-
+        filters = [ScenarioContext.scenario_id == scenario_id]
         if context_types:
-            stmt = stmt.where(ScenarioContext.type.in_(context_types))
+            filters.append(ScenarioContext.type.in_(context_types))
 
-        stmt = stmt.order_by(distance_expr).limit(top_k)
-
-        result = await db.execute(stmt)
-
-        contexts = []
-        for row in result:
-            ctx: ScenarioContext = row[0]
-            similarity: float = row[1]
-
-            if similarity >= threshold:
-                contexts.append(RetrievedContext(
-                    context_id=ctx.context_id,
-                    type=ctx.type,
-                    content=ctx.content,
-                    similarity=similarity
-                ))
-
-        return contexts
+        return await self._search(
+            db=db,
+            query=query,
+            model=ScenarioContext,
+            embedding_col=ScenarioContext.embedding,
+            mapper=mapper,
+            base_filters=filters,
+            top_k=top_k,
+            threshold=threshold
+        )
 
 
 # Singleton instance
