@@ -70,6 +70,31 @@ ALTER TABLE scenario
     ON DELETE SET NULL;
 
 -- ============================================================
+-- MAP (맵 요소 - 방, 복도)
+-- ============================================================
+CREATE TABLE map (
+    scenario_id         BIGINT NOT NULL,
+    map_id              BIGINT NOT NULL,
+
+    type                VARCHAR(20) NOT NULL CHECK (type IN ('room', 'corridor')),
+    name                VARCHAR(100) NOT NULL,
+
+    -- Position (bottom-left origin)
+    x                   SMALLINT NOT NULL,
+    y                   SMALLINT NOT NULL,
+
+    -- Dimensions
+    width               SMALLINT NOT NULL,
+    height              SMALLINT NOT NULL,
+
+    -- Additional data (mood for rooms, connections for corridors)
+    extra_data          JSONB DEFAULT '{}',
+
+    PRIMARY KEY (scenario_id, map_id),
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- SUSPECT (용의자)
 -- ============================================================
 CREATE TABLE suspect (
@@ -93,6 +118,10 @@ CREATE TABLE suspect (
 
     -- 자백 트리거 단서 IDs (local clue_id 배열)
     critical_clue_ids   JSONB NOT NULL DEFAULT '[]',
+
+    -- Map position (within room)
+    x                   SMALLINT,
+    y                   SMALLINT,
 
     -- Embedding for RAG
     profile_embedding   vector(1024),
@@ -134,6 +163,10 @@ CREATE TABLE clue (
     decoded_answer      TEXT,  -- 단서 분석 시 형사가 알려줄 해독된 답 (nullable)
     is_red_herring      BOOLEAN NOT NULL DEFAULT FALSE,
 
+    -- Map position (within room)
+    x                   SMALLINT,
+    y                   SMALLINT,
+
     -- Embeddings for RAG
     description_embedding vector(1024),
     logic_embedding       vector(1024),
@@ -153,7 +186,7 @@ CREATE TABLE game_session (
     -- Game State
     current_pressure    INT DEFAULT 0,
     suspect_pressures   JSONB DEFAULT '{}'::jsonb,
-    evidence_seen_ids   JSONB DEFAULT '[]'::jsonb,
+    clue_seen_ids   JSONB DEFAULT '[]'::jsonb,
 
     -- Progress Tracking
     suspect_interactions JSONB DEFAULT '{}'::jsonb,
@@ -186,8 +219,29 @@ CREATE TABLE chat_message_embedding (
 );
 
 -- ============================================================
+-- SCENARIO_CONTEXT (조력자용 공개 컨텍스트)
+-- ============================================================
+CREATE TABLE scenario_context (
+    scenario_id         BIGINT NOT NULL,
+    context_id          BIGINT NOT NULL,
+
+    type                VARCHAR(50) NOT NULL
+                        CHECK (type IN ('incident', 'location', 'world')),
+    content             TEXT NOT NULL,
+    extra_data          JSONB DEFAULT '{}',
+    embedding           vector(1024),
+
+    PRIMARY KEY (scenario_id, context_id),
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
+
+-- Map indexes
+CREATE INDEX idx_map_scenario ON map(scenario_id);
+CREATE INDEX idx_map_type ON map(scenario_id, type);
 
 -- Suspect indexes
 CREATE INDEX idx_suspect_culprit ON suspect(scenario_id, is_culprit);
@@ -210,6 +264,10 @@ CREATE INDEX idx_chat_message_embedding ON chat_message_embedding USING hnsw (em
 CREATE INDEX idx_chat_message_scenario_session ON chat_message_embedding(scenario_id, session_id);
 CREATE INDEX idx_chat_message_suspect ON chat_message_embedding(scenario_id, suspect_id) WHERE suspect_id IS NOT NULL;
 CREATE INDEX idx_chat_message_clue ON chat_message_embedding(scenario_id, clue_id) WHERE clue_id IS NOT NULL;
+
+-- Scenario context indexes
+CREATE INDEX idx_scenario_context_embedding ON scenario_context USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX idx_scenario_context_type ON scenario_context(scenario_id, type);
 
 -- ============================================================
 -- COMMENTS

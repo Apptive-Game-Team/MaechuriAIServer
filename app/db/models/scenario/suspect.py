@@ -2,7 +2,7 @@
 from typing import List, Optional, Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, String, Text, Boolean, Integer, ForeignKey, ForeignKeyConstraint, CheckConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, Integer, SmallInteger, ForeignKey, ForeignKeyConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,6 +33,10 @@ class Suspect(Base):
     lying_pattern: Mapped[str] = mapped_column(String(50))
 
     critical_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
+
+    # Map position (within room)
+    x: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    y: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
 
     # Embedding for RAG (name + role + description)
     profile_embedding = mapped_column(Vector(1024), nullable=True)

@@ -61,7 +61,9 @@ class Scenario(Base):
 
     suspects: Mapped[List["Suspect"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     clues: Mapped[List["Clue"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
+    contexts: Mapped[List["ScenarioContext"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     game_sessions: Mapped[List["GameSession"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
+    map_elements: Mapped[List["Map"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("difficulty IN ('easy', 'mid', 'hard')", name="check_difficulty"),
