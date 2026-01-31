@@ -1,58 +1,7 @@
 """
-Map Position Calculator
+Map Position Calculator - Calculates (x, y) coordinates for map elements.
 
-This module calculates the bottom-left (x, y) coordinates for map elements
-(rooms and corridors) based on their connections.
-
-Algorithm Overview:
-==================
-
-1. INPUT: MapOutputSchema containing:
-   - rooms: List of rooms with id, name, width, height
-   - corridors: List of corridors with connections (room_id, direction)
-   - obj: List of objects (clues, suspects) with relative positions within rooms
-
-2. GRAPH CONSTRUCTION:
-   - Build adjacency list from corridor connections
-   - Each corridor connects 2+ rooms with directional information
-   - Example: Corridor connects Room1(south) <-> Room2(north)
-     means Room2 is to the NORTH of Room1
-
-3. BFS ROOM PLACEMENT:
-   - Start from first room at center position (0, 0)
-   - For each connected room, calculate position based on direction:
-     - NORTH: new_y = current_y + current_height/2 + new_height/2 + corridor_length
-     - SOUTH: new_y = current_y - current_height/2 - new_height/2 - corridor_length
-     - EAST:  new_x = current_x + current_width/2 + new_width/2 + corridor_length
-     - WEST:  new_x = current_x - current_width/2 - new_width/2 - corridor_length
-
-4. NORMALIZATION:
-   - Find minimum x and y coordinates
-   - Shift all positions so minimum becomes 0 (all coordinates positive)
-
-5. OUTPUT:
-   - Convert center positions to bottom-left coordinates
-   - Return MapPositionResult with all element positions
-
-Visual Example:
-==============
-
-    Input corridors:
-    - Corridor1: Room1(south) <-> Room2(north)  # Room2 is north of Room1
-    - Corridor2: Room1(east) <-> Room3(west)    # Room3 is east of Room1
-
-    Result layout:
-                    ┌─────────┐
-                    │  Room2  │
-                    │  (0,22) │
-                    └────┬────┘
-                         │ Corridor1
-                    ┌────┴────┐      ┌─────────┐
-                    │  Room1  │──────│  Room3  │
-                    │  (0,0)  │ C2   │  (22,0) │
-                    └─────────┘      └─────────┘
-
-    Bottom-left (x,y) coordinates are stored for each element.
+Algorithm: BFS traversal from first room, placing neighbors based on corridor directions.
 """
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
@@ -61,25 +10,23 @@ from collections import deque
 from app.models.schemas.map import MapOutputSchema, RoomSchema, CorridorSchema
 
 
+# Direction vectors: (x_multiplier, y_multiplier, use_width_for_current, use_width_for_neighbor)
+DIRECTION_VECTORS = {
+    "north": (0, 1, False, False),   # Same x, higher y (use heights)
+    "south": (0, -1, False, False),  # Same x, lower y (use heights)
+    "east": (1, 0, True, True),      # Higher x, same y (use widths)
+    "west": (-1, 0, True, True),     # Lower x, same y (use widths)
+}
+
+
 @dataclass
 class MapElementPosition:
-    """Position and dimensions of a map element.
-
-    Attributes:
-        id: Original element ID from MapOutputSchema
-        type: 'room' or 'corridor'
-        name: Element name
-        x: Bottom-left X coordinate (grid units)
-        y: Bottom-left Y coordinate (grid units)
-        width: Element width
-        height: Element height
-        extra_data: Additional data (mood for rooms, connections for corridors)
-    """
+    """Position and dimensions of a map element."""
     id: int
-    type: str
+    type: str  # 'room' or 'corridor'
     name: str
-    x: int
-    y: int
+    x: int     # Bottom-left X
+    y: int     # Bottom-left Y
     width: int
     height: int
     extra_data: dict
@@ -87,275 +34,127 @@ class MapElementPosition:
 
 @dataclass
 class MapPositionResult:
-    """Result of map position calculation.
-
-    Attributes:
-        elements: List of all positioned elements (rooms + corridors)
-        room_positions: Quick lookup dict of room_id -> (x, y) bottom-left position
-    """
+    """Result containing positioned elements and room position lookup."""
     elements: List[MapElementPosition]
     room_positions: Dict[int, Tuple[int, int]]
 
 
-def calculate_map_positions(
-    map_data: MapOutputSchema,
-    gap: int = 2
-) -> MapPositionResult:
-    """
-    Calculate bottom-left (x, y) coordinates for all map elements.
-
-    Uses BFS graph traversal based on corridor connections to place rooms,
-    then calculates corridor positions between connected rooms.
-
-    Args:
-        map_data: MapOutputSchema containing rooms, corridors, and objects
-        gap: Spacing between adjacent elements (default: 2)
-
-    Returns:
-        MapPositionResult with calculated positions for all elements
-
-    Example:
-        >>> from app.models.schemas.map import MapOutputSchema
-        >>> map_data = MapOutputSchema(rooms=[...], corridors=[...], obj=[...])
-        >>> result = calculate_map_positions(map_data)
-        >>> for elem in result.elements:
-        ...     print(f"{elem.name}: ({elem.x}, {elem.y})")
-    """
-    rooms = {r.id: r for r in map_data.rooms}
-    corridors = map_data.corridors
-
-    # Step 1: Build adjacency map from corridors
-    # room_neighbors[room_id] = [(neighbor_id, direction, corridor), ...]
-    room_neighbors: Dict[int, List[Tuple[int, str, CorridorSchema]]] = {
-        r.id: [] for r in map_data.rooms
-    }
-
-    for corridor in corridors:
-        for i, conn in enumerate(corridor.connections):
-            for j, other_conn in enumerate(corridor.connections):
-                if i != j:
-                    # conn.room_id is connected to other_conn.room_id
-                    # other_conn.direction tells us WHERE other_conn.room_id is
-                    room_neighbors[conn.room_id].append(
-                        (other_conn.room_id, other_conn.direction, corridor)
-                    )
-
-    # Step 2: Place rooms using BFS (center positions first)
-    room_positions: Dict[int, Tuple[int, int]] = {}  # room_id -> (center_x, center_y)
-
-    if not rooms:
+def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPositionResult:
+    """Calculate bottom-left coordinates for all map elements using BFS."""
+    if not map_data.rooms:
         return MapPositionResult(elements=[], room_positions={})
 
-    # Start from first room at origin (center = 0, 0)
-    start_room_id = map_data.rooms[0].id
-    room_positions[start_room_id] = (0, 0)
+    rooms = {r.id: r for r in map_data.rooms}
 
-    visited = {start_room_id}
-    queue = deque([start_room_id])
+    # Build adjacency: room_id -> [(neighbor_id, direction, corridor), ...]
+    neighbors = {r.id: [] for r in map_data.rooms}
+    for corridor in map_data.corridors:
+        for i, conn in enumerate(corridor.connections):
+            for j, other in enumerate(corridor.connections):
+                if i != j:
+                    neighbors[conn.room_id].append((other.room_id, other.direction, corridor))
+
+    # BFS to place rooms (center positions)
+    centers = {map_data.rooms[0].id: (0, 0)}
+    queue = deque([map_data.rooms[0].id])
+    visited = {map_data.rooms[0].id}
 
     while queue:
-        current_id = queue.popleft()
-        current_room = rooms[current_id]
-        cx, cy = room_positions[current_id]
+        curr_id = queue.popleft()
+        curr = rooms[curr_id]
+        cx, cy = centers[curr_id]
 
-        for neighbor_id, direction, corridor in room_neighbors[current_id]:
-            if neighbor_id in visited:
+        for nbr_id, direction, corridor in neighbors[curr_id]:
+            if nbr_id in visited:
                 continue
+            nbr = rooms[nbr_id]
+            length = getattr(corridor, 'length_hint', 5)
+            centers[nbr_id] = _calc_neighbor_pos(cx, cy, curr, nbr, direction, length + gap)
+            visited.add(nbr_id)
+            queue.append(nbr_id)
 
-            neighbor_room = rooms[neighbor_id]
+    # Normalize to positive space
+    shift_x = -min(cx - rooms[rid].width // 2 for rid, (cx, _) in centers.items())
+    shift_y = -min(cy - rooms[rid].height // 2 for rid, (_, cy) in centers.items())
+    shift_x = max(0, shift_x)
+    shift_y = max(0, shift_y)
 
-            # Calculate neighbor CENTER position based on direction
-            nx, ny = _calculate_neighbor_position(
-                cx, cy,
-                current_room.width, current_room.height,
-                neighbor_room.width, neighbor_room.height,
-                direction,
-                corridor.width_hint if hasattr(corridor, 'width_hint') else 3,
-                corridor.length_hint if hasattr(corridor, 'length_hint') else 5,
-                gap
-            )
+    # Helper: center -> bottom-left
+    def to_bottom_left(room_id: int) -> Tuple[int, int]:
+        cx, cy = centers[room_id]
+        r = rooms[room_id]
+        return cx - r.width // 2 + shift_x, cy - r.height // 2 + shift_y
 
-            room_positions[neighbor_id] = (nx, ny)
-            visited.add(neighbor_id)
-            queue.append(neighbor_id)
+    # Build elements
+    elements = [
+        MapElementPosition(
+            id=r.id, type="room", name=r.name,
+            x=to_bottom_left(r.id)[0], y=to_bottom_left(r.id)[1],
+            width=r.width, height=r.height, extra_data={"mood": r.mood}
+        )
+        for r in map_data.rooms if r.id in centers
+    ]
 
-    # Step 3: Normalize - shift all positions to positive space
-    min_x = min(pos[0] - rooms[rid].width // 2 for rid, pos in room_positions.items())
-    min_y = min(pos[1] - rooms[rid].height // 2 for rid, pos in room_positions.items())
-
-    shift_x = -min_x if min_x < 0 else 0
-    shift_y = -min_y if min_y < 0 else 0
-
-    # Step 4: Build final element list with bottom-left coordinates
-    elements: List[MapElementPosition] = []
-
-    # Add rooms (convert center -> bottom-left)
-    for room in map_data.rooms:
-        if room.id in room_positions:
-            cx, cy = room_positions[room.id]
-            # Bottom-left = center - half_dimension
-            x = cx - room.width // 2 + shift_x
-            y = cy - room.height // 2 + shift_y
-
-            elements.append(MapElementPosition(
-                id=room.id,
-                type="room",
-                name=room.name,
-                x=x,
-                y=y,
-                width=room.width,
-                height=room.height,
-                extra_data={"mood": room.mood}
-            ))
-
-    # Add corridors
-    for corridor in corridors:
-        pos = _calculate_corridor_position(corridor, room_positions, rooms, shift_x, shift_y)
+    for corridor in map_data.corridors:
+        pos = _calc_corridor_pos(corridor, centers, rooms, shift_x, shift_y)
         if pos:
             elements.append(MapElementPosition(
-                id=corridor.id,
-                type="corridor",
-                name=corridor.name,
-                x=pos[0],
-                y=pos[1],
-                width=pos[2],
-                height=pos[3],
-                extra_data={
-                    "connections": [
-                        {"room_id": c.room_id, "direction": c.direction}
-                        for c in corridor.connections
-                    ]
-                }
+                id=corridor.id, type="corridor", name=corridor.name,
+                x=pos[0], y=pos[1], width=pos[2], height=pos[3],
+                extra_data={"connections": [{"room_id": c.room_id, "direction": c.direction} for c in corridor.connections]}
             ))
-
-    # Build final room_positions with bottom-left coordinates
-    final_room_positions = {}
-    for room in map_data.rooms:
-        if room.id in room_positions:
-            cx, cy = room_positions[room.id]
-            x = cx - room.width // 2 + shift_x
-            y = cy - room.height // 2 + shift_y
-            final_room_positions[room.id] = (x, y)
 
     return MapPositionResult(
         elements=elements,
-        room_positions=final_room_positions
+        room_positions={r.id: to_bottom_left(r.id) for r in map_data.rooms if r.id in centers}
     )
 
 
-def _calculate_neighbor_position(
-    cx: int, cy: int,
-    cw: int, ch: int,
-    nw: int, nh: int,
-    direction: str,
-    corridor_width: int,
-    corridor_length: int,
-    gap: int
+def _calc_neighbor_pos(
+    cx: int, cy: int, curr: RoomSchema, nbr: RoomSchema, direction: str, offset: int
 ) -> Tuple[int, int]:
-    """
-    Calculate neighbor room CENTER position based on connection direction.
+    """Calculate neighbor center position based on direction."""
+    vec = DIRECTION_VECTORS.get(direction, (1, 0, True, True))
+    x_mult, y_mult, use_w_curr, use_w_nbr = vec
 
-    The direction indicates WHERE the neighbor room is relative to current room.
+    curr_half = (curr.width if use_w_curr else curr.height) // 2
+    nbr_half = (nbr.width if use_w_nbr else nbr.height) // 2
 
-    Visual:
-        direction="north" means neighbor is ABOVE current room
-
-             ┌──────────┐
-             │ neighbor │  <- placed here (north)
-             └────┬─────┘
-                  │ corridor
-             ┌────┴─────┐
-             │ current  │
-             └──────────┘
-
-    Args:
-        cx, cy: Current room center position
-        cw, ch: Current room width/height
-        nw, nh: Neighbor room width/height
-        direction: 'north', 'south', 'east', 'west'
-        corridor_length: Length of connecting corridor
-        gap: Additional spacing
-
-    Returns:
-        (nx, ny): Neighbor room CENTER position
-    """
-    offset = corridor_length + gap
-
-    if direction == "north":
-        # Neighbor is above: same x, higher y
-        return (cx, cy + ch // 2 + nh // 2 + offset)
-    elif direction == "south":
-        # Neighbor is below: same x, lower y
-        return (cx, cy - ch // 2 - nh // 2 - offset)
-    elif direction == "east":
-        # Neighbor is to the right: higher x, same y
-        return (cx + cw // 2 + nw // 2 + offset, cy)
-    elif direction == "west":
-        # Neighbor is to the left: lower x, same y
-        return (cx - cw // 2 - nw // 2 - offset, cy)
-    else:
-        # Fallback: place to the right
-        return (cx + cw + nw + offset, cy)
+    return (
+        cx + x_mult * (curr_half + nbr_half + offset),
+        cy + y_mult * (curr_half + nbr_half + offset)
+    )
 
 
-def _calculate_corridor_position(
+def _calc_corridor_pos(
     corridor: CorridorSchema,
-    room_positions: Dict[int, Tuple[int, int]],
+    centers: Dict[int, Tuple[int, int]],
     rooms: Dict[int, RoomSchema],
-    shift_x: int,
-    shift_y: int
+    shift_x: int, shift_y: int
 ) -> Optional[Tuple[int, int, int, int]]:
-    """
-    Calculate corridor bottom-left position based on connected rooms.
-
-    The corridor is placed in the gap between two rooms.
-
-    Returns:
-        (x, y, width, height) or None if cannot calculate
-    """
+    """Calculate corridor position between two rooms."""
     if len(corridor.connections) < 2:
         return None
 
-    conn1, conn2 = corridor.connections[0], corridor.connections[1]
-
-    if conn1.room_id not in room_positions or conn2.room_id not in room_positions:
+    c1, c2 = corridor.connections[0], corridor.connections[1]
+    if c1.room_id not in centers or c2.room_id not in centers:
         return None
 
-    r1_cx, r1_cy = room_positions[conn1.room_id]
-    r2_cx, r2_cy = room_positions[conn2.room_id]
+    r1_cx, r1_cy = centers[c1.room_id]
+    r2_cx, r2_cy = centers[c2.room_id]
+    r1, r2 = rooms[c1.room_id], rooms[c2.room_id]
 
-    room1 = rooms[conn1.room_id]
-    room2 = rooms[conn2.room_id]
+    is_horizontal = abs(r2_cx - r1_cx) > abs(r2_cy - r1_cy)
 
-    # Determine corridor orientation
-    dx = abs(r2_cx - r1_cx)
-    dy = abs(r2_cy - r1_cy)
-
-    if dx > dy:
-        # Horizontal corridor (rooms are side by side)
-        min_x = min(r1_cx + room1.width // 2, r2_cx + room2.width // 2)
-        max_x = max(r1_cx - room1.width // 2, r2_cx - room2.width // 2)
-        mid_y = (r1_cy + r2_cy) // 2
-
-        width = max_x - min_x
-        height = corridor.width_hint
-
-        x = min_x + shift_x
-        y = mid_y - height // 2 + shift_y
+    if is_horizontal:
+        min_x = min(r1_cx + r1.width // 2, r2_cx + r2.width // 2)
+        max_x = max(r1_cx - r1.width // 2, r2_cx - r2.width // 2)
+        w, h = max(max_x - min_x, corridor.width_hint), corridor.width_hint
+        x, y = min_x + shift_x, (r1_cy + r2_cy) // 2 - h // 2 + shift_y
     else:
-        # Vertical corridor (rooms are above/below)
-        mid_x = (r1_cx + r2_cx) // 2
-        min_y = min(r1_cy + room1.height // 2, r2_cy + room2.height // 2)
-        max_y = max(r1_cy - room1.height // 2, r2_cy - room2.height // 2)
+        min_y = min(r1_cy + r1.height // 2, r2_cy + r2.height // 2)
+        max_y = max(r1_cy - r1.height // 2, r2_cy - r2.height // 2)
+        w, h = corridor.width_hint, max(max_y - min_y, corridor.width_hint)
+        x, y = (r1_cx + r2_cx) // 2 - w // 2 + shift_x, min_y + shift_y
 
-        width = corridor.width_hint
-        height = max_y - min_y
-
-        x = mid_x - width // 2 + shift_x
-        y = min_y + shift_y
-
-    # Ensure positive dimensions
-    width = max(width, corridor.width_hint)
-    height = max(height, corridor.width_hint)
-
-    return (x, y, width, height)
+    return x, y, w, h
