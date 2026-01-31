@@ -1,5 +1,5 @@
 """RAG Service - Orchestrates retrieval and context building for agents."""
-from typing import Optional
+from typing import Optional, List
 from dataclasses import dataclass
 import logging
 
@@ -27,6 +27,28 @@ class ClueRAGContext:
     related_clues: str      # Formatted related clues
     relevant_history: str   # Formatted related past conversations
     full_context: str       # Combined context string
+
+
+@dataclass
+class GeneralRAGContext:
+    """RAG context for general detective chat."""
+    scenario_context: str   # Incident, location, world info
+    clue_context: str       # Related clues (if referenced)
+    suspect_context: str    # Related suspect profiles (if referenced)
+    relevant_history: str   # Relevant past conversations
+    full_context: str       # Combined context string
+
+
+@dataclass
+class UnifiedRAGContext:
+    """Unified RAG context that adapts based on chat mode.
+
+    Supports general chat, clue analysis, and suspect inquiry modes.
+    """
+    full_context: str           # Combined context string
+    relevant_history: str       # Formatted chat history
+    mode: str                   # 'general', 'clue_analysis', 'suspect_inquiry'
+    clue_details: Optional[dict] = None  # Clue info for analysis mode
 
 
 class RAGService:
@@ -222,6 +244,318 @@ class RAGService:
             relevant_history=history_str,
             full_context=full_context
         )
+
+    async def get_general_context(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        query: str,
+        session_id: Optional[str] = None,
+        clue_ids: Optional[list[int]] = None,
+        suspect_ids: Optional[list[int]] = None,
+        top_k_context: int = 5,
+        top_k_clues: int = 2,
+        top_k_suspects: int = 2,
+        top_k_history: int = 5,
+        similarity_threshold: float = 0.3
+    ) -> GeneralRAGContext:
+        """Get RAG context for general detective chat.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID.
+        query : str
+            The user's query/message.
+        session_id : str, optional
+            Session ID for history search.
+        clue_ids : list[int], optional
+            Specific clue IDs referenced in the message.
+        suspect_ids : list[int], optional
+            Specific suspect IDs referenced in the message.
+        top_k_context : int, optional
+            Number of scenario contexts to retrieve. Defaults to 5.
+        top_k_clues : int, optional
+            Number of clues to retrieve per referenced clue. Defaults to 2.
+        top_k_suspects : int, optional
+            Number of suspect profiles to retrieve. Defaults to 2.
+        top_k_history : int, optional
+            Number of history messages to retrieve. Defaults to 5.
+        similarity_threshold : float, optional
+            Minimum similarity threshold. Defaults to 0.3.
+
+        Returns
+        -------
+        GeneralRAGContext
+            Context containing relevant information.
+        """
+        # 1. Search scenario contexts (incident, location, world)
+        contexts = await self.retriever.search_contexts(
+            db=db,
+            scenario_id=scenario_id,
+            query=query,
+            top_k=top_k_context,
+            threshold=similarity_threshold
+        )
+
+        # 2. Search clues if clue_ids are provided
+        clues = []
+        if clue_ids:
+            clues = await self.retriever.search_clues(
+                db=db,
+                scenario_id=scenario_id,
+                query=query,
+                top_k=top_k_clues * len(clue_ids),
+                threshold=similarity_threshold,
+                search_type="description"
+            )
+            # Filter to only include referenced clues
+            clues = [c for c in clues if c.clue_id in clue_ids]
+
+        # 3. Search suspect profiles if suspect_ids are provided
+        suspects = []
+        if suspect_ids:
+            suspects = await self.retriever.search_suspect_profiles(
+                db=db,
+                scenario_id=scenario_id,
+                query=query,
+                top_k=top_k_suspects,
+                threshold=similarity_threshold,
+                suspect_ids=suspect_ids
+            )
+
+        # 4. Search chat history (all conversations with detective)
+        history = []
+        if session_id:
+            history = await self.retriever.search_chat_history(
+                db=db,
+                scenario_id=scenario_id,
+                session_id=session_id,
+                query=query,
+                top_k=top_k_history,
+                threshold=similarity_threshold
+            )
+
+        # 5. Build context strings
+        scenario_context_str = self._build_scenario_context_str(contexts)
+        clue_context_str = self._build_clue_context_str(clues)
+        suspect_context_str = self._build_suspect_context_str(suspects)
+        history_str = self.context_builder.build_chat_history_context(history)
+
+        # 6. Combine all contexts
+        full_parts = []
+        if scenario_context_str:
+            full_parts.append(f"[사건 정보]\n{scenario_context_str}")
+        if clue_context_str:
+            full_parts.append(f"[관련 단서]\n{clue_context_str}")
+        if suspect_context_str:
+            full_parts.append(f"[관련 용의자]\n{suspect_context_str}")
+
+        full_context = "\n\n".join(full_parts) if full_parts else ""
+
+        return GeneralRAGContext(
+            scenario_context=scenario_context_str,
+            clue_context=clue_context_str,
+            suspect_context=suspect_context_str,
+            relevant_history=history_str,
+            full_context=full_context
+        )
+
+    async def get_unified_context(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        query: str,
+        session_id: Optional[str] = None,
+        mode: str = "general",
+        focus_clue_ids: Optional[List[int]] = None,
+        suspect_ids: Optional[List[int]] = None,
+        top_k: int = 5,
+        similarity_threshold: float = 0.4
+    ) -> UnifiedRAGContext:
+        """Get unified RAG context that adapts based on chat mode.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID.
+        query : str
+            The user's query/message.
+        session_id : str, optional
+            Session ID for history search.
+        mode : str, optional
+            Chat mode: 'general', 'clue_analysis', 'suspect_inquiry'.
+            Defaults to 'general'.
+        focus_clue_ids : list[int], optional
+            Clue IDs to focus on (for clue_analysis mode).
+        suspect_ids : list[int], optional
+            Suspect IDs referenced in the message.
+        top_k : int, optional
+            Number of results to retrieve. Defaults to 5.
+        similarity_threshold : float, optional
+            Minimum similarity threshold. Defaults to 0.4.
+
+        Returns
+        -------
+        UnifiedRAGContext
+            Unified context adapted for the specified mode.
+        """
+        context_parts = []
+        history_str = ""
+        clue_details = None
+
+        # 1. Always get base scenario context
+        scenario_contexts = await self.retriever.search_contexts(
+            db=db,
+            scenario_id=scenario_id,
+            query=query,
+            top_k=top_k,
+            threshold=similarity_threshold
+        )
+        if scenario_contexts:
+            scenario_str = self._build_scenario_context_str(scenario_contexts)
+            context_parts.append(f"[사건 정보]\n{scenario_str}")
+
+        # 2. Mode-specific retrieval
+        if mode == "clue_analysis" and focus_clue_ids:
+            # Get related clues (excluding the focus clue)
+            primary_clue_id = focus_clue_ids[0]
+            related_clues = await self.retriever.search_clues(
+                db=db,
+                scenario_id=scenario_id,
+                query=query,
+                top_k=3,
+                threshold=0.5,
+                search_type="description"
+            )
+            # Filter out the focus clue itself
+            related_clues = [c for c in related_clues if c.clue_id != primary_clue_id]
+
+            if related_clues:
+                clues_str = self._build_clue_context_str(related_clues)
+                context_parts.append(f"[관련 증거]\n{clues_str}")
+
+            # Get clue-scoped chat history
+            if session_id:
+                history_results = await self.retriever.search_chat_history(
+                    db=db,
+                    scenario_id=scenario_id,
+                    session_id=session_id,
+                    query=query,
+                    top_k=5,
+                    threshold=0.5,
+                    clue_id=primary_clue_id
+                )
+                history_str = self.context_builder.build_chat_history_context(history_results)
+
+        elif mode == "suspect_inquiry" and suspect_ids:
+            # Get suspect profiles
+            suspects = await self.retriever.search_suspect_profiles(
+                db=db,
+                scenario_id=scenario_id,
+                query=query,
+                top_k=3,
+                threshold=similarity_threshold,
+                suspect_ids=suspect_ids
+            )
+            if suspects:
+                suspect_str = self._build_suspect_context_str(suspects)
+                context_parts.append(f"[용의자 정보]\n{suspect_str}")
+
+            # Get suspect-scoped or general chat history
+            if session_id:
+                history_results = await self.retriever.search_chat_history(
+                    db=db,
+                    scenario_id=scenario_id,
+                    session_id=session_id,
+                    query=query,
+                    top_k=5,
+                    threshold=similarity_threshold,
+                    suspect_id=suspect_ids[0] if suspect_ids else None
+                )
+                history_str = self.context_builder.build_chat_history_context(history_results)
+
+        else:
+            # General mode: broad retrieval
+            if focus_clue_ids:
+                clues = await self.retriever.search_clues(
+                    db=db,
+                    scenario_id=scenario_id,
+                    query=query,
+                    top_k=2,
+                    threshold=0.3,
+                    search_type="description"
+                )
+                clues = [c for c in clues if c.clue_id in focus_clue_ids]
+                if clues:
+                    clues_str = self._build_clue_context_str(clues)
+                    context_parts.append(f"[관련 단서]\n{clues_str}")
+
+            if suspect_ids:
+                suspects = await self.retriever.search_suspect_profiles(
+                    db=db,
+                    scenario_id=scenario_id,
+                    query=query,
+                    top_k=2,
+                    threshold=0.3,
+                    suspect_ids=suspect_ids
+                )
+                if suspects:
+                    suspect_str = self._build_suspect_context_str(suspects)
+                    context_parts.append(f"[관련 용의자]\n{suspect_str}")
+
+            # Get all history (no scope filter)
+            if session_id:
+                history_results = await self.retriever.search_chat_history(
+                    db=db,
+                    scenario_id=scenario_id,
+                    session_id=session_id,
+                    query=query,
+                    top_k=5,
+                    threshold=0.3
+                )
+                history_str = self.context_builder.build_chat_history_context(history_results)
+
+        full_context = "\n\n".join(context_parts) if context_parts else ""
+
+        return UnifiedRAGContext(
+            full_context=full_context,
+            relevant_history=history_str,
+            mode=mode,
+            clue_details=clue_details
+        )
+
+    def _build_scenario_context_str(self, contexts: list) -> str:
+        """Build formatted string from scenario contexts."""
+        if not contexts:
+            return ""
+        parts = []
+        for ctx in contexts:
+            parts.append(ctx.content)
+        return "\n".join(parts)
+
+    def _build_clue_context_str(self, clues: list) -> str:
+        """Build formatted string from clues."""
+        if not clues:
+            return ""
+        parts = []
+        for clue in clues:
+            parts.append(f"- {clue.name}: {clue.description}")
+        return "\n".join(parts)
+
+    def _build_suspect_context_str(self, suspects: list) -> str:
+        """Build formatted string from suspect profiles."""
+        if not suspects:
+            return ""
+        parts = []
+        for s in suspects:
+            parts.append(f"- {s.name} ({s.role}, {s.age}세): {s.description}")
+            parts.append(f"  알리바이: {s.alibi_summary}")
+        return "\n".join(parts)
 
     async def index_scenario(self, db: AsyncSession, scenario_id: int) -> dict:
         """Index all data for a scenario.
