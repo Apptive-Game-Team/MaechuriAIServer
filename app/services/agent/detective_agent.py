@@ -1,6 +1,7 @@
 """Detective agent for general chat - answers questions about the case."""
 from typing import Optional, List
 from app.services.prompt.prompt_loader import PromptLoader
+from app.services.rag.context_builder import get_context_builder, ContextBuilder
 
 
 class DetectiveAgent:
@@ -12,8 +13,9 @@ class DetectiveAgent:
     - 단서 분석 (clue context 포함 시)
     """
 
-    def __init__(self, llm_client):
+    def __init__(self, llm_client, context_builder: Optional[ContextBuilder] = None):
         self.llm = llm_client
+        self.context_builder = context_builder or get_context_builder()
         self.prompt_template = PromptLoader.load(
             "app/prompts/detective/chat_system.txt"
         )
@@ -41,7 +43,7 @@ class DetectiveAgent:
         history_str = history_context if history_context else "(대화 시작)"
 
         # 단서 컨텍스트 구성
-        clue_context = self._build_clue_context(clue_infos)
+        clue_context = self.context_builder.build_detailed_clue_context(clue_infos)
 
         # 시스템 프롬프트 구성
         system_prompt = self.prompt_template.format(
@@ -57,19 +59,3 @@ class DetectiveAgent:
         )
 
         return response
-
-    def _build_clue_context(self, clue_infos: Optional[List[dict]]) -> str:
-        """단서 정보를 컨텍스트 문자열로 변환"""
-        if not clue_infos:
-            return "(현재 분석 중인 증거 없음)"
-
-        parts = []
-        for clue in clue_infos:
-            clue_str = f"""[증거: {clue.get('name', '알 수 없음')}]
-- 발견 장소: {clue.get('found_at', '알 수 없음')}
-- 외관/설명: {clue.get('description', '설명 없음')}
-- 해석된 의미: {clue.get('decoded_answer', '분석 결과 없음')}
-- 주의: {'이 증거는 수사에 혼란을 줄 수 있음' if clue.get('is_red_herring') else ''}"""
-            parts.append(clue_str)
-
-        return "\n\n".join(parts)

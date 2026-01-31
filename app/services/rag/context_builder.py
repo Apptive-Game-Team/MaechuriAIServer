@@ -1,12 +1,106 @@
 """Context builder for RAG - converts retrieved data to LLM-ready context."""
-from typing import List, Optional
+from typing import List, Optional, Any, Protocol, runtime_checkable
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 from app.services.rag.retriever import (
     RetrievedFact,
     RetrievedClue,
     RetrievedChatMessage
 )
+
+
+@runtime_checkable
+class HasContent(Protocol):
+    """Protocol for objects with content attribute."""
+    content: str
+
+
+@runtime_checkable
+class HasNameDescription(Protocol):
+    """Protocol for objects with name and description."""
+    name: str
+    description: str
+
+
+@runtime_checkable
+class HasSuspectProfile(Protocol):
+    """Protocol for suspect-like objects."""
+    name: str
+    role: str
+    age: int
+    description: str
+    alibi_summary: str
+
+
+class EntityFormatter(ABC):
+    """Abstract base class for entity formatters."""
+
+    @abstractmethod
+    def format(self, entity: Any) -> str:
+        """Format a single entity to string."""
+        pass
+
+    def format_list(self, entities: List[Any]) -> str:
+        """Format a list of entities."""
+        if not entities:
+            return ""
+        return "\n".join(self.format(e) for e in entities)
+
+
+class ScenarioContextFormatter(EntityFormatter):
+    """Formatter for ScenarioContext entities."""
+
+    def format(self, entity: HasContent) -> str:
+        return entity.content
+
+
+class ClueFormatter(EntityFormatter):
+    """Formatter for Clue entities."""
+
+    def format(self, entity: HasNameDescription) -> str:
+        return f"- {entity.name}: {entity.description}"
+
+
+class SuspectProfileFormatter(EntityFormatter):
+    """Formatter for Suspect profile entities."""
+
+    def format(self, entity: HasSuspectProfile) -> str:
+        lines = [
+            f"- {entity.name} ({entity.role}, {entity.age}세): {entity.description}",
+            f"  알리바이: {entity.alibi_summary}"
+        ]
+        return "\n".join(lines)
+
+
+class DetailedClueFormatter(EntityFormatter):
+    """Formatter for detailed clue info (dict-based)."""
+
+    def format(self, clue: dict) -> str:
+        warning = "이 증거는 수사에 혼란을 줄 수 있음" if clue.get("is_red_herring") else ""
+        return f"""[증거: {clue.get('name', '알 수 없음')}]
+- 발견 장소: {clue.get('found_at', '알 수 없음')}
+- 외관/설명: {clue.get('description', '설명 없음')}
+- 해석된 의미: {clue.get('decoded_answer', '분석 결과 없음')}
+- 주의: {warning}"""
+
+    def format_list(self, clues: List[dict]) -> str:
+        if not clues:
+            return ""
+        return "\n\n".join(self.format(c) for c in clues)
+
+
+class SimpleHistoryFormatter(EntityFormatter):
+    """Formatter for simple chat history (dict-based)."""
+
+    def format(self, message: dict) -> str:
+        return f"{message.get('role', 'unknown')}: {message.get('content', '')}"
+
+    def format_list(self, messages: List[dict]) -> str:
+        if not messages:
+            return ""
+        return "\n".join(self.format(m) for m in messages)
+
 
 @dataclass
 class RAGContext:
@@ -21,7 +115,112 @@ class ContextBuilder:
     """Builds formatted context strings from retrieved RAG results.
 
     Converts retrieved data into formatted text suitable for LLM prompts.
+    Uses Strategy Pattern with pluggable formatters for different entity types.
     """
+
+    def __init__(self):
+        """Initialize with default formatters."""
+        self._scenario_formatter = ScenarioContextFormatter()
+        self._clue_formatter = ClueFormatter()
+        self._suspect_formatter = SuspectProfileFormatter()
+        self._detailed_clue_formatter = DetailedClueFormatter()
+        self._simple_history_formatter = SimpleHistoryFormatter()
+
+    def build_scenario_context(self, contexts: List[HasContent]) -> str:
+        """Build formatted string from scenario contexts.
+
+        Parameters
+        ----------
+        contexts : List[HasContent]
+            ScenarioContext entities with content attribute.
+
+        Returns
+        -------
+        str
+            Formatted context string.
+        """
+        return self._scenario_formatter.format_list(contexts)
+
+    def build_clue_summary(self, clues: List[HasNameDescription]) -> str:
+        """Build formatted string from clues (simple name/description).
+
+        Parameters
+        ----------
+        clues : List[HasNameDescription]
+            Clue entities with name and description.
+
+        Returns
+        -------
+        str
+            Formatted clue summary.
+        """
+        return self._clue_formatter.format_list(clues)
+
+    def build_suspect_profile(self, suspects: List[HasSuspectProfile]) -> str:
+        """Build formatted string from suspect profiles.
+
+        Parameters
+        ----------
+        suspects : List[HasSuspectProfile]
+            Suspect entities with profile information.
+
+        Returns
+        -------
+        str
+            Formatted suspect profiles.
+        """
+        return self._suspect_formatter.format_list(suspects)
+
+    def build_detailed_clue_context(
+        self,
+        clue_infos: Optional[List[dict]],
+        empty_message: str = "(현재 분석 중인 증거 없음)"
+    ) -> str:
+        """Build detailed clue context from dict-based clue info.
+
+        Parameters
+        ----------
+        clue_infos : List[dict], optional
+            Clue info dicts with keys: name, found_at, description,
+            decoded_answer, is_red_herring.
+        empty_message : str, optional
+            Message to return when clue_infos is empty.
+
+        Returns
+        -------
+        str
+            Formatted detailed clue context.
+        """
+        if not clue_infos:
+            return empty_message
+        return self._detailed_clue_formatter.format_list(clue_infos)
+
+    def build_simple_history(
+        self,
+        history: Optional[List[dict]],
+        count: Optional[int] = None,
+        empty_message: str = "(대화 시작)"
+    ) -> str:
+        """Build simple formatted history from chat messages.
+
+        Parameters
+        ----------
+        history : List[dict], optional
+            Chat history dicts with 'role' and 'content' keys.
+        count : int, optional
+            If provided, only use the last N messages.
+        empty_message : str, optional
+            Message to return when history is empty.
+
+        Returns
+        -------
+        str
+            Formatted history string.
+        """
+        if not history:
+            return empty_message
+        messages = history[-count:] if count and len(history) > count else history
+        return self._simple_history_formatter.format_list(messages)
 
     def build_fact_context(
         self,

@@ -253,7 +253,6 @@ class ChatService:
             suspect_id=suspect_id,
             current_pressure=suspect_pressure,
             clue_seen_ids=list(game_session.clue_seen_ids),
-            chat_history=[]  # 최근 대화는 RAG에서 가져옴
         )
 
         # 4. 단서 처리 (있다면)
@@ -288,7 +287,6 @@ class ChatService:
             user_message=user_message,
             suspect_summary=self._create_suspect_summary(suspect),
             current_pressure=state.current_pressure,
-            conversation_context=self._format_recent_context(state.chat_history),
             clue_presented=clue,
             suspect_alibi=suspect.alibi_summary,
             suspect_timeline=self._format_timeline(suspect.timeline)
@@ -472,13 +470,6 @@ class ChatService:
             prove_str = "증명가능" if t.can_prove else "미확인"
             lines.append(f"- {t.time}: {t.location}에서 {t.activity} ({prove_str})")
         return "\n".join(lines)
-
-    def _format_recent_context(self, history: List[dict], count: int = 5) -> str:
-        """최근 대화 맥락"""
-        recent = history[-count:] if len(history) > count else history
-        if not recent:
-            return "(대화 시작)"
-        return "\n".join([f"{h['role']}: {h['content']}" for h in recent])
 
     async def _get_clue(self, scenario_id: int, clue_id: int) -> Optional[dict]:
         """단서 정보 조회"""

@@ -339,9 +339,9 @@ class RAGService:
             )
 
         # 5. Build context strings
-        scenario_context_str = self._build_scenario_context_str(contexts)
-        clue_context_str = self._build_clue_context_str(clues)
-        suspect_context_str = self._build_suspect_context_str(suspects)
+        scenario_context_str = self.context_builder.build_scenario_context(contexts)
+        clue_context_str = self.context_builder.build_clue_summary(clues)
+        suspect_context_str = self.context_builder.build_suspect_profile(suspects)
         history_str = self.context_builder.build_chat_history_context(history)
 
         # 6. Combine all contexts
@@ -417,7 +417,7 @@ class RAGService:
             threshold=similarity_threshold
         )
         if scenario_contexts:
-            scenario_str = self._build_scenario_context_str(scenario_contexts)
+            scenario_str = self.context_builder.build_scenario_context(scenario_contexts)
             context_parts.append(f"[사건 정보]\n{scenario_str}")
 
         # 2. Mode-specific retrieval
@@ -436,7 +436,7 @@ class RAGService:
             related_clues = [c for c in related_clues if c.clue_id != primary_clue_id]
 
             if related_clues:
-                clues_str = self._build_clue_context_str(related_clues)
+                clues_str = self.context_builder.build_clue_summary(related_clues)
                 context_parts.append(f"[관련 증거]\n{clues_str}")
 
             # Get clue-scoped chat history
@@ -463,7 +463,7 @@ class RAGService:
                 suspect_ids=suspect_ids
             )
             if suspects:
-                suspect_str = self._build_suspect_context_str(suspects)
+                suspect_str = self.context_builder.build_suspect_profile(suspects)
                 context_parts.append(f"[용의자 정보]\n{suspect_str}")
 
             # Get suspect-scoped or general chat history
@@ -492,7 +492,7 @@ class RAGService:
                 )
                 clues = [c for c in clues if c.clue_id in focus_clue_ids]
                 if clues:
-                    clues_str = self._build_clue_context_str(clues)
+                    clues_str = self.context_builder.build_clue_summary(clues)
                     context_parts.append(f"[관련 단서]\n{clues_str}")
 
             if suspect_ids:
@@ -505,7 +505,7 @@ class RAGService:
                     suspect_ids=suspect_ids
                 )
                 if suspects:
-                    suspect_str = self._build_suspect_context_str(suspects)
+                    suspect_str = self.context_builder.build_suspect_profile(suspects)
                     context_parts.append(f"[관련 용의자]\n{suspect_str}")
 
             # Get all history (no scope filter)
@@ -528,34 +528,6 @@ class RAGService:
             mode=mode,
             clue_details=clue_details
         )
-
-    def _build_scenario_context_str(self, contexts: list) -> str:
-        """Build formatted string from scenario contexts."""
-        if not contexts:
-            return ""
-        parts = []
-        for ctx in contexts:
-            parts.append(ctx.content)
-        return "\n".join(parts)
-
-    def _build_clue_context_str(self, clues: list) -> str:
-        """Build formatted string from clues."""
-        if not clues:
-            return ""
-        parts = []
-        for clue in clues:
-            parts.append(f"- {clue.name}: {clue.description}")
-        return "\n".join(parts)
-
-    def _build_suspect_context_str(self, suspects: list) -> str:
-        """Build formatted string from suspect profiles."""
-        if not suspects:
-            return ""
-        parts = []
-        for s in suspects:
-            parts.append(f"- {s.name} ({s.role}, {s.age}세): {s.description}")
-            parts.append(f"  알리바이: {s.alibi_summary}")
-        return "\n".join(parts)
 
     async def index_scenario(self, db: AsyncSession, scenario_id: int) -> dict:
         """Index all data for a scenario.
