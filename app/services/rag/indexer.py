@@ -11,7 +11,8 @@ from app.db.models import (
     Fact,
     Clue,
     ChatMessageEmbedding,
-    Location
+    Location,
+    ScenarioContext
 )
 from app.services.embedding import get_embedding_service, EmbeddingService
 
@@ -41,8 +42,8 @@ class RAGIndexer:
     async def index_scenario(self, db: AsyncSession, scenario_id: int) -> dict:
         """Index all data for a scenario.
 
-        Generates and stores embeddings for all suspects, timelines, secrets, and clues
-        in the given scenario.
+        Generates and stores embeddings for all suspects, timelines, secrets, clues,
+        and contexts in the given scenario.
 
         Parameters
         ----------
@@ -58,14 +59,18 @@ class RAGIndexer:
         """
         # Index suspects, timelines, and secrets
         suspect_stats = await self.index_suspects(db, scenario_id)
-        
+
         # Index clues
         clues_indexed = await self.index_clues(db, scenario_id)
-        
+
+        # Index contexts (incident, location, world)
+        contexts_indexed = await self.index_contexts(db, scenario_id)
+
         stats = {
             "suspects": suspect_stats["suspects"],
             "facts": suspect_stats["facts"],
             "clues": clues_indexed,
+            "contexts": contexts_indexed,
         }
 
         await db.commit()
@@ -203,6 +208,47 @@ class RAGIndexer:
             )
 
         return len(clue_updates)
+
+    async def index_contexts(self, db: AsyncSession, scenario_id: int) -> int:
+        """Index all contexts (incident, location, world) in a scenario.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID.
+
+        Returns
+        -------
+        int
+            Number of contexts indexed.
+        """
+        from sqlalchemy import select
+
+        # Load contexts
+        result = await db.execute(
+            select(ScenarioContext).where(ScenarioContext.scenario_id == scenario_id)
+        )
+        contexts = result.scalars().all()
+
+        context_updates = []
+        for ctx in contexts:
+            # Generate embedding from content
+            embedding = self.embedding_service.embed_text(ctx.content)
+            context_updates.append({
+                "scenario_id": scenario_id,
+                "context_id": ctx.context_id,
+                "embedding": embedding
+            })
+
+        if context_updates:
+            await db.execute(
+                update(ScenarioContext),
+                context_updates
+            )
+
+        return len(context_updates)
 
     async def index_chat_message(
         self,

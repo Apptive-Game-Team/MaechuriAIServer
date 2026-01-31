@@ -5,7 +5,7 @@ import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding
+from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding, ScenarioContext
 from app.services.embedding import get_embedding_service, EmbeddingService
 
 
@@ -46,6 +46,28 @@ class RetrievedChatMessage:
     content: str
     suspect_id: Optional[int]
     clue_id: Optional[int]
+    similarity: float
+
+
+@dataclass
+class RetrievedSuspectProfile:
+    """Retrieved suspect profile with similarity score."""
+    suspect_id: int
+    name: str
+    role: str
+    age: int
+    gender: str
+    description: str
+    alibi_summary: str
+    similarity: float
+
+
+@dataclass
+class RetrievedContext:
+    """Retrieved scenario context with similarity score."""
+    context_id: int
+    type: str  # 'incident', 'location', 'world'
+    content: str
     similarity: float
 
 
@@ -278,6 +300,138 @@ class RAGRetriever:
                 ))
 
         return messages
+
+    async def search_suspect_profiles(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        query: str,
+        top_k: int = 3,
+        threshold: float = 0.5,
+        suspect_ids: Optional[List[int]] = None
+    ) -> List[RetrievedSuspectProfile]:
+        """Search for relevant suspect profiles based on query.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID.
+        query : str
+            The search query.
+        top_k : int, optional
+            Number of results to return. Defaults to 3.
+        threshold : float, optional
+            Minimum similarity threshold. Defaults to 0.5.
+        suspect_ids : List[int], optional
+            If provided, only search these specific suspects.
+
+        Returns
+        -------
+        List[RetrievedSuspectProfile]
+            List of matching suspect profiles.
+        """
+        query_embedding = self.embedding_service.embed_query(query)
+
+        distance_expr = Suspect.profile_embedding.cosine_distance(query_embedding)
+        similarity_expr = (1 - distance_expr).label("similarity")
+
+        stmt = (
+            select(Suspect, similarity_expr)
+            .where(Suspect.scenario_id == scenario_id)
+            .where(Suspect.profile_embedding.is_not(None))
+        )
+
+        if suspect_ids:
+            stmt = stmt.where(Suspect.suspect_id.in_(suspect_ids))
+
+        stmt = stmt.order_by(distance_expr).limit(top_k)
+
+        result = await db.execute(stmt)
+
+        profiles = []
+        for row in result:
+            suspect: Suspect = row[0]
+            similarity: float = row[1]
+
+            if similarity >= threshold:
+                profiles.append(RetrievedSuspectProfile(
+                    suspect_id=suspect.suspect_id,
+                    name=suspect.name,
+                    role=suspect.role,
+                    age=suspect.age,
+                    gender=suspect.gender,
+                    description=suspect.description,
+                    alibi_summary=suspect.alibi_summary,
+                    similarity=similarity
+                ))
+
+        return profiles
+
+    async def search_contexts(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        query: str,
+        top_k: int = 5,
+        threshold: float = 0.5,
+        context_types: Optional[List[str]] = None
+    ) -> List[RetrievedContext]:
+        """Search for relevant scenario contexts.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID.
+        query : str
+            The search query.
+        top_k : int, optional
+            Number of results to return. Defaults to 5.
+        threshold : float, optional
+            Minimum similarity threshold. Defaults to 0.5.
+        context_types : List[str], optional
+            Filter by context types ('incident', 'location', 'world').
+
+        Returns
+        -------
+        List[RetrievedContext]
+            List of matching contexts.
+        """
+        query_embedding = self.embedding_service.embed_query(query)
+
+        distance_expr = ScenarioContext.embedding.cosine_distance(query_embedding)
+        similarity_expr = (1 - distance_expr).label("similarity")
+
+        stmt = (
+            select(ScenarioContext, similarity_expr)
+            .where(ScenarioContext.scenario_id == scenario_id)
+            .where(ScenarioContext.embedding.is_not(None))
+        )
+
+        if context_types:
+            stmt = stmt.where(ScenarioContext.type.in_(context_types))
+
+        stmt = stmt.order_by(distance_expr).limit(top_k)
+
+        result = await db.execute(stmt)
+
+        contexts = []
+        for row in result:
+            ctx: ScenarioContext = row[0]
+            similarity: float = row[1]
+
+            if similarity >= threshold:
+                contexts.append(RetrievedContext(
+                    context_id=ctx.context_id,
+                    type=ctx.type,
+                    content=ctx.content,
+                    similarity=similarity
+                ))
+
+        return contexts
 
 
 # Singleton instance
