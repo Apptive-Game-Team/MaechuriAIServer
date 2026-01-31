@@ -3,7 +3,6 @@ import logging
 import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing_extensions import deprecated
 
 if TYPE_CHECKING:
     from app.db.repositories.scenario_repository import ScenarioRepository
