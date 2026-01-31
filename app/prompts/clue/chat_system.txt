@@ -41,9 +41,6 @@ Detective: "흠... 그럴 수도 있는데, 뭔가 석연치 않네요. 이게 �
 - Keep responses concise (2-4 sentences).
 - Use expressions like "흠...", "오!", "제가 분석해봤는데요" naturally.
 
-[CONVERSATION HISTORY]
-{chat_history}
-
 [RELEVANT CONTEXT FROM INVESTIGATION]
 {rag_context}
 
