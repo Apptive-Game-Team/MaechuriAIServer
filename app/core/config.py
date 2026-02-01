@@ -23,6 +23,12 @@ class Settings:
     DB_USER: str = os.getenv("DB_USER", "")
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
 
+    # Redis
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", ""))
+    REDIS_DB: int = int(os.getenv("REDIS_DB", ""))
+    REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
+
     @property
     def database_url(self) -> str:
         return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
