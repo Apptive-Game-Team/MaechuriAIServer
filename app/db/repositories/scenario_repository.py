@@ -13,7 +13,6 @@ from app.db.models import (
     Suspect,
     Fact,
     Clue,
-    ScenarioContext,
     Map
 )
 from app.models.schemas.scenario import ScenarioResult
@@ -443,46 +442,55 @@ class ScenarioRepository:
                 )
                 session.add(clue)
 
-            # 5. Create ScenarioContext
-            context_id = 1
+            # 5. Create context Facts (suspect_id=0)
+            # Get the next fact_id after suspect facts
+            max_suspect_fact_id = 0
+            for suspect_schema in scenario_result.suspects:
+                for fact_schema in suspect_schema.facts:
+                    if fact_schema.fact_id > max_suspect_fact_id:
+                        max_suspect_fact_id = fact_schema.fact_id
+            context_fact_id = max_suspect_fact_id + 1
 
             # 5-1. Incident context
             incident_content = self._build_incident_context_from_result(scenario_result)
-            incident_context = ScenarioContext(
+            incident_fact = Fact(
                 scenario_id=scenario_id,
-                context_id=context_id,
+                fact_id=context_fact_id,
+                suspect_id=0,  # Context indicator
+                threshold=0,
                 type="incident",
-                content=incident_content,
-                extra_data=scenario_result.incident.model_dump(mode='json')
+                content={"text": incident_content, "extra_data": scenario_result.incident.model_dump(mode='json')}
             )
-            session.add(incident_context)
-            context_id += 1
+            session.add(incident_fact)
+            context_fact_id += 1
 
             # 5-2. Location contexts
             for loc_name, loc_id in loc_map.items():
                 loc_content = self._build_location_context(
                     loc_name, loc_id, visibility_map, access_map, loc_map
                 )
-                loc_context = ScenarioContext(
+                loc_fact = Fact(
                     scenario_id=scenario_id,
-                    context_id=context_id,
+                    fact_id=context_fact_id,
+                    suspect_id=0,  # Context indicator
+                    threshold=0,
                     type="location",
-                    content=loc_content,
-                    extra_data={"location_id": loc_id, "name": loc_name}
+                    content={"text": loc_content, "extra_data": {"location_id": loc_id, "name": loc_name}}
                 )
-                session.add(loc_context)
-                context_id += 1
+                session.add(loc_fact)
+                context_fact_id += 1
 
             # 5-3. World context
             world_content = self._build_world_context_from_result(scenario_result)
-            world_context = ScenarioContext(
+            world_fact = Fact(
                 scenario_id=scenario_id,
-                context_id=context_id,
+                fact_id=context_fact_id,
+                suspect_id=0,  # Context indicator
+                threshold=0,
                 type="world",
-                content=world_content,
-                extra_data=scenario_result.world.model_dump(mode='json')
+                content={"text": world_content, "extra_data": scenario_result.world.model_dump(mode='json')}
             )
-            session.add(world_context)
+            session.add(world_fact)
 
             # 6. Save Map elements (rooms, corridors)
             if map_data:

@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import select, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
-from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding, ScenarioContext
+from app.db.models import Suspect, Fact, Clue, ChatMessageEmbedding
 from app.services.embedding import get_embedding_service, EmbeddingService
 
 
@@ -368,24 +368,29 @@ class RAGRetriever:
         threshold: float = 0.5,
         context_types: Optional[List[str]] = None
     ) -> List[RetrievedContext]:
-        """Search for relevant scenario contexts."""
-        def mapper(ctx: ScenarioContext, similarity: float) -> RetrievedContext:
+        """Search for relevant scenario contexts (Facts with suspect_id=0)."""
+        def mapper(fact: Fact, similarity: float) -> RetrievedContext:
+            # Extract text from JSONB content
+            content = fact.content.get("text", str(fact.content)) if isinstance(fact.content, dict) else str(fact.content)
             return RetrievedContext(
-                context_id=ctx.context_id,
-                type=ctx.type,
-                content=ctx.content,
+                context_id=fact.fact_id,
+                type=fact.type,
+                content=content,
                 similarity=similarity
             )
 
-        filters = [ScenarioContext.scenario_id == scenario_id]
+        filters = [
+            Fact.scenario_id == scenario_id,
+            Fact.suspect_id == 0,  # Context indicator
+        ]
         if context_types:
-            filters.append(ScenarioContext.type.in_(context_types))
+            filters.append(Fact.type.in_(context_types))
 
         return await self._search(
             db=db,
             query=query,
-            model=ScenarioContext,
-            embedding_col=ScenarioContext.embedding,
+            model=Fact,
+            embedding_col=Fact.embedding,
             mapper=mapper,
             base_filters=filters,
             top_k=top_k,

@@ -13,8 +13,7 @@ from app.db.models import (
     Fact,
     Clue,
     ChatMessageEmbedding,
-    Location,
-    ScenarioContext
+    Location
 )
 from app.services.embedding import get_embedding_service, EmbeddingService
 
@@ -150,7 +149,7 @@ class ClueIndexer(BaseIndexer):
 
 
 class ContextIndexer(BaseIndexer):
-    """Indexer for scenario contexts."""
+    """Indexer for scenario contexts (Facts with suspect_id=0)."""
 
     async def index(
         self,
@@ -158,23 +157,28 @@ class ContextIndexer(BaseIndexer):
         scenario_id: int,
         embedding_service: EmbeddingService
     ) -> Dict[str, int]:
-        """Index all contexts in a scenario."""
+        """Index all context facts (suspect_id=0) in a scenario."""
         result = await db.execute(
-            select(ScenarioContext).where(ScenarioContext.scenario_id == scenario_id)
+            select(Fact).where(
+                Fact.scenario_id == scenario_id,
+                Fact.suspect_id == 0  # Context indicator
+            )
         )
         contexts = result.scalars().all()
 
         context_updates = []
         for ctx in contexts:
-            embedding = embedding_service.embed_text(ctx.content)
+            # Extract text from JSONB content
+            content_text = ctx.content.get("text", str(ctx.content)) if isinstance(ctx.content, dict) else str(ctx.content)
+            embedding = embedding_service.embed_text(content_text)
             context_updates.append({
                 "scenario_id": scenario_id,
-                "context_id": ctx.context_id,
+                "fact_id": ctx.fact_id,
                 "embedding": embedding
             })
 
         if context_updates:
-            await db.execute(update(ScenarioContext), context_updates)
+            await db.execute(update(Fact), context_updates)
 
         return {"contexts": len(context_updates)}
 
