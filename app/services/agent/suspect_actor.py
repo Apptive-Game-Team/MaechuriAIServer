@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from app.services.prompt.prompt_loader import PromptLoader
+from app.services.rag.context_builder import get_context_builder, ContextBuilder
 from app.models.schemas.suspect import SuspectSchema
 from app.models.domain.suspect_state import SuspectState
 
@@ -12,8 +13,9 @@ class SuspectActor:
     현재 pressure와 공개된 비밀을 기반으로 응답 생성.
     """
 
-    def __init__(self, llm_client):
+    def __init__(self, llm_client, context_builder: Optional[ContextBuilder] = None):
         self.llm = llm_client
+        self.context_builder = context_builder or get_context_builder()
         self.system_prompt_template = PromptLoader.load("app/prompts/actor/system.txt")
 
     def generate_response(
@@ -53,7 +55,7 @@ class SuspectActor:
             "pressure_level": state.current_pressure,
             "is_culprit": suspect.is_culprit,
             "clue_presented": json.dumps(clue_presented, ensure_ascii=False) if clue_presented else "None",
-            "chat_history": self._format_history(state.get_recent_history(10)),
+            "chat_history": self.context_builder.build_simple_history(state.get_recent_history(10)),
             "rag_context": rag_context or "",
         }
 
@@ -67,9 +69,3 @@ class SuspectActor:
         )
 
         return response
-
-    def _format_history(self, history: list) -> str:
-        """대화 히스토리 포맷"""
-        if not history:
-            return "(대화 시작)"
-        return "\n".join([f"{h['role']}: {h['content']}" for h in history])

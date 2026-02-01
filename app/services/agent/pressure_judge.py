@@ -23,7 +23,6 @@ class PressureJudge:
         user_message: str,
         suspect_summary: str,
         current_pressure: int,
-        conversation_context: str,
         clue_presented: Optional[dict] = None,
         suspect_alibi: Optional[str] = None,
         suspect_timeline: Optional[str] = None
@@ -35,7 +34,6 @@ class PressureJudge:
             user_message: 유저가 보낸 메시지
             suspect_summary: 용의자 요약 정보 (이름, 역할, 범인여부)
             current_pressure: 현재 pressure (0-100)
-            conversation_context: 최근 대화 맥락
             clue_presented: 제시된 단서 (있다면)
             suspect_alibi: 용의자의 알리바이 요약
             suspect_timeline: 용의자의 타임라인 요약
@@ -51,7 +49,6 @@ class PressureJudge:
             "suspect_summary": suspect_summary,
             "suspect_alibi": suspect_alibi or "정보 없음",
             "suspect_timeline": suspect_timeline or "정보 없음",
-            "conversation_context": conversation_context
         }
 
         raw = self.llm.complete(

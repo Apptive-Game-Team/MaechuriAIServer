@@ -1,7 +1,7 @@
 import json
 import re
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +82,3 @@ def safe_json_load(json_str: str) -> Dict[str, Any]:
             logger.debug(f"Original: {json_str[:200]}...")
             logger.debug(f"Repaired: {repaired[:200]}...")
             raise  # 복구 실패 시 원본 에러 전파
-
-def format_history(history: List[Dict[str, str]]) -> str:
-    """
-    Converts a list of chat history dictionaries to a formatted string.
-    Expected format of history items: {'role': '...', 'content': '...'}
-    """
-    return "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])

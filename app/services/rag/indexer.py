@@ -1,10 +1,12 @@
 """RAG Indexer for generating and storing embeddings."""
 
-from typing import List, Optional
+from abc import ABC, abstractmethod
+from typing import List, Optional, Dict, Any
 import logging
 
-from sqlalchemy import update
+from sqlalchemy import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.models import (
     Suspect,
@@ -16,7 +18,169 @@ from app.db.models import (
 from app.services.embedding import get_embedding_service, EmbeddingService
 
 
-logger = logging.getLogger(__name__)  # log 추적용
+logger = logging.getLogger(__name__)
+
+class BaseIndexer(ABC):
+    """Abstract base class for entity indexers."""
+
+    @abstractmethod
+    async def index(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        embedding_service: EmbeddingService
+    ) -> Dict[str, int]:
+        """Index entities for a scenario.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID to index.
+        embedding_service : EmbeddingService
+            The embedding service to use.
+
+        Returns
+        -------
+        Dict[str, int]
+            Statistics about indexed items.
+        """
+        pass
+
+
+class SuspectIndexer(BaseIndexer):
+    """Indexer for suspects and their facts."""
+
+    async def index(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        embedding_service: EmbeddingService
+    ) -> Dict[str, int]:
+        """Index all suspects and facts in a scenario."""
+        result = await db.execute(
+            select(Suspect)
+            .where(Suspect.scenario_id == scenario_id)
+            .options(selectinload(Suspect.facts))
+        )
+        suspects = result.scalars().all()
+
+        suspect_updates = []
+        fact_updates = []
+
+        for suspect in suspects:
+            profile_embedding = embedding_service.embed_suspect_profile(
+                name=suspect.name,
+                role=suspect.role,
+                description=suspect.description,
+                age=suspect.age,
+                gender=suspect.gender,
+            )
+            suspect_updates.append({
+                "scenario_id": scenario_id,
+                "suspect_id": suspect.suspect_id,
+                "profile_embedding": profile_embedding
+            })
+
+            for fact in suspect.facts:
+                fact_embedding = embedding_service.embed_fact(fact)
+                fact_updates.append({
+                    "scenario_id": scenario_id,
+                    "suspect_id": suspect.suspect_id,
+                    "fact_id": fact.fact_id,
+                    "embedding": fact_embedding
+                })
+
+        if suspect_updates:
+            await db.execute(update(Suspect), suspect_updates)
+
+        if fact_updates:
+            await db.execute(update(Fact), fact_updates)
+
+        return {
+            "suspects": len(suspect_updates),
+            "facts": len(fact_updates),
+        }
+
+
+class ClueIndexer(BaseIndexer):
+    """Indexer for clues."""
+
+    async def index(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        embedding_service: EmbeddingService
+    ) -> Dict[str, int]:
+        """Index all clues in a scenario."""
+        loc_result = await db.execute(
+            select(Location).where(Location.scenario_id == scenario_id)
+        )
+        loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
+
+        result = await db.execute(
+            select(Clue).where(Clue.scenario_id == scenario_id)
+        )
+        clues = result.scalars().all()
+
+        clue_updates = []
+        for clue in clues:
+            loc_name = loc_map.get(clue.location_id, "Unknown")
+            description_embedding = embedding_service.embed_clue_description(
+                name=clue.name, description=clue.description, found_at=loc_name
+            )
+            logic_embedding = embedding_service.embed_clue_logic(
+                name=clue.name,
+                logic_explanation=clue.logic_explanation,
+                decoded_answer=clue.decoded_answer,
+            )
+            clue_updates.append({
+                "scenario_id": scenario_id,
+                "clue_id": clue.clue_id,
+                "description_embedding": description_embedding,
+                "logic_embedding": logic_embedding
+            })
+
+        if clue_updates:
+            await db.execute(update(Clue), clue_updates)
+
+        return {"clues": len(clue_updates)}
+
+
+class ContextIndexer(BaseIndexer):
+    """Indexer for scenario contexts (Facts with suspect_id=0)."""
+
+    async def index(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        embedding_service: EmbeddingService
+    ) -> Dict[str, int]:
+        """Index all context facts (suspect_id=0) in a scenario."""
+        result = await db.execute(
+            select(Fact).where(
+                Fact.scenario_id == scenario_id,
+                Fact.suspect_id == 0  # Context indicator
+            )
+        )
+        contexts = result.scalars().all()
+
+        context_updates = []
+        for ctx in contexts:
+            # Extract text from JSONB content
+            content_text = ctx.content.get("text", str(ctx.content)) if isinstance(ctx.content, dict) else str(ctx.content)
+            embedding = embedding_service.embed_text(content_text)
+            context_updates.append({
+                "scenario_id": scenario_id,
+                "fact_id": ctx.fact_id,
+                "embedding": embedding
+            })
+
+        if context_updates:
+            await db.execute(update(Fact), context_updates)
+
+        return {"contexts": len(context_updates)}
 
 
 class RAGIndexer:
@@ -26,23 +190,35 @@ class RAGIndexer:
     - Generating embeddings when scenarios are created
     - Updating embeddings when data changes
     - Storing chat message embeddings during conversations
+
+    Uses Strategy Pattern with pluggable indexers for different entity types.
     """
 
-    def __init__(self, embedding_service: Optional[EmbeddingService] = None):
+    def __init__(
+        self,
+        embedding_service: Optional[EmbeddingService] = None,
+        indexers: Optional[List[BaseIndexer]] = None
+    ):
         """Initialize the RAG indexer.
 
         Parameters
         ----------
         embedding_service : EmbeddingService, optional
             The embedding service to use. Uses singleton if not provided.
+        indexers : List[BaseIndexer], optional
+            List of indexer strategies. Uses default indexers if not provided.
         """
         self.embedding_service = embedding_service or get_embedding_service()
+        self.indexers = indexers or [
+            SuspectIndexer(),
+            ClueIndexer(),
+            ContextIndexer(),
+        ]
 
-    async def index_scenario(self, db: AsyncSession, scenario_id: int) -> dict:
+    async def index_scenario(self, db: AsyncSession, scenario_id: int) -> Dict[str, Any]:
         """Index all data for a scenario.
 
-        Generates and stores embeddings for all suspects, timelines, secrets, and clues
-        in the given scenario.
+        Generates and stores embeddings for all entities using registered indexers.
 
         Parameters
         ----------
@@ -56,153 +232,18 @@ class RAGIndexer:
         dict
             Statistics about indexed items.
         """
-        # Index suspects, timelines, and secrets
-        suspect_stats = await self.index_suspects(db, scenario_id)
-        
-        # Index clues
-        clues_indexed = await self.index_clues(db, scenario_id)
-        
-        stats = {
-            "suspects": suspect_stats["suspects"],
-            "facts": suspect_stats["facts"],
-            "clues": clues_indexed,
-        }
+        stats: Dict[str, int] = {}
+
+        for indexer in self.indexers:
+            indexer_stats = await indexer.index(
+                db, scenario_id, self.embedding_service
+            )
+            stats.update(indexer_stats)
 
         await db.commit()
 
         logger.info(f"Indexed scenario {scenario_id}: {stats}")
         return stats
-
-    async def index_suspects(self, db: AsyncSession, scenario_id: int) -> dict:
-        """Index all suspects in a scenario.
-
-        Parameters
-        ----------
-        db : AsyncSession
-            Database session.
-        scenario_id : int
-            The scenario ID.
-
-        Returns
-        -------
-        dict
-            Stats containing number of suspects, timelines, and secrets indexed.
-        """
-        from sqlalchemy import select
-        from sqlalchemy.orm import selectinload
-
-
-        # 2. Load suspects with relationships
-        result = await db.execute(
-            select(Suspect)
-            .where(Suspect.scenario_id == scenario_id)
-            .options(selectinload(Suspect.facts))
-        )
-        suspects = result.scalars().all()
-
-        suspect_updates = []
-        fact_updates = []
-        
-        for suspect in suspects:
-            # Index suspect profile
-            profile_embedding = self.embedding_service.embed_suspect_profile(
-                name=suspect.name,
-                role=suspect.role,
-                description=suspect.description,
-                age=suspect.age,
-                gender=suspect.gender,
-            )
-            # Keys must match model attribute names for ORM bulk update
-            suspect_updates.append({
-                "scenario_id": scenario_id,
-                "suspect_id": suspect.suspect_id,
-                "profile_embedding": profile_embedding
-            })
-
-            # Index Facts
-            for fact in suspect.facts:
-                fact_embedding = self.embedding_service.embed_fact(fact)
-                fact_updates.append({
-                    "scenario_id": scenario_id,
-                    "suspect_id": suspect.suspect_id,
-                    "fact_id": fact.fact_id,
-                    "embedding": fact_embedding
-                })
-
-        # Bulk updates
-        if suspect_updates:
-            await db.execute(
-                update(Suspect),
-                suspect_updates
-            )
-
-        if fact_updates:
-            await db.execute(
-                update(Fact),
-                fact_updates
-            )
-
-        return {
-            "suspects": len(suspect_updates),
-            "facts": len(fact_updates),
-        }
-
-    async def index_clues(self, db: AsyncSession, scenario_id: int) -> int:
-        """Index all clues in a scenario.
-
-        Parameters
-        ----------
-        db : AsyncSession
-            Database session.
-        scenario_id : int
-            The scenario ID.
-
-        Returns
-        -------
-        int
-            Number of clues indexed.
-        """
-        from sqlalchemy import select
-
-        # 1. Load Locations for mapping IDs to Names
-        loc_result = await db.execute(
-            select(Location).where(Location.scenario_id == scenario_id)
-        )
-        loc_map = {loc.location_id: loc.name for loc in loc_result.scalars().all()}
-
-        # 2. Load clues
-        result = await db.execute(select(Clue).where(Clue.scenario_id == scenario_id))
-        clues = result.scalars().all()
-
-        clue_updates = []
-        for clue in clues:
-            # Index description
-            loc_name = loc_map.get(clue.location_id, "Unknown")
-            description_embedding = self.embedding_service.embed_clue_description(
-                name=clue.name, description=clue.description, found_at=loc_name
-            )
-
-            # Index logic explanation
-            logic_embedding = self.embedding_service.embed_clue_logic(
-                name=clue.name,
-                logic_explanation=clue.logic_explanation,
-                decoded_answer=clue.decoded_answer,
-            )
-
-            clue_updates.append({
-                "scenario_id": scenario_id,
-                "clue_id": clue.clue_id,
-                "description_embedding": description_embedding,
-                "logic_embedding": logic_embedding
-            })
-
-        if clue_updates:
-            await db.execute(
-                update(Clue),
-                clue_updates
-            )
-
-        return len(clue_updates)
 
     async def index_chat_message(
         self,

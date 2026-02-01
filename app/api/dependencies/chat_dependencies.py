@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.db.repositories.scenario_repository import ScenarioRepository
+from app.services.agent.detective_agent import DetectiveAgent
 from app.services.llm.gemini_client import GeminiClient
 from app.services.npc.chat_service import ChatService
 from app.services.agent.pressure_judge import PressureJudge
@@ -35,16 +36,23 @@ def get_clue_agent(
 ) -> ClueAgent:
     return ClueAgent(llm_client)
 
+def get_detective_agent(
+    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+) -> DetectiveAgent:
+    return DetectiveAgent(llm_client)
+
 
 def get_chat_service(
     scenario_repository: Annotated[ScenarioRepository, Depends(get_scenario_repository)],
     pressure_judge: Annotated[PressureJudge, Depends(get_pressure_judge)],
     suspect_actor: Annotated[SuspectActor, Depends(get_suspect_actor)],
-    clue_agent: Annotated[ClueAgent, Depends(get_clue_agent)]
+    clue_agent: Annotated[ClueAgent, Depends(get_clue_agent)],
+    detective_agent: Annotated[DetectiveAgent, Depends(get_detective_agent)]
 ) -> ChatService:
     return ChatService(
         scenario_repository=scenario_repository,
         pressure_judge=pressure_judge,
         suspect_actor=suspect_actor,
-        clue_agent=clue_agent
+        clue_agent=clue_agent,
+        detective_agent=detective_agent,
     )

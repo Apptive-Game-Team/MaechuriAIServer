@@ -177,21 +177,21 @@ class ScenarioService:
         # 8. 최종 결과 조합
         final_scenario = ScenarioResult(
             **expansion_result.model_dump(),  # 본인
-            clues=clue_result,  # 추가
+            clues=clue_result.clues,  # List[ClueItemSchema]
             map=map_result,  # 추가
             suspects=[SuspectSchema.from_generation(generation) for generation in suspects_result.suspects]  # 추가
         )
 
-        return final_scenario.model_dump(mode='json')
+        return final_scenario
 
-    async def save_to_db(self, scenario_data: dict, db=None) -> int:
+    async def save_to_db(self, scenario: ScenarioResult, db=None) -> int:
         """
         Save generated scenario to database and index for RAG.
 
         Parameters
         ----------
-        scenario_data : dict
-            The scenario data from generate() method
+        scenario : ScenarioResult
+            The complete scenario result object
         db : AsyncSession, optional
             Database session for RAG indexing. If not provided, only saves scenario.
 
@@ -201,7 +201,7 @@ class ScenarioService:
             The created scenario ID
         """
         # Save to database
-        scenario_id = await self.repository.save_scenario(scenario_data)
+        scenario_id = await self.repository.save_scenario(scenario)
         logger.info(f"Scenario saved to DB with ID: {scenario_id}")
 
         # Index for RAG if db session provided
@@ -214,36 +214,40 @@ class ScenarioService:
 
         return scenario_id
 
-    async def generate_and_save(self, pre_input: str, request_id: str = None, db=None) -> tuple[dict, int]:
+    async def generate_and_save(
+        self,
+        pre_input: str,
+        request_id: str = None,
+        db=None
+    ) -> tuple[ScenarioResult, int]:
         """
         Generate scenario and save to database with RAG indexing.
 
         Parameters
         ----------
-        request_id : str
-            Unique identifier for the generation request.
         pre_input : str
             Input for scenario generation
+        request_id : str, optional
+            Unique identifier for the generation request.
         db : AsyncSession, optional
             Database session for RAG indexing
 
         Returns
         -------
-        tuple[dict, int]
-            Tuple of (scenario_data, scenario_id)
+        tuple[ScenarioResult, int]
+            Tuple of (scenario_result, scenario_id)
         """
-        # Generate scenario (sync operation)
-
         if request_id is None:
             request_id = str(uuid.uuid4())
 
-        scenario_data = await asyncio.to_thread(
+        # Generate scenario (sync operation)
+        scenario_result = await asyncio.to_thread(
             self.generate,
             pre_input,
             request_id
         )
 
         # Save to DB and index for RAG
-        scenario_id = await self.save_to_db(scenario_data, db)
+        scenario_id = await self.save_to_db(scenario_result, db)
 
-        return scenario_data, scenario_id
+        return scenario_result, scenario_id

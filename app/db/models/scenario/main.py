@@ -59,12 +59,10 @@ class Scenario(Base):
         post_update=True
     )
 
-    visibility_rules: Mapped[List["VisibilityRule"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
-    access_rules: Mapped[List["AccessRule"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
-    required_clues: Mapped[List["RequiredClue"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     suspects: Mapped[List["Suspect"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     clues: Mapped[List["Clue"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
     game_sessions: Mapped[List["GameSession"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
+    map_elements: Mapped[List["Map"]] = relationship(back_populates="scenario", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("difficulty IN ('easy', 'mid', 'hard')", name="check_difficulty"),

@@ -6,11 +6,13 @@ from .common import (
 )
 from .request import (
     SuspectChatRequest,
-    ClueChatRequest
+    ClueChatRequest,
+    GeneralChatRequest
 )
 from .response import (
     SuspectChatResponse,
-    ClueChatResponse
+    ClueChatResponse,
+    GeneralChatResponse
 )
 
 __all__ = [
@@ -21,7 +23,9 @@ __all__ = [
     # Request
     "SuspectChatRequest",
     "ClueChatRequest",
+    "GeneralChatRequest",
     # Response
     "SuspectChatResponse",
     "ClueChatResponse",
+    "GeneralChatResponse",
 ]

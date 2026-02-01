@@ -2,7 +2,7 @@
 from typing import Optional, TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, String, Text, Boolean, ForeignKey, ForeignKeyConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, SmallInteger, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,10 @@ class Clue(Base):
     logic_explanation: Mapped[str] = mapped_column(Text)
     decoded_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_red_herring: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Map position (within room)
+    x: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    y: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
 
     # Embeddings for RAG
     description_embedding = mapped_column(Vector(1024), nullable=True)
