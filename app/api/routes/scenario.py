@@ -5,10 +5,12 @@ from typing import Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db, async_session_factory
+from app.db.redis import get_redis
 from app.services.scenario.scenario_service import ScenarioService
 from app.services.scenario.solve_service import SolveService
 from app.services.rag import get_rag_service
 from app.api.dependencies.scenario_dependencies import get_scenario_service, get_solve_service
+from app.services.task import ScenarioTaskStore
 from app.models.schemas.solve import ScenarioSolveRequest, ScenarioSolveResponse
 from app.models.schemas.scenario_task import (
     ScenarioStatus,
@@ -21,12 +23,10 @@ from app.models.schemas.scenario_task import (
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 
-# 백그라운드 태스크 상태 관리
-scenario_tasks: dict[str, ScenarioTaskInfo] = {}
-
 
 async def create_scenario_background(
         scenario_service: ScenarioService,
+        task_store: ScenarioTaskStore,
         key: str,
         theme: str = "random",
 ):
@@ -37,6 +37,8 @@ async def create_scenario_background(
     ----------
     scenario_service : ScenarioService
         시나리오 서비스
+    task_store : ScenarioTaskStore
+        Redis 태스크 저장소
     key : str
         태스크 추적용 고유 키
     theme : str
@@ -44,12 +46,12 @@ async def create_scenario_background(
     """
     logger.info(f"[{key}] Starting background scenario generation with theme: {theme}")
 
-    if key not in scenario_tasks:
-        logger.error(f"[{key}] Task not found in scenario_tasks")
+    task_info = await task_store.get(key)
+    if task_info is None:
+        logger.error(f"[{key}] Task not found in task_store")
         return
 
-    task_info = scenario_tasks[key]
-    task_info.status = ScenarioStatus.PROCESSING
+    await task_store.update_status(key, ScenarioStatus.PROCESSING)
 
     try:
         # 독립적인 DB 세션 생성
@@ -60,14 +62,16 @@ async def create_scenario_background(
                 db=db
             )
 
-            task_info.scenario_id = scenario_id
-            task_info.status = ScenarioStatus.COMPLETED
+            await task_store.update_status(
+                key,
+                ScenarioStatus.COMPLETED,
+                scenario_id=scenario_id
+            )
 
             logger.info(f"[{key}] Scenario generated successfully. ID: {scenario_id}")
 
     except Exception as e:
-        task_info.status = ScenarioStatus.FAILED
-        task_info.error = str(e)
+        await task_store.update_status(key, ScenarioStatus.FAILED, error=str(e))
         logger.error(f"[{key}] Scenario generation failed: {e}", exc_info=True)
 
 
@@ -99,9 +103,13 @@ async def create_daily_scenario(
     key = request.key
     theme = request.theme
 
+    # Redis 태스크 저장소 생성
+    redis_client = await get_redis()
+    task_store = ScenarioTaskStore(redis_client)
+
     # 이미 진행 중인 태스크 체크
-    if key in scenario_tasks:
-        existing_task = scenario_tasks[key]
+    existing_task = await task_store.get(key)
+    if existing_task is not None:
         if existing_task.status == ScenarioStatus.PROCESSING:
             raise HTTPException(
                 status_code=409,
@@ -118,10 +126,10 @@ async def create_daily_scenario(
 
     # 새 태스크 등록
     task_info = ScenarioTaskInfo(key=key, theme=theme)
-    scenario_tasks[key] = task_info
+    await task_store.set(task_info)
 
     # 백그라운드 태스크 시작
-    background_tasks.add_task(create_scenario_background, scenario_service, key, theme)
+    background_tasks.add_task(create_scenario_background, scenario_service, task_store, key, theme)
 
     logger.info(f"[{key}] Scenario generation task queued with theme: {theme}")
 
@@ -289,15 +297,20 @@ async def get_all_tasks():
     ScenarioTaskListResponse
         모든 태스크 목록
     """
-    tasks = []
-    for task_key, task_info in scenario_tasks.items():
-        tasks.append(ScenarioStatusResponse(
-            key=task_key,
+    redis_client = await get_redis()
+    task_store = ScenarioTaskStore(redis_client)
+
+    all_tasks = await task_store.get_all()
+    tasks = [
+        ScenarioStatusResponse(
+            key=task_info.key,
             status=task_info.status,
             theme=task_info.theme,
             scenario_id=task_info.scenario_id,
             error=task_info.error
-        ))
+        )
+        for task_info in all_tasks
+    ]
 
     return ScenarioTaskListResponse(
         total=len(tasks),
@@ -320,7 +333,10 @@ async def get_task_status(key: str):
     ScenarioStatusResponse
         태스크 상세 상태
     """
-    task_info = scenario_tasks.get(key)
+    redis_client = await get_redis()
+    task_store = ScenarioTaskStore(redis_client)
+
+    task_info = await task_store.get(key)
     if task_info is None:
         raise HTTPException(
             status_code=404,

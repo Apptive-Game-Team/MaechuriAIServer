@@ -1,8 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from app.api.routes.scenario import router as scenario_router
 from app.api.routes.chat import router as chat_router
+from app.db.redis import close_redis
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """앱 라이프사이클 관리"""
+    # Startup
+    yield
+    # Shutdown
+    await close_redis()
 
 
 def create_app() -> FastAPI:
@@ -14,6 +26,7 @@ def create_app() -> FastAPI:
         title="MaechuriAIServer",
         description="MaechuriAIServer",
         version="0.0.1",
+        lifespan=lifespan,
     )
 
     app.add_middleware(
