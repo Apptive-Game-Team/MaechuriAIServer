@@ -25,7 +25,7 @@ class PressureJudge:
         current_pressure: int,
         clue_presented: Optional[dict] = None,
         suspect_alibi: Optional[str] = None,
-        suspect_timeline: Optional[str] = None
+        suspect_facts: Optional[str] = None
     ) -> PressureJudgeOutput:
         """
         유저의 질문/행동을 평가하여 pressure 변화량 반환.
@@ -48,7 +48,7 @@ class PressureJudge:
             "current_pressure": current_pressure,
             "suspect_summary": suspect_summary,
             "suspect_alibi": suspect_alibi or "정보 없음",
-            "suspect_timeline": suspect_timeline or "정보 없음",
+            "suspect_timeline": suspect_facts or "정보 없음",
         }
 
         raw = self.llm.complete(
