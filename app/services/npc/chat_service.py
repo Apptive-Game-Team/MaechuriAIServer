@@ -4,6 +4,8 @@ import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.agent.suspect_agent import SuspectAgent
+
 if TYPE_CHECKING:
     from app.db.repositories.scenario_repository import ScenarioRepository
     from app.services.rag import RAGService
@@ -14,7 +16,7 @@ from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.rag import get_rag_service
 from app.models.domain.suspect_state import SuspectState
-from app.models.schemas.suspect import SuspectSchema
+from app.models.schemas.suspect import SuspectSchema, FactSchema
 from app.models.schemas.chat import (
     SuspectChatResponse,
     ClueChatResponse,
@@ -35,7 +37,7 @@ class ChatService:
         self,
         scenario_repository: "ScenarioRepository",
         pressure_judge: PressureJudge,
-        suspect_actor: SuspectActor,
+        suspect_actor: SuspectAgent,
         clue_agent: ClueAgent,
         detective_agent: Optional[DetectiveAgent] = None,
         rag_service: Optional["RAGService"] = None
@@ -287,7 +289,7 @@ class ChatService:
             current_pressure=state.current_pressure,
             clue_presented=clue,
             suspect_alibi=suspect.alibi_summary,
-            suspect_timeline=self._format_timeline(suspect.timeline)
+            suspect_facts=self._format_facts(suspect.facts)
         )
 
         # 7. Pressure 업데이트
@@ -461,13 +463,53 @@ class ChatService:
         culprit_str = "범인" if suspect.is_culprit else "무고한 용의자"
         return f"이름: {suspect.name}, 역할: {suspect.role}, 상태: {culprit_str}"
 
-    def _format_timeline(self, timeline: List) -> str:
-        """Judge용 타임라인 요약"""
-        lines = []
-        for t in timeline:
-            prove_str = "증명가능" if t.can_prove else "미확인"
-            lines.append(f"- {t.time}: {t.location}에서 {t.activity} ({prove_str})")
+    def _format_facts(
+            self,
+            facts: List[FactSchema],
+    ) -> str:
+        """Build context string from retrieved facts."""
+        if not facts:
+            return ""
+
+        lines = ["[관련 사실]"]
+        for fact in facts:
+            text = None
+            match fact.type:
+                case "timeline":
+                    text = self._format_timeline(fact.content)
+                case "secret":
+                    text = self._format_secret(fact)
+                case _:
+                    text = fact.content.to_string()
+            lines.append(text)
+
         return "\n".join(lines)
+
+    def _format_timeline(
+            self,
+            timeline: dict,
+    ) -> str:
+        time = timeline.get("time")
+        location = timeline.get("location")
+        activity = timeline.get("activity")
+
+        if time is None or location is None or activity is None:
+            # Fallback: show the raw timeline content if expected keys are missing
+            return f"- {str(timeline)}"
+
+        return f"- {time}: {location}에서 {activity}"
+
+    def _format_secret(
+            self,
+            fact: FactSchema
+    ) -> str:
+        content = fact.content.get("content")
+
+        if content is None:
+            # Fallback: show the raw fact content if expected key is missing
+            return f"- (압박 {fact.threshold}+) {str(fact.content)}"
+
+        return f"- (압박 {fact.threshold}+) {content}"
 
     async def _get_clue(self, scenario_id: int, clue_id: int) -> Optional[dict]:
         """단서 정보 조회"""
