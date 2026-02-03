@@ -1,6 +1,5 @@
-from typing import Optional, List, TYPE_CHECKING, Tuple
+from typing import Optional,  TYPE_CHECKING
 import logging
-import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,8 +12,9 @@ from app.services.agent.suspect_actor import SuspectActor
 from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.rag import get_rag_service
+from app.services.npc.formatters import ChatFormatter
+from app.utils import MessageParser
 from app.models.domain.suspect_state import SuspectState
-from app.models.schemas.suspect import SuspectSchema
 from app.models.schemas.chat import (
     SuspectChatResponse,
     ClueChatResponse,
@@ -76,7 +76,7 @@ class ChatService:
             game_session = await session_repo.create_session(session_id, scenario_id)
 
         # 2. user_message 파싱 [c:01] 또는 [s:01] 등의 정보 확인
-        clue_ids, suspect_ids = self._parse_message_references(user_message)
+        clue_ids, suspect_ids = MessageParser.parse_references(user_message)
 
         # 3. RAG 컨텍스트 검색
         rag_context = ""
@@ -176,50 +176,25 @@ class ChatService:
             answer=response
         )
 
-    def _parse_message_references(self, message: str) -> Tuple[List[int], List[int]]:
-        """메시지에서 [c:01], [s:01] 등의 참조를 파싱합니다.
-
-        Args:
-            message: 유저 메시지
-
-        Returns:
-            Tuple[List[int], List[int]]: (clue_ids, suspect_ids)
-        """
-        clue_ids: List[int] = []
-        suspect_ids: List[int] = []
-
-        # [c:01], [c:1], [C:01] 등의 패턴 매칭
-        clue_pattern = r'\[c:(\d+)\]'
-        suspect_pattern = r'\[s:(\d+)\]'
-
-        # 대소문자 무시
-        clue_matches = re.findall(clue_pattern, message, re.IGNORECASE)
-        suspect_matches = re.findall(suspect_pattern, message, re.IGNORECASE)
-
-        # 문자열을 정수로 변환
-        clue_ids = [int(m) for m in clue_matches]
-        suspect_ids = [int(m) for m in suspect_matches]
-
-        return clue_ids, suspect_ids
-
     async def suspect_chat(
         self,
         session_id: str,
         scenario_id: int,
         suspect_id: int,
         user_message: str,
-        db: AsyncSession,
-        clue_id: Optional[int] = None
+        db: AsyncSession
     ) -> SuspectChatResponse:
         """용의자와 대화 (Stateful with GameSession).
+
+        메시지에서 [c:XX] 형식으로 단서를 참조할 수 있습니다.
+        예: "이 증거에 대해 어떻게 생각해? [c:1]"
 
         Args:
             session_id: 게임 세션 ID (UUID)
             scenario_id: 시나리오 ID
             suspect_id: 용의자 ID
-            user_message: 유저 메시지
+            user_message: 유저 메시지 ([c:ID]로 단서 참조 가능)
             db: 데이터베이스 세션 (필수)
-            clue_id: 제시할 단서 ID (있다면)
         """
         # 1. GameSession 로드 및 검증/생성
         session_repo = GameSessionRepository(db)
@@ -229,7 +204,10 @@ class ChatService:
             # 세션이 없으면 생성 (Lazy Creation)
             game_session = await session_repo.create_session(session_id, scenario_id)
 
-        # 2. 용의자 데이터 로드
+        # 2. user_message 파싱 [c:XX] 정보 확인
+        clue_ids, _ = MessageParser.parse_references(user_message)
+
+        # 3. 용의자 데이터 로드
         suspect = await self.scenario_repository.get_suspect_info(
             scenario_id=game_session.scenario_id,
             suspect_id=suspect_id
@@ -243,8 +221,7 @@ class ChatService:
                 pressure_delta=0
             )
 
-        # 3. 상태 복원 (GameSession 기반)
-        # Use suspect-specific pressure if available
+        # 4. 상태 복원 (GameSession 기반)
         suspect_pressure = game_session.suspect_pressures.get(str(suspect_id), 0)
 
         state = SuspectState(
@@ -253,15 +230,16 @@ class ChatService:
             clue_seen_ids=list(game_session.clue_seen_ids),
         )
 
-        # 4. 단서 처리 (있다면)
+        # 5. 단서 처리 (메시지에서 파싱된 경우)
         clue = None
-        if clue_id:
+        if clue_ids:
+            clue_id = clue_ids[0]  # 첫 번째 단서 사용
             clue = await self._get_clue(scenario_id, clue_id)
             if clue:
                 state.add_clue(clue_id)
                 await session_repo.add_clue_seen(session_id, scenario_id, clue_id)
 
-        # 5. RAG 컨텍스트 검색
+        # 6. RAG 컨텍스트 검색
         rag_context = None
         try:
             rag_result = await self.rag_service.get_suspect_context(
@@ -271,7 +249,6 @@ class ChatService:
                 query=user_message,
                 current_pressure=state.current_pressure,
                 session_id=session_id,
-                top_k_timeline=3,
                 top_k_secrets=2,
                 top_k_history=5
             )
@@ -280,21 +257,21 @@ class ChatService:
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
-        # 6. Judge: pressure 변화량 평가
+        # 7. Judge: pressure 변화량 평가
         judge_result = self.judge.evaluate(
             user_message=user_message,
-            suspect_summary=self._create_suspect_summary(suspect),
+            suspect_summary=ChatFormatter.format_suspect_summary(suspect),
             current_pressure=state.current_pressure,
             clue_presented=clue,
             suspect_alibi=suspect.alibi_summary,
-            suspect_timeline=self._format_timeline(suspect.timeline)
+            suspect_facts=ChatFormatter.format_facts(suspect.facts)
         )
 
-        # 7. Pressure 업데이트
+        # 8. Pressure 업데이트
         new_pressure = state.update_pressure(judge_result.pressure_delta)
         await session_repo.update_suspect_pressure(session_id, scenario_id, suspect_id, new_pressure)
 
-        # 8. Actor: 응답 생성 (RAG 컨텍스트 포함)
+        # 9. Actor: 응답 생성 (RAG 컨텍스트 포함)
         response = self.actor.generate_response(
             suspect=suspect,
             state=state,
@@ -303,11 +280,10 @@ class ChatService:
             rag_context=rag_context
         )
 
-        # 9. RAG용 메시지 임베딩 저장
+        # 10. RAG용 메시지 임베딩 저장
         try:
-            # 메시지 인덱스는 suspect_interactions 값을 사용
             suspect_interactions = game_session.suspect_interactions.get(str(suspect_id), 0)
-            message_idx = suspect_interactions * 2  # user + suspect = 2 messages per interaction
+            message_idx = suspect_interactions * 2
 
             await self.rag_service.index_chat_message(
                 db=db,
@@ -332,7 +308,7 @@ class ChatService:
         except Exception as e:
             logger.warning(f"Chat message indexing failed: {e}")
 
-        # 10. GameSession 진행도 업데이트
+        # 11. GameSession 진행도 업데이트
         await session_repo.increment_suspect_interaction(session_id, scenario_id, suspect_id)
         await db.commit()
 
@@ -455,19 +431,6 @@ class ChatService:
             user_message=user_message,
             answer=response_message
         )
-
-    def _create_suspect_summary(self, suspect: SuspectSchema) -> str:
-        """Judge용 용의자 요약"""
-        culprit_str = "범인" if suspect.is_culprit else "무고한 용의자"
-        return f"이름: {suspect.name}, 역할: {suspect.role}, 상태: {culprit_str}"
-
-    def _format_timeline(self, timeline: List) -> str:
-        """Judge용 타임라인 요약"""
-        lines = []
-        for t in timeline:
-            prove_str = "증명가능" if t.can_prove else "미확인"
-            lines.append(f"- {t.time}: {t.location}에서 {t.activity} ({prove_str})")
-        return "\n".join(lines)
 
     async def _get_clue(self, scenario_id: int, clue_id: int) -> Optional[dict]:
         """단서 정보 조회"""

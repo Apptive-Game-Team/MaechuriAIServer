@@ -11,7 +11,7 @@ You receive JSON with:
 - current_pressure: Current pressure level (0-100)
 - suspect_summary: Brief info about the suspect (name, role, is_culprit)
 - suspect_alibi: The suspect's claimed alibi (if provided)
-- suspect_timeline: The suspect's timeline (if provided)
+- suspect_facts: The suspect's timeline or secret or some information (if provided)
 - conversation_context: Recent conversation history
 
 [OUTPUT]

@@ -1,15 +1,19 @@
 """Chat request schemas."""
-from typing import Optional
 from pydantic import BaseModel, Field
 
 
 class SuspectChatRequest(BaseModel):
-    """Request for suspect chat (Stateful with GameSession)."""
+    """Request for suspect chat (Stateful with GameSession).
+
+    Use [c:ID] in user_message to present clues.
+    Example: "이 증거에 대해 어떻게 생각해? [c:1]"
+    """
     session_id: str = Field(description="Game session ID (UUID)")
     scenario_id: int = Field(description="Scenario ID")
     suspect_id: int = Field(description="Suspect ID to interrogate")
-    user_message: str = Field(description="User's question/message")
-    clue_id: Optional[int] = Field(default=None, description="Clue ID to present (optional)")
+    user_message: str = Field(
+        description="User's message. Use [c:ID] to present clues (e.g., [c:1])"
+    )
 
 
 class ClueChatRequest(BaseModel):

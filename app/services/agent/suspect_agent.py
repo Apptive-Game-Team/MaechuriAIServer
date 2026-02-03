@@ -1,9 +1,13 @@
 import json
 from typing import List, Optional
+
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.domain.fsm.interrogation import InterrogationState, AllowedMoves
 
 class SuspectAgent:
+    '''
+    --- deprecated
+    '''
     def __init__(self, llm_client):
         self.llm = llm_client
         self.system_prompt_template = PromptLoader.load("app/prompts/chat/system.txt")

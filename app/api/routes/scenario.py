@@ -79,8 +79,8 @@ async def create_scenario_background(
 async def create_daily_scenario(
         request: ScenarioCreateRequest,
         background_tasks: BackgroundTasks,
-        scenario_service: Annotated[ScenarioService, Depends(get_scenario_service)],
-        db: Annotated[AsyncSession, Depends(get_db)]):
+        scenario_service: Annotated[ScenarioService, Depends(get_scenario_service)]
+):
     """
     새로운 데일리 미스터리 시나리오를 생성합니다 (백그라운드).
 
