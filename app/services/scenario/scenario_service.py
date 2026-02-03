@@ -3,6 +3,7 @@ import asyncio
 import logging
 import uuid
 
+from app.models.schemas import ScenarioResult
 from app.models.schemas.scenario import ScenarioResult
 from app.models.schemas.suspect import SuspectGenerationRequest, SuspectSchema
 from app.services.agent.clue_generator import ClueGenerator
@@ -51,7 +52,7 @@ class ScenarioService:
 
     def generate(self,
                  pre_input: str,
-                 request_id: str = None) -> dict:
+                 request_id: str = None) -> ScenarioResult:
 
         if request_id is None:
             request_id = str(uuid.uuid4())

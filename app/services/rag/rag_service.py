@@ -13,16 +13,6 @@ from app.services.rag.indexer import RAGIndexer, get_rag_indexer
 logger = logging.getLogger(__name__)
 
 
-# Header labels for context sections
-HEADERS = {
-    "scenario": "사건 정보",
-    "clue": "관련 단서",
-    "evidence": "관련 증거",
-    "suspect": "관련 용의자",
-    "suspect_info": "용의자 정보",
-}
-
-
 @dataclass
 class SuspectRAGContext:
     """RAG context for suspect interrogation."""
@@ -123,16 +113,6 @@ class RAGService:
         history_str = self.context_builder.build_chat_history_context(history)
         return history, history_str
 
-    def _build_section(self, header_key: str, content: str) -> Optional[str]:
-        """Build a context section with header if content exists."""
-        if not content:
-            return None
-        return f"[{HEADERS[header_key]}]\n{content}"
-
-    def _join_sections(self, *sections: Optional[str]) -> str:
-        """Join non-empty sections with double newlines."""
-        return "\n\n".join(s for s in sections if s)
-
     async def get_suspect_context(
         self,
         db: AsyncSession,
@@ -141,7 +121,6 @@ class RAGService:
         query: str,
         current_pressure: int,
         session_id: Optional[str] = None,
-        top_k_timeline: int = 3,
         top_k_secrets: int = 2,
         top_k_history: int = 5,
         similarity_threshold: float = 0.5
@@ -165,8 +144,6 @@ class RAGService:
             Current pressure level (0-100).
         session_id : str, optional
             Session ID for history search.
-        top_k_timeline : int, optional
-            Number of timeline entries to retrieve. Defaults to 3.
         top_k_secrets : int, optional
             Number of secrets to retrieve. Defaults to 2.
         top_k_history : int, optional
@@ -348,10 +325,10 @@ class RAGService:
         clue_context_str = self.context_builder.build_clue_summary(clues)
         suspect_context_str = self.context_builder.build_suspect_profile(suspects)
 
-        full_context = self._join_sections(
-            self._build_section("scenario", scenario_context_str),
-            self._build_section("clue", clue_context_str),
-            self._build_section("suspect", suspect_context_str),
+        full_context = ContextBuilder.join_sections(
+            ContextBuilder.build_section("scenario", scenario_context_str),
+            ContextBuilder.build_section("clue", clue_context_str),
+            ContextBuilder.build_section("suspect", suspect_context_str),
         )
 
         return GeneralRAGContext(
@@ -360,124 +337,6 @@ class RAGService:
             suspect_context=suspect_context_str,
             relevant_history=history_str,
             full_context=full_context
-        )
-
-    async def get_unified_context(
-        self,
-        db: AsyncSession,
-        scenario_id: int,
-        query: str,
-        session_id: Optional[str] = None,
-        mode: str = "general",
-        focus_clue_ids: Optional[List[int]] = None,
-        suspect_ids: Optional[List[int]] = None,
-        top_k: int = 5,
-        similarity_threshold: float = 0.4
-    ) -> UnifiedRAGContext:
-        """Get unified RAG context that adapts based on chat mode.
-
-        Parameters
-        ----------
-        db : AsyncSession
-            Database session.
-        scenario_id : int
-            The scenario ID.
-        query : str
-            The user's query/message.
-        session_id : str, optional
-            Session ID for history search.
-        mode : str, optional
-            Chat mode: 'general', 'clue_analysis', 'suspect_inquiry'.
-            Defaults to 'general'.
-        focus_clue_ids : list[int], optional
-            Clue IDs to focus on (for clue_analysis mode).
-        suspect_ids : list[int], optional
-            Suspect IDs referenced in the message.
-        top_k : int, optional
-            Number of results to retrieve. Defaults to 5.
-        similarity_threshold : float, optional
-            Minimum similarity threshold. Defaults to 0.4.
-
-        Returns
-        -------
-        UnifiedRAGContext
-            Unified context adapted for the specified mode.
-        """
-        sections = []
-        clue_details = None
-
-        # 1. Always get base scenario context
-        scenario_contexts = await self.retriever.search_contexts(
-            db=db, scenario_id=scenario_id, query=query,
-            top_k=top_k, threshold=similarity_threshold
-        )
-        if scenario_contexts:
-            scenario_str = self.context_builder.build_scenario_context(scenario_contexts)
-            sections.append(self._build_section("scenario", scenario_str))
-
-        # 2. Mode-specific retrieval
-        if mode == "clue_analysis" and focus_clue_ids:
-            primary_clue_id = focus_clue_ids[0]
-            related_clues = await self.retriever.search_clues(
-                db=db, scenario_id=scenario_id, query=query,
-                top_k=3, threshold=0.5, search_type="description"
-            )
-            related_clues = [c for c in related_clues if c.clue_id != primary_clue_id]
-
-            if related_clues:
-                clues_str = self.context_builder.build_clue_summary(related_clues)
-                sections.append(self._build_section("evidence", clues_str))
-
-            _, history_str = await self._get_history(
-                db, scenario_id, session_id, query,
-                top_k=5, threshold=0.5, clue_id=primary_clue_id
-            )
-
-        elif mode == "suspect_inquiry" and suspect_ids:
-            suspects = await self.retriever.search_suspect_profiles(
-                db=db, scenario_id=scenario_id, query=query,
-                top_k=3, threshold=similarity_threshold, suspect_ids=suspect_ids
-            )
-            if suspects:
-                suspect_str = self.context_builder.build_suspect_profile(suspects)
-                sections.append(self._build_section("suspect_info", suspect_str))
-
-            _, history_str = await self._get_history(
-                db, scenario_id, session_id, query,
-                top_k=5, threshold=similarity_threshold,
-                suspect_id=suspect_ids[0] if suspect_ids else None
-            )
-
-        else:
-            # General mode
-            if focus_clue_ids:
-                clues = await self.retriever.search_clues(
-                    db=db, scenario_id=scenario_id, query=query,
-                    top_k=2, threshold=0.3, search_type="description"
-                )
-                clues = [c for c in clues if c.clue_id in focus_clue_ids]
-                if clues:
-                    clues_str = self.context_builder.build_clue_summary(clues)
-                    sections.append(self._build_section("clue", clues_str))
-
-            if suspect_ids:
-                suspects = await self.retriever.search_suspect_profiles(
-                    db=db, scenario_id=scenario_id, query=query,
-                    top_k=2, threshold=0.3, suspect_ids=suspect_ids
-                )
-                if suspects:
-                    suspect_str = self.context_builder.build_suspect_profile(suspects)
-                    sections.append(self._build_section("suspect", suspect_str))
-
-            _, history_str = await self._get_history(
-                db, scenario_id, session_id, query, top_k=5, threshold=0.3
-            )
-
-        return UnifiedRAGContext(
-            full_context=self._join_sections(*sections),
-            relevant_history=history_str,
-            mode=mode,
-            clue_details=clue_details
         )
 
     async def index_scenario(self, db: AsyncSession, scenario_id: int) -> dict:

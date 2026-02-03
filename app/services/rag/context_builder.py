@@ -1,5 +1,5 @@
 """Context builder for RAG - converts retrieved data to LLM-ready context."""
-from typing import List, Optional, Any, Protocol, runtime_checkable
+from typing import List, Optional, Any, Protocol, runtime_checkable, Dict
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
@@ -8,6 +8,16 @@ from app.services.rag.retriever import (
     RetrievedClue,
     RetrievedChatMessage
 )
+
+
+# Header labels for context sections
+SECTION_HEADERS: Dict[str, str] = {
+    "scenario": "사건 정보",
+    "clue": "관련 단서",
+    "evidence": "관련 증거",
+    "suspect": "관련 용의자",
+    "suspect_info": "용의자 정보",
+}
 
 
 @runtime_checkable
@@ -126,6 +136,43 @@ class ContextBuilder:
         self._detailed_clue_formatter = DetailedClueFormatter()
         self._simple_history_formatter = SimpleHistoryFormatter()
 
+    @staticmethod
+    def build_section(header_key: str, content: str) -> Optional[str]:
+        """Build a context section with header if content exists.
+
+        Parameters
+        ----------
+        header_key : str
+            Key from SECTION_HEADERS (e.g., 'scenario', 'clue', 'suspect').
+        content : str
+            The content to wrap with the header.
+
+        Returns
+        -------
+        Optional[str]
+            Formatted section with header, or None if content is empty.
+        """
+        if not content:
+            return None
+        header = SECTION_HEADERS.get(header_key, header_key)
+        return f"[{header}]\n{content}"
+
+    @staticmethod
+    def join_sections(*sections: Optional[str]) -> str:
+        """Join non-empty sections with double newlines.
+
+        Parameters
+        ----------
+        *sections : Optional[str]
+            Variable number of section strings (can include None).
+
+        Returns
+        -------
+        str
+            Joined sections separated by double newlines.
+        """
+        return "\n\n".join(s for s in sections if s)
+
     def build_scenario_context(self, contexts: List[HasContent]) -> str:
         """Build formatted string from scenario contexts.
 
@@ -194,33 +241,6 @@ class ContextBuilder:
         if not clue_infos:
             return empty_message
         return self._detailed_clue_formatter.format_list(clue_infos)
-
-    def build_simple_history(
-        self,
-        history: Optional[List[dict]],
-        count: Optional[int] = None,
-        empty_message: str = "(대화 시작)"
-    ) -> str:
-        """Build simple formatted history from chat messages.
-
-        Parameters
-        ----------
-        history : List[dict], optional
-            Chat history dicts with 'role' and 'content' keys.
-        count : int, optional
-            If provided, only use the last N messages.
-        empty_message : str, optional
-            Message to return when history is empty.
-
-        Returns
-        -------
-        str
-            Formatted history string.
-        """
-        if not history:
-            return empty_message
-        messages = history[-count:] if count and len(history) > count else history
-        return self._simple_history_formatter.format_list(messages)
 
     def build_fact_context(
         self,

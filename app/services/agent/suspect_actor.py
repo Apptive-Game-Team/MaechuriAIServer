@@ -55,7 +55,6 @@ class SuspectActor:
             "pressure_level": state.current_pressure,
             "is_culprit": suspect.is_culprit,
             "clue_presented": json.dumps(clue_presented, ensure_ascii=False) if clue_presented else "None",
-            "chat_history": self.context_builder.build_simple_history(state.get_recent_history(10)),
             "rag_context": rag_context or "",
         }
 
