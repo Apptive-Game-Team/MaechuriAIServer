@@ -43,7 +43,11 @@ class BGEM3Model(EmbeddingModel):
         if hasattr(self, '_initialized') and self._initialized:
             return
 
-        self.model = SentenceTransformer(model_name_or_path, device=device)
+        self.model = SentenceTransformer(
+          model_name_or_path,
+          device=device,
+          model_kwargs={"low_cpu_mem_usage": False}
+        )
         self._initialized = True
 
     @property
