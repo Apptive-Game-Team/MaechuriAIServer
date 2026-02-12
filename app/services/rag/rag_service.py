@@ -1,6 +1,6 @@
 """RAG Service - Orchestrates retrieval and context building for agents."""
 from typing import Optional, List, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +19,7 @@ class SuspectRAGContext:
     relevant_facts: str   # Formatted facts (within pressure threshold)
     relevant_history: str   # Formatted related past conversations
     full_context: str       # Combined context string
+    retrieved_fact_ids: List[int] = field(default_factory=list)  # Fact IDs found relevant by similarity search
 
 
 @dataclass
@@ -180,7 +181,8 @@ class RAGService:
         return SuspectRAGContext(
             relevant_facts=facts_str,
             relevant_history=history_str,
-            full_context=full_context
+            full_context=full_context,
+            retrieved_fact_ids=[f.fact_id for f in facts]
         )
 
     async def get_clue_context(

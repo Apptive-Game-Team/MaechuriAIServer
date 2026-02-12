@@ -242,6 +242,7 @@ class ChatService:
 
         # 6. RAG 컨텍스트 검색
         rag_context = None
+        rag_relevant_fact_ids = []
         try:
             rag_result = await self.rag_service.get_suspect_context(
                 db=db,
@@ -255,6 +256,7 @@ class ChatService:
             )
             if rag_result.full_context:
                 rag_context = rag_result.full_context
+            rag_relevant_fact_ids = rag_result.retrieved_fact_ids
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
@@ -314,9 +316,14 @@ class ChatService:
         await db.commit()
 
         # 12. 현재 pressure로 공개된 fact ID 계산
+        # - secret: pressure threshold 기반
+        # - timeline: RAG 유사도 기반 (관련된 것만 공개)
         revealed_fact_ids = [
             fact.fact_id for fact in suspect.facts
-            if fact.threshold <= new_pressure
+            if (fact.fact_id in rag_relevant_fact_ids and (
+            (fact.type == "secret" and fact.threshold <= new_pressure) or
+            (fact.type == "timeline")
+            ))
         ]
 
         return SuspectChatResponse(
