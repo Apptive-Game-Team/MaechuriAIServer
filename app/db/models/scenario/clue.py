@@ -22,7 +22,7 @@ class Clue(Base):
     name: Mapped[str] = mapped_column(String(100))
     location_id: Mapped[int] = mapped_column(BigInteger)
     description: Mapped[str] = mapped_column(Text)
-    related_fact_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    related_suspect_ids: Mapped[list] = mapped_column(JSONB, default=list)
     logic_explanation: Mapped[str] = mapped_column(Text)
     decoded_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_red_herring: Mapped[bool] = mapped_column(Boolean, default=False)

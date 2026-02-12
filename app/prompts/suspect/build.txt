@@ -65,8 +65,8 @@ You receive JSON "input" containing:
    ```
    - Match personality to the character's role and background
 
-6. Critical Evidence IDs:
-   - List evidence IDs that are crucial to this suspect
+6. Critical Clue IDs:
+   - List Clue IDs that are crucial to this suspect
    - For CULPRIT: Murder weapon, DNA evidence, witness testimony of crime
    - For INNOCENT: Usually empty []
    - Check 'clues' list for evidence where related_suspect_ids includes this suspect
