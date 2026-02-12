@@ -308,7 +308,7 @@ class ScenarioRepository:
                     name=clue_schema.name,
                     location_id=loc_id,
                     description=clue_schema.description,
-                    related_fact_ids=clue_schema.related_suspect_ids,
+                    related_suspect_ids=clue_schema.related_suspect_ids,
                     logic_explanation=clue_schema.logic_explanation,
                     decoded_answer=clue_schema.decoded_answer,
                     is_red_herring=clue_schema.is_red_herring,

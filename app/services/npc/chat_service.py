@@ -218,7 +218,8 @@ class ChatService:
                 user_message=user_message,
                 answer="용의자를 찾을 수 없습니다.",
                 pressure=game_session.current_pressure,
-                pressure_delta=0
+                pressure_delta=0,
+                revealed_fact_ids=[]
             )
 
         # 4. 상태 복원 (GameSession 기반)
@@ -312,11 +313,18 @@ class ChatService:
         await session_repo.increment_suspect_interaction(session_id, scenario_id, suspect_id)
         await db.commit()
 
+        # 12. 현재 pressure로 공개된 fact ID 계산
+        revealed_fact_ids = [
+            fact.fact_id for fact in suspect.facts
+            if fact.threshold <= new_pressure
+        ]
+
         return SuspectChatResponse(
             user_message=user_message,
             answer=response,
             pressure=new_pressure,
-            pressure_delta=judge_result.pressure_delta
+            pressure_delta=judge_result.pressure_delta,
+            revealed_fact_ids=revealed_fact_ids
         )
 
     async def clue_chat(

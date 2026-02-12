@@ -135,17 +135,17 @@ CREATE TABLE suspect (
 -- ============================================================
 CREATE TABLE fact (
     scenario_id         BIGINT NOT NULL,
-    suspect_id          BIGINT NOT NULL,
+    suspect_id          BIGINT NOT NULL DEFAULT 0,  -- 0 = scenario context, >0 = suspect fact
     fact_id             BIGINT NOT NULL,
 
     threshold           INT NOT NULL DEFAULT 0,
-    type                VARCHAR(50) NOT NULL,  -- e.g., "secret", "timeline"
+    type                VARCHAR(50) NOT NULL
+                        CHECK (type IN ('secret', 'timeline', 'incident', 'location', 'world')),
     content             JSONB NOT NULL,
     embedding           vector(1024),
 
     PRIMARY KEY (scenario_id, fact_id),
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE,
-    FOREIGN KEY (scenario_id, suspect_id) REFERENCES suspect(scenario_id, suspect_id) ON DELETE CASCADE
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -158,7 +158,7 @@ CREATE TABLE clue (
     name                VARCHAR(100) NOT NULL,
     location_id         BIGINT NOT NULL,  -- FK to location
     description         TEXT NOT NULL,
-    related_fact_ids    JSONB DEFAULT '[]',
+    related_suspect_ids JSONB DEFAULT '[]',
     logic_explanation   TEXT NOT NULL,
     decoded_answer      TEXT,  -- 단서 분석 시 형사가 알려줄 해독된 답 (nullable)
     is_red_herring      BOOLEAN NOT NULL DEFAULT FALSE,
@@ -180,13 +180,13 @@ CREATE TABLE clue (
 -- GAME_SESSION (게임 세션)
 -- ============================================================
 CREATE TABLE game_session (
-    session_id          VARCHAR(36) PRIMARY KEY,
+    session_id          VARCHAR(255) NOT NULL,
     scenario_id         BIGINT NOT NULL,
 
     -- Game State
     current_pressure    INT DEFAULT 0,
     suspect_pressures   JSONB DEFAULT '{}'::jsonb,
-    clue_seen_ids   JSONB DEFAULT '[]'::jsonb,
+    clue_seen_ids       JSONB DEFAULT '[]'::jsonb,
 
     -- Progress Tracking
     suspect_interactions JSONB DEFAULT '{}'::jsonb,
@@ -197,6 +197,7 @@ CREATE TABLE game_session (
     last_activity_at    TIMESTAMP DEFAULT NOW(),
     completed_at        TIMESTAMP,
 
+    PRIMARY KEY (session_id, scenario_id),
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
 );
 
@@ -215,23 +216,6 @@ CREATE TABLE chat_message_embedding (
     embedding           vector(1024),
     created_at          TIMESTAMP DEFAULT NOW(),
 
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
-);
-
--- ============================================================
--- SCENARIO_CONTEXT (조력자용 공개 컨텍스트)
--- ============================================================
-CREATE TABLE scenario_context (
-    scenario_id         BIGINT NOT NULL,
-    context_id          BIGINT NOT NULL,
-
-    type                VARCHAR(50) NOT NULL
-                        CHECK (type IN ('incident', 'location', 'world')),
-    content             TEXT NOT NULL,
-    extra_data          JSONB DEFAULT '{}',
-    embedding           vector(1024),
-
-    PRIMARY KEY (scenario_id, context_id),
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
 );
 
@@ -264,10 +248,6 @@ CREATE INDEX idx_chat_message_embedding ON chat_message_embedding USING hnsw (em
 CREATE INDEX idx_chat_message_scenario_session ON chat_message_embedding(scenario_id, session_id);
 CREATE INDEX idx_chat_message_suspect ON chat_message_embedding(scenario_id, suspect_id) WHERE suspect_id IS NOT NULL;
 CREATE INDEX idx_chat_message_clue ON chat_message_embedding(scenario_id, clue_id) WHERE clue_id IS NOT NULL;
-
--- Scenario context indexes
-CREATE INDEX idx_scenario_context_embedding ON scenario_context USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX idx_scenario_context_type ON scenario_context(scenario_id, type);
 
 -- ============================================================
 -- COMMENTS

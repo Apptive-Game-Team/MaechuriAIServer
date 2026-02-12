@@ -1,4 +1,6 @@
 """Chat response schemas."""
+from typing import List
+
 from pydantic import BaseModel, Field
 
 
@@ -8,6 +10,7 @@ class SuspectChatResponse(BaseModel):
     answer: str = Field(description="Suspect's response")
     pressure: int = Field(description="Current pressure level (0-100)")
     pressure_delta: int = Field(description="Pressure change from this interaction")
+    revealed_fact_ids: List[int] = Field(description="Fact IDs revealed at current pressure level (threshold <= pressure)")
 
 
 class ClueChatResponse(BaseModel):

@@ -54,7 +54,7 @@ class ScenarioMapper:
             name=clue.name,
             found_at=loc_map.get(clue.location_id, f"Location_{clue.location_id}"),
             description=clue.description,
-            related_suspect_ids=clue.related_fact_ids or [],
+            related_suspect_ids=clue.related_suspect_ids or [],
             logic_explanation=clue.logic_explanation,
             decoded_answer=clue.decoded_answer,
             is_red_herring=clue.is_red_herring

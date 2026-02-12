@@ -36,7 +36,7 @@ class RetrievedClue:
     logic_explanation: str
     decoded_answer: Optional[str]
     is_red_herring: bool
-    related_fact_ids: List[int]
+    related_suspect_ids: List[int]
     similarity: float
 
 
@@ -226,7 +226,7 @@ class RAGRetriever:
                 logic_explanation=clue.logic_explanation,
                 decoded_answer=clue.decoded_answer,
                 is_red_herring=clue.is_red_herring,
-                related_fact_ids=clue.related_fact_ids or [],
+                related_suspect_ids=clue.related_suspect_ids or [],
                 similarity=similarity
             )
 

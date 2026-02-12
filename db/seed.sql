@@ -171,7 +171,7 @@ INSERT INTO fact (scenario_id, suspect_id, fact_id, threshold, content, type) VA
 -- ============================================================
 -- CLUE
 -- ============================================================
-INSERT INTO clue (scenario_id, clue_id, name, location_id, description, related_fact_ids, logic_explanation, decoded_answer, is_red_herring) VALUES
+INSERT INTO clue (scenario_id, clue_id, name, location_id, description, related_suspect_ids, logic_explanation, decoded_answer, is_red_herring) VALUES
 (1, 1, '암호화된 뇌과학 수식', 2,
  '박선우 연구실 화이트보드에 복잡한 뇌과학 수식이 적혀있다. 수식 중간에 특정 변수가 다른 변수로 대체되어 있는데, 이는 범인의 이름 이니셜과 관련된 암호처럼 보인다.',
  '[1]', '피해자가 범인에 대한 단서를 남기기 위해 범인의 이름 이니셜을 수식에 암호화한 것으로 추정된다.',
