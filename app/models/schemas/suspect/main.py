@@ -27,12 +27,6 @@ class SuspectSchema(BaseModel):
     # Personality
     personality: "PersonalitySchema" = Field(description="성격 및 말투")
 
-    # Critical clues for confession
-    critical_clue_ids: List[int] = Field(
-        default=[],
-        description="모두 제시 시 자백 유도 가능한 핵심 단서 ID들"
-    )
-
     @classmethod
     def from_generation(cls, generation: "SuspectGenerationSchema") -> "SuspectSchema":
         timeline: List[FactSchema] = [FactSchema.from_timeline(t) for t in generation.timeline]
@@ -49,7 +43,6 @@ class SuspectSchema(BaseModel):
             alibi_summary=generation.alibi_summary,
             facts=timeline + secrets,
             personality=generation.personality,
-            critical_clue_ids=generation.critical_clue_ids,
         )
 
 

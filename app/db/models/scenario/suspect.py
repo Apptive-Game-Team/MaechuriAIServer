@@ -32,8 +32,6 @@ class Suspect(Base):
     emotional_tendency: Mapped[str] = mapped_column(String(100))
     lying_pattern: Mapped[str] = mapped_column(String(50))
 
-    critical_clue_ids: Mapped[list] = mapped_column(JSONB, default=list)
-
     # Map position (within room)
     x: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     y: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)

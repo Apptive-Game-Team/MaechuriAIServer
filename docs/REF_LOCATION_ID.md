@@ -98,7 +98,6 @@ erDiagram
         varchar speech_style
         varchar emotional_tendency
         varchar lying_pattern
-        jsonb critical_clue_ids
     }
 
     SUSPECT_TIMELINE {

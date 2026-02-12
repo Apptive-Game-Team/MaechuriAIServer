@@ -280,7 +280,6 @@ class ScenarioRepository:
                     speech_style=suspect_schema.personality.speech_style,
                     emotional_tendency=suspect_schema.personality.emotional_tendency,
                     lying_pattern=suspect_schema.personality.lying_pattern,
-                    critical_clue_ids=suspect_schema.critical_clue_ids,
                     x=suspect_pos[0] if suspect_pos else None,
                     y=suspect_pos[1] if suspect_pos else None
                 )

@@ -30,12 +30,6 @@ class SuspectGenerationSchema(BaseModel):
     # Personality
     personality: PersonalitySchema = Field(description="성격 및 말투")
 
-    # Critical clues for confession
-    critical_clue_ids: List[int] = Field(
-        default=[],
-        description="모두 제시 시 자백 유도 가능한 핵심 단서 ID들"
-    )
-
 
 class SuspectGenerationListSchema(BaseModel):
     """List of suspects."""

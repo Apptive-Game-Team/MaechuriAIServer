@@ -116,9 +116,6 @@ CREATE TABLE suspect (
     emotional_tendency  VARCHAR(100) NOT NULL,
     lying_pattern       VARCHAR(50) NOT NULL,
 
-    -- 자백 트리거 단서 IDs (local clue_id 배열)
-    critical_clue_ids   JSONB NOT NULL DEFAULT '[]',
-
     -- Map position (within room)
     x                   SMALLINT,
     y                   SMALLINT,

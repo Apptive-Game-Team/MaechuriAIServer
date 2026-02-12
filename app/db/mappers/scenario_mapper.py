@@ -41,8 +41,7 @@ class ScenarioMapper:
                 speech_style=suspect.speech_style,
                 emotional_tendency=suspect.emotional_tendency,
                 lying_pattern=suspect.lying_pattern
-            ),
-            critical_clue_ids=suspect.critical_clue_ids or []
+            )
         )
 
     @staticmethod
