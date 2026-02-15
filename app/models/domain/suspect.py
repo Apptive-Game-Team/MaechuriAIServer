@@ -22,7 +22,6 @@ class Suspect:
             answering_rule: Optional[Dict[str, Any]] = None,
             truth_model: Optional[Dict[str, Any]] = None,
             secrets_by_stage: Optional[Dict[str, List[str]]] = None,
-            critical_clue_ids: Optional[List[int]] = None,
             # Context fields (set after creation)
             incident_summary: str = "",
             primary_location: str = "",
@@ -53,7 +52,6 @@ class Suspect:
             "breakdown": [],
             "confession": []
         }
-        self.critical_clue_ids = critical_clue_ids or []
 
         # Context
         self.incident_summary = incident_summary
@@ -85,7 +83,6 @@ class Suspect:
             answering_rule=schema_data.get("answering_rule"),
             truth_model=schema_data.get("truth_model"),
             secrets_by_stage=schema_data.get("secrets_by_stage"),
-            critical_clue_ids=schema_data.get("critical_clue_ids", []),
             # Context injection
             incident_summary=case_context.get("summary", ""),
             primary_location=case_context.get("primary_location", ""),
@@ -123,7 +120,6 @@ class Suspect:
             "secrets_by_stage": self.secrets_by_stage,
 
             # Clue tracking
-            "critical_clue_ids": self.critical_clue_ids,
             "clue_seen": [],  # Initialize empty, updated during interrogation
 
             # Interrogation state (initialized)

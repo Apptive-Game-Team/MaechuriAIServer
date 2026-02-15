@@ -4,8 +4,12 @@ import logging
 import uuid
 
 from app.models.schemas import ScenarioResult
-from app.models.schemas.scenario import ScenarioResult
+from app.models.schemas.scenario import ScenarioResult, ScenarioSkeleton, ScenarioExpansion
 from app.models.schemas.suspect import SuspectGenerationRequest, SuspectSchema
+from app.models.schemas.suspect.response import SuspectGenerationListSchema
+from app.models.schemas.clue.response import ClueSetSchema
+from app.models.schemas.map.skeleton import MapSkeletonSchema
+from app.models.schemas.map.detail import MapOutputSchema
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
 from app.services.agent.consistency_validator import ConsistencyValidator
@@ -69,7 +73,7 @@ class ScenarioService:
         time.sleep(3)
 
         # 2. Skeleton 생성 (재시도 적용)
-        skeleton_result = self.state_manager.load_intermediate_state(request_id, "skeleton_result", "ScenarioSkeleton")
+        skeleton_result = self.state_manager.load_intermediate_state(request_id, "skeleton_result", ScenarioSkeleton)
         if skeleton_result is None:
             skeleton_result = self.json_retry.parse_with_retry(
                 parser_func=lambda: self.scenario_generator.generate_skeleton(case_state),
@@ -85,7 +89,7 @@ class ScenarioService:
         time.sleep(3)
 
         # 3. Expansion 생성 (재시도 적용)
-        expansion_result = self.state_manager.load_intermediate_state(request_id, "expansion_result", "ScenarioExpansion")
+        expansion_result = self.state_manager.load_intermediate_state(request_id, "expansion_result", ScenarioExpansion)
         if expansion_result is None:
             expansion_result = self.json_retry.parse_with_retry(
                 parser_func=lambda: self.scenario_generator.generate_expansion(skeleton_result),
@@ -102,7 +106,7 @@ class ScenarioService:
         time.sleep(3)
 
         # 4. Map Skeleton 생성 (재시도 적용)
-        map_skeleton = self.state_manager.load_intermediate_state(request_id, "map_skeleton", "MapSkeleton")
+        map_skeleton = self.state_manager.load_intermediate_state(request_id, "map_skeleton", MapSkeletonSchema)
         if map_skeleton is None:
             map_skeleton = self.json_retry.parse_with_retry(
                 parser_func=lambda: self.map_generator.generate_skeleton(expansion_result),
@@ -119,7 +123,7 @@ class ScenarioService:
         time.sleep(3)
 
         # 5. Suspects 생성 (재시도 적용)
-        suspects_result = self.state_manager.load_intermediate_state(request_id, "suspects_result", "SuspectList")
+        suspects_result = self.state_manager.load_intermediate_state(request_id, "suspects_result", SuspectGenerationListSchema)
         if suspects_result is None:
             suspect_req = SuspectGenerationRequest.from_expansion(
                 expansion_result, map_skeleton
@@ -140,7 +144,7 @@ class ScenarioService:
         time.sleep(3)
 
         # 6. Clues 생성 (재시도 적용)
-        clue_result = self.state_manager.load_intermediate_state(request_id, "clue_result", "ClueSet")
+        clue_result = self.state_manager.load_intermediate_state(request_id, "clue_result", ClueSetSchema)
         if clue_result is None:
             clue_result = self.json_retry.parse_with_retry(
                 parser_func=lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
@@ -157,7 +161,7 @@ class ScenarioService:
         time.sleep(3)
 
         # 7. Map Detail 생성 (재시도 적용)
-        map_result = self.state_manager.load_intermediate_state(request_id, "map_detail", "MapDetail")
+        map_result = self.state_manager.load_intermediate_state(request_id, "map_detail", MapOutputSchema)
         if map_result is None:
             map_result = self.json_retry.parse_with_retry(
                 parser_func=lambda: self.map_generator.generate_detail(

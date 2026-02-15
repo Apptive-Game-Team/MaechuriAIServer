@@ -128,9 +128,6 @@ class SuspectAgent:
         # --- 2. Check Transitions ---
         seen_ids = {e["id"] for e in suspect["clue_seen"]}
         next_state = current_state
-        
-        # Get dynamic critical clue IDs
-        critical_ids = suspect.get("critical_clue_ids", [])
 
         if current_state == InterrogationState.DEFENSIVE:
             if (metrics["pressure"] >= 65 or
@@ -139,21 +136,12 @@ class SuspectAgent:
                 next_state = InterrogationState.CORNERED
 
         elif current_state == InterrogationState.CORNERED:
-            # Trigger breakdown if pressure is high, contradictions are frequent,
-            # or if ANY critical clue has been revealed (shaking their confidence).
-            has_seen_any_critical = any(cid in seen_ids for cid in critical_ids)
-            
             if (metrics["pressure"] >= 85 or
-                metrics["contradictions"] >= 3 or
-                has_seen_any_critical):
+                metrics["contradictions"] >= 3):
                 next_state = InterrogationState.BREAKDOWN
 
         elif current_state == InterrogationState.BREAKDOWN:
-            # Trigger confession only if ALL critical clue has been presented.
-            has_seen_all_critical = all(cid in seen_ids for cid in critical_ids)
-            
-            # If critical_ids list is empty, we avoid auto-confession to prevent bugs.
-            if critical_ids and has_seen_all_critical:
+            if metrics["pressure"] >= 95:
                 next_state = InterrogationState.CONFESSION
 
         # --- 3. Apply Transition ---

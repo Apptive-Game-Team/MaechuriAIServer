@@ -69,32 +69,32 @@ INSERT INTO location (scenario_id, location_id, name) VALUES
 INSERT INTO suspect (
     scenario_id, suspect_id, name, role, age, gender, description,
     is_culprit, motive, alibi_summary,
-    speech_style, emotional_tendency, lying_pattern, critical_clue_ids
+    speech_style, emotional_tendency, lying_pattern
 ) VALUES
 (1, 1, '최영진', '지도교수', 50, '남성',
  '명망 있는 뇌과학 분야의 지도교수. 항상 깔끔한 정장 차림이며, 학구적이지만 다소 권위적인 태도를 보인다. 최근 박선우 박사과정 학생과의 연구 방향 문제로 갈등이 있었다.',
  TRUE,
  '박선우의 독단적인 연구 방식과 최근 발표 예정이었던 연구 성과가 자신의 명예와 연구 방향에 큰 위협이 된다고 판단했다. 박선우가 자신의 아이디어를 훔쳐 독자적으로 발표하려 하자, 자신의 학문적 권위와 명예를 지키기 위해 우발적으로 살해했다.',
  '사건 발생 추정 시각에는 자신의 연구실에서 논문 작업을 하고 있었다고 주장하지만, 이를 증명할 증인은 없다.',
- '존댓말, 권위적이고 차갑게', '침착함을 유지하려 하지만 압박 시 쉽게 흥분, 방어적', 'deny', '[1, 2, 3, 4, 5]'),
+ '존댓말, 권위적이고 차갑게', '침착함을 유지하려 하지만 압박 시 쉽게 흥분, 방어적', 'deny'),
 
 (1, 2, '이수진', '동료 박사과정 학생', 28, '여성',
  '박선우에게 늘 뒤처진다는 열등감에 시달렸으며, 자신의 아이디어를 가로챘다고 주장하는 동료 박사과정 학생. 차분해 보이지만 내면에 불안감을 가지고 있다.',
  FALSE, NULL,
  '사건 당일 밤 12시 이전에 연구동을 떠나 집으로 돌아갔다고 주장합니다.',
- '존댓말', '방어적', 'partial_truth', '[]'),
+ '존댓말', '방어적', 'partial_truth'),
 
 (1, 3, '김민준', '야간 경비원', 52, '남성',
  '오랜 경력의 야간 경비원. 책임감이 강하지만 다소 고지식한 면이 있으며, 최근 개인적인 고민이 많아 보인다.',
  FALSE, NULL,
  '사건 발생 시간대에 3층 복도를 순찰 중이었다고 주장하지만, CCTV 고장으로 증명할 수 없다고 진술했다.',
- '존댓말', '방어적', 'partial_truth', '[]'),
+ '존댓말', '방어적', 'partial_truth'),
 
 (1, 4, '정윤아', '청소 담당 직원', 58, '여성',
  '오랜 기간 연구동에서 근무해온 베테랑 청소 직원. 조용하고 소심한 성격으로, 눈에 띄지 않으려 노력한다.',
  FALSE, NULL,
  '사건 당일 밤 11시까지 3층 복도를 청소한 후 퇴근했다고 주장하나, 실제로는 조금 더 늦게까지 건물에 머물렀다.',
- '존댓말', '소심함', 'partial_truth', '[]');
+ '존댓말', '소심함', 'partial_truth');
 
 -- ============================================================
 -- SUSPECT_TIMELINE
@@ -171,7 +171,7 @@ INSERT INTO fact (scenario_id, suspect_id, fact_id, threshold, content, type) VA
 -- ============================================================
 -- CLUE
 -- ============================================================
-INSERT INTO clue (scenario_id, clue_id, name, location_id, description, related_fact_ids, logic_explanation, decoded_answer, is_red_herring) VALUES
+INSERT INTO clue (scenario_id, clue_id, name, location_id, description, related_suspect_ids, logic_explanation, decoded_answer, is_red_herring) VALUES
 (1, 1, '암호화된 뇌과학 수식', 2,
  '박선우 연구실 화이트보드에 복잡한 뇌과학 수식이 적혀있다. 수식 중간에 특정 변수가 다른 변수로 대체되어 있는데, 이는 범인의 이름 이니셜과 관련된 암호처럼 보인다.',
  '[1]', '피해자가 범인에 대한 단서를 남기기 위해 범인의 이름 이니셜을 수식에 암호화한 것으로 추정된다.',

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from app.api.routes.scenario import router as scenario_router
@@ -7,11 +8,16 @@ from app.db.redis import close_redis
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """앱 라이프사이클 관리"""
-    # Startup
+    # Start up
+    logger.info("Loading BGE-M3 embedding model...")
+    from app.services.embedding import get_embedding_model
+    get_embedding_model()
+    logger.info("BGE-M3 embedding model loaded.")
     yield
     # Shutdown
     await close_redis()

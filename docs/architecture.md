@@ -138,7 +138,7 @@ Suspect (PK: scenario_id + suspect_id)
 ├── profile: name, role, age, gender, description
 ├── truth: is_culprit, motive
 ├── personality: speech_style, emotional_tendency, lying_pattern
-├── alibi_summary, critical_clue_ids
+├── alibi_summary
 │
 ├── timeline (1:N) → SuspectTimeline
 │   └── time_range, location_id, activity, can_prove, witness

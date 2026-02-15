@@ -11,7 +11,7 @@ def test_scenario():
     print("SCENARIO TEST START")
 
     agent = ScenarioService(GeminiClient())
-    test_str = "ed4acf8d-bc30-4e52-9a6e-f062726d128d"
+    test_str = "cfe2aacb-436f-4e97-8b4c-a28c2cdcdae6"
     # request_id = datetime.now().strftime("%y_%m_%d_%H_%M_test")
     scenario_result = agent.generate("밀실 방화 사망 사건", test_str)
 
@@ -29,14 +29,21 @@ def test_scenario():
 
     print(f"\nResult saved to: {file_path}")
 
+    return file_path
 
-async def test_save_scenario():
+
+async def test_save_scenario(
+        file_path: str = "",
+):
     agent = ScenarioService(GeminiClient())
 
     from app.db.database import async_session_factory
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(base_dir, 'result_20260127_173313.json')
+    if file_path == "":
+        file_path = os.path.join(base_dir, 'result_20260127_173313.json')
+    else:
+        file_path = os.path.join(base_dir, file_path)
 
     with open(file_path, 'r', encoding='utf-8') as f:
         scenario_data = json.load(f)
@@ -51,3 +58,9 @@ async def test_save_scenario():
         await agent.save_to_db(scenario_result, db)
 
         print("Successfully generated and saved scenario")
+
+
+if __name__ == "__main__":
+    import asyncio
+    file_path = test_scenario()
+    asyncio.run(test_save_scenario(file_path))

@@ -218,7 +218,8 @@ class ChatService:
                 user_message=user_message,
                 answer="용의자를 찾을 수 없습니다.",
                 pressure=game_session.current_pressure,
-                pressure_delta=0
+                pressure_delta=0,
+                revealed_fact_ids=[]
             )
 
         # 4. 상태 복원 (GameSession 기반)
@@ -241,6 +242,7 @@ class ChatService:
 
         # 6. RAG 컨텍스트 검색
         rag_context = None
+        rag_relevant_fact_ids = []
         try:
             rag_result = await self.rag_service.get_suspect_context(
                 db=db,
@@ -254,6 +256,7 @@ class ChatService:
             )
             if rag_result.full_context:
                 rag_context = rag_result.full_context
+            rag_relevant_fact_ids = rag_result.retrieved_fact_ids
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
@@ -312,11 +315,23 @@ class ChatService:
         await session_repo.increment_suspect_interaction(session_id, scenario_id, suspect_id)
         await db.commit()
 
+        # 12. 현재 pressure로 공개된 fact ID 계산
+        # - secret: pressure threshold 기반
+        # - timeline: RAG 유사도 기반 (관련된 것만 공개)
+        revealed_fact_ids = [
+            fact.fact_id for fact in suspect.facts
+            if (fact.fact_id in rag_relevant_fact_ids and (
+            (fact.type == "secret" and fact.threshold <= new_pressure) or
+            (fact.type == "timeline")
+            ))
+        ]
+
         return SuspectChatResponse(
             user_message=user_message,
             answer=response,
             pressure=new_pressure,
-            pressure_delta=judge_result.pressure_delta
+            pressure_delta=judge_result.pressure_delta,
+            revealed_fact_ids=revealed_fact_ids
         )
 
     async def clue_chat(

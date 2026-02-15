@@ -7,7 +7,6 @@ You receive JSON "input" containing:
 - world_context: Locations, visibility rules
 - ground_truth: Crime facts (culprit_ids, method, motive)
 - generation_config: Number of suspects
-- clues: Available evidence list
 - constraints: Logical constraints
 
 [GENERATION RULES]
@@ -65,12 +64,6 @@ You receive JSON "input" containing:
    ```
    - Match personality to the character's role and background
 
-6. Critical Evidence IDs:
-   - List evidence IDs that are crucial to this suspect
-   - For CULPRIT: Murder weapon, DNA evidence, witness testimony of crime
-   - For INNOCENT: Usually empty []
-   - Check 'clues' list for evidence where related_suspect_ids includes this suspect
-
 [OUTPUT FORMAT]
 ```json
 {
@@ -87,8 +80,7 @@ You receive JSON "input" containing:
       "alibi_summary": "사건 당시 주방에서 설거지를 하고 있었다고 주장",
       "timeline": [...],
       "secrets": [...],
-      "personality": {...},
-      "critical_evidence_ids": []
+      "personality": {...}
     }
   ]
 }
