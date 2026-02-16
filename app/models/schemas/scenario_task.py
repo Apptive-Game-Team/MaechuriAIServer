@@ -5,10 +5,10 @@ from enum import Enum
 
 class ScenarioStatus(str, Enum):
     """시나리오 생성 상태"""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class ScenarioTaskInfo:
