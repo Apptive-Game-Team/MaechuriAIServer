@@ -7,7 +7,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from collections import deque
 
-from app.models.schemas.map import MapOutputSchema, RoomSchema, CorridorSchema
+from app.models.schemas.map import MapOutputSchema, RoomSkeletonSchema, CorridorSchema, MapElementType
 
 
 # Direction vectors: (x_multiplier, y_multiplier, use_width_for_current, use_width_for_neighbor)
@@ -23,13 +23,12 @@ DIRECTION_VECTORS = {
 class MapElementPosition:
     """Position and dimensions of a map element."""
     id: int
-    type: str  # 'room' or 'corridor'
+    type: MapElementType
     name: str
     x: int     # Bottom-left X
     y: int     # Bottom-left Y
     width: int
     height: int
-    extra_data: dict
 
 
 @dataclass
@@ -90,7 +89,7 @@ def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPosit
         MapElementPosition(
             id=r.id, type="room", name=r.name,
             x=to_bottom_left(r.id)[0], y=to_bottom_left(r.id)[1],
-            width=r.width, height=r.height, extra_data={"mood": r.mood}
+            width=r.width, height=r.height
         )
         for r in map_data.rooms if r.id in centers
     ]
@@ -100,8 +99,7 @@ def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPosit
         if pos:
             elements.append(MapElementPosition(
                 id=corridor.id, type="corridor", name=corridor.name,
-                x=pos[0], y=pos[1], width=pos[2], height=pos[3],
-                extra_data={"connections": [{"room_id": c.room_id, "direction": c.direction} for c in corridor.connections]}
+                x=pos[0], y=pos[1], width=pos[2], height=pos[3]
             ))
 
     return MapPositionResult(
@@ -111,7 +109,7 @@ def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPosit
 
 
 def _calc_neighbor_pos(
-    cx: int, cy: int, curr: RoomSchema, nbr: RoomSchema, direction: str, offset: int
+    cx: int, cy: int, curr: RoomSkeletonSchema, nbr: RoomSkeletonSchema, direction: str, offset: int
 ) -> Tuple[int, int]:
     """Calculate neighbor center position based on direction."""
     vec = DIRECTION_VECTORS.get(direction, (1, 0, True, True))
@@ -129,7 +127,7 @@ def _calc_neighbor_pos(
 def _calc_corridor_pos(
     corridor: CorridorSchema,
     centers: Dict[int, Tuple[int, int]],
-    rooms: Dict[int, RoomSchema],
+    rooms: Dict[int, RoomSkeletonSchema],
     shift_x: int, shift_y: int
 ) -> Optional[Tuple[int, int, int, int]]:
     """Calculate corridor position between two rooms."""
