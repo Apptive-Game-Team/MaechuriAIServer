@@ -41,7 +41,8 @@ class ScenarioMapper:
                 speech_style=suspect.speech_style,
                 emotional_tendency=suspect.emotional_tendency,
                 lying_pattern=suspect.lying_pattern
-            )
+            ),
+            appearance_prompt=suspect.appearance_prompt
         )
 
     @staticmethod
@@ -56,7 +57,8 @@ class ScenarioMapper:
             related_suspect_ids=clue.related_suspect_ids or [],
             logic_explanation=clue.logic_explanation,
             decoded_answer=clue.decoded_answer,
-            is_red_herring=clue.is_red_herring
+            is_red_herring=clue.is_red_herring,
+            appearance_prompt=clue.appearance_prompt
         )
 
     @staticmethod

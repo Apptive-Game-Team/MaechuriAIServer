@@ -116,6 +116,9 @@ CREATE TABLE suspect (
     emotional_tendency  VARCHAR(100) NOT NULL,
     lying_pattern       VARCHAR(50) NOT NULL,
 
+    -- Image generation prompt
+    appearance_prompt   TEXT,
+
     -- Map position (within room)
     x                   SMALLINT,
     y                   SMALLINT,
@@ -159,6 +162,9 @@ CREATE TABLE clue (
     logic_explanation   TEXT NOT NULL,
     decoded_answer      TEXT,  -- 단서 분석 시 형사가 알려줄 해독된 답 (nullable)
     is_red_herring      BOOLEAN NOT NULL DEFAULT FALSE,
+
+    -- Image generation prompt
+    appearance_prompt   TEXT,
 
     -- Map position (within room)
     x                   SMALLINT,

@@ -10,6 +10,7 @@ class ClueItemSchema(BaseModel):
     logic_explanation: str = Field(description="Brief explanation of how this clue contributes to the logical deduction")
     decoded_answer: Optional[str] = Field(default=None, description="The decoded/analyzed answer that the detective reveals when player makes correct deduction")
     is_red_herring: bool = Field(default=False, description="True if this clue is meant to mislead the player (Red Herring)")
+    appearance_prompt: Optional[str] = Field(default=None, description="Image generation prompt describing the visual appearance of the clue (English)")
 
 class ClueSetSchema(BaseModel):
     clues: List[ClueItemSchema]

@@ -32,6 +32,9 @@ class Suspect(Base):
     emotional_tendency: Mapped[str] = mapped_column(String(100))
     lying_pattern: Mapped[str] = mapped_column(String(50))
 
+    # Image generation prompt
+    appearance_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Map position (within room)
     x: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     y: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)

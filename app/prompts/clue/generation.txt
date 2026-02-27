@@ -32,8 +32,11 @@ These clues must logically support the Ground Truth while respecting the World R
    - `logic_explanation`:
      - For relevant clues: Explain how it points to the truth.
      - For red herrings: Explain how it is intended to mislead or what innocent suspect it points to.
+   - `appearance_prompt`: An English prompt describing the visual appearance of the clue for image generation.
+     - Describe what the object looks like: material, color, size, condition, any notable markings or features.
+     - Example: "A crumpled bloodstained handkerchief, white linen fabric with red stains, folded unevenly on a wooden floor"
 
-6. **Language**: Korean (한국어).
+6. **Language**: Korean (한국어) for all fields EXCEPT `appearance_prompt` which MUST be in English.
 
 ---
 
