@@ -117,7 +117,7 @@ CREATE TABLE suspect (
     lying_pattern       VARCHAR(50) NOT NULL,
 
     -- Image generation prompt
-    appearance_prompt   TEXT,
+    visual_description   TEXT,
 
     -- Map position (within room)
     x                   SMALLINT,
@@ -164,7 +164,7 @@ CREATE TABLE clue (
     is_red_herring      BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- Image generation prompt
-    appearance_prompt   TEXT,
+    visual_description   TEXT,
 
     -- Map position (within room)
     x                   SMALLINT,

@@ -42,7 +42,7 @@ class ScenarioMapper:
                 emotional_tendency=suspect.emotional_tendency,
                 lying_pattern=suspect.lying_pattern
             ),
-            appearance_prompt=suspect.appearance_prompt
+            visual_description=suspect.visual_description
         )
 
     @staticmethod
@@ -58,7 +58,7 @@ class ScenarioMapper:
             logic_explanation=clue.logic_explanation,
             decoded_answer=clue.decoded_answer,
             is_red_herring=clue.is_red_herring,
-            appearance_prompt=clue.appearance_prompt
+            visual_description=clue.visual_description
         )
 
     @staticmethod

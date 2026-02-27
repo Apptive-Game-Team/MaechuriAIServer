@@ -31,7 +31,7 @@ class SuspectGenerationSchema(BaseModel):
     personality: PersonalitySchema = Field(description="성격 및 말투")
 
     # Image generation
-    appearance_prompt: Optional[str] = Field(default=None, description="이미지 생성을 위한 생김새 프롬프트 (영어)")
+    visual_description: Optional[str] = Field(default=None, description="이미지 생성을 위한 생김새 프롬프트 (영어)")
 
 
 class SuspectGenerationListSchema(BaseModel):

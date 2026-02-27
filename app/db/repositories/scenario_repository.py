@@ -280,7 +280,7 @@ class ScenarioRepository:
                     speech_style=suspect_schema.personality.speech_style,
                     emotional_tendency=suspect_schema.personality.emotional_tendency,
                     lying_pattern=suspect_schema.personality.lying_pattern,
-                    appearance_prompt=suspect_schema.appearance_prompt,
+                    visual_description=suspect_schema.visual_description,
                     x=suspect_pos[0] if suspect_pos else None,
                     y=suspect_pos[1] if suspect_pos else None
                 )
@@ -312,7 +312,7 @@ class ScenarioRepository:
                     logic_explanation=clue_schema.logic_explanation,
                     decoded_answer=clue_schema.decoded_answer,
                     is_red_herring=clue_schema.is_red_herring,
-                    appearance_prompt=clue_schema.appearance_prompt,
+                    visual_description=clue_schema.visual_description,
                     x=clue_pos[0] if clue_pos else None,
                     y=clue_pos[1] if clue_pos else None
                 )
