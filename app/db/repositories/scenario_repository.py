@@ -12,7 +12,6 @@ from app.db.models import (
     Suspect,
     Fact,
     Clue,
-    Map
 )
 from app.db.mappers import ScenarioMapper
 from app.models.schemas.scenario import ScenarioResult
@@ -228,18 +227,51 @@ class ScenarioRepository:
                 for rule in scenario_result.world_detail.access_rules:
                     access_map[rule.location] = rule.requires
 
-            # Create Location objects
+            # Pre-calculate map positions if map data is available
+            map_data = scenario_result.map
+            map_result = None
+            room_geom = {}
+
+            if map_data:
+                map_result = calculate_map_positions(map_data)
+                room_geom = {el.name: el for el in map_result.elements if el.type == "room"}
+
+            # Create room Location objects
             for loc_name, loc_id in loc_map.items():
                 vis_data = visibility_map.get(loc_name, {})
+                geom = room_geom.get(loc_name)
                 location = Location(
                     scenario_id=scenario_id,
                     location_id=loc_id,
                     name=loc_name,
+                    type="room",
+                    x=geom.x if geom else None,
+                    y=geom.y if geom else None,
+                    width=geom.width if geom else None,
+                    height=geom.height if geom else None,
                     can_see=vis_data.get("can_see", []),
                     cannot_see=vis_data.get("cannot_see", []),
                     access_requires=access_map.get(loc_name)
                 )
                 session.add(location)
+
+            # Create corridor Location objects
+            if map_result:
+                corridor_id_start = len(loc_map) + 1
+                for idx, el in enumerate(
+                    (e for e in map_result.elements if e.type == "corridor"), start=0
+                ):
+                    location = Location(
+                        scenario_id=scenario_id,
+                        location_id=corridor_id_start + idx,
+                        name=el.name,
+                        type="corridor",
+                        x=el.x,
+                        y=el.y,
+                        width=el.width,
+                        height=el.height,
+                    )
+                    session.add(location)
 
             await session.flush()
 
@@ -247,10 +279,9 @@ class ScenarioRepository:
             scenario.incident_location_id = get_mapped_loc_id(scenario_result.incident.location)
             scenario.crime_location_id = get_mapped_loc_id(scenario_result.ground_truth_detail.crime_location)
 
-            # Build position maps from map data (if provided)
+            # Build suspect/clue positions from map data (room-relative)
             suspect_positions: Dict[int, Tuple[int, int]] = {}
             clue_positions: Dict[int, Tuple[int, int]] = {}
-            map_data = scenario_result.map
 
             if map_data:
                 for obj in map_data.obj:
@@ -367,25 +398,6 @@ class ScenarioRepository:
                 content={"text": world_content, "extra_data": scenario_result.world.model_dump(mode='json')}
             )
             session.add(world_fact)
-
-            # 6. Save Map elements (rooms, corridors)
-            if map_data:
-                map_result = calculate_map_positions(map_data)
-                map_id_counter = 1
-                for element in map_result.elements:
-                    map_entry = Map(
-                        scenario_id=scenario_id,
-                        map_id=map_id_counter,
-                        type=element.type,
-                        name=element.name,
-                        x=element.x,
-                        y=element.y,
-                        width=element.width,
-                        height=element.height,
-                        extra_data={**element.extra_data, "original_id": element.id}
-                    )
-                    session.add(map_entry)
-                    map_id_counter += 1
 
             await session.commit()
             return scenario_id
