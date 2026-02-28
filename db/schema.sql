@@ -48,9 +48,19 @@ CREATE TABLE location (
     scenario_id         BIGINT NOT NULL,
     location_id         BIGINT NOT NULL,
     name                VARCHAR(100) NOT NULL,
-    can_see             JSONB DEFAULT '[]',      -- List of location_ids visible from here
-    cannot_see          JSONB DEFAULT '[]',      -- List of location_ids not visible from here
-    access_requires     VARCHAR(100),            -- Access requirement (e.g., key name)
+    type                VARCHAR(20) NOT NULL DEFAULT 'room'
+                        CHECK (type IN ('room', 'corridor')),
+
+    -- Map geometry (bottom-left origin, null when no map data)
+    x                   SMALLINT,
+    y                   SMALLINT,
+    width               SMALLINT,
+    height              SMALLINT,
+
+    -- Visibility and access (rooms only)
+    can_see             JSONB DEFAULT '[]',
+    cannot_see          JSONB DEFAULT '[]',
+    access_requires     VARCHAR(100),
 
     PRIMARY KEY (scenario_id, location_id),
     FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
@@ -69,30 +79,6 @@ ALTER TABLE scenario
     REFERENCES location(scenario_id, location_id)
     ON DELETE SET NULL;
 
--- ============================================================
--- MAP (맵 요소 - 방, 복도)
--- ============================================================
-CREATE TABLE map (
-    scenario_id         BIGINT NOT NULL,
-    map_id              BIGINT NOT NULL,
-
-    type                VARCHAR(20) NOT NULL CHECK (type IN ('room', 'corridor')),
-    name                VARCHAR(100) NOT NULL,
-
-    -- Position (bottom-left origin)
-    x                   SMALLINT NOT NULL,
-    y                   SMALLINT NOT NULL,
-
-    -- Dimensions
-    width               SMALLINT NOT NULL,
-    height              SMALLINT NOT NULL,
-
-    -- Additional data (mood for rooms, connections for corridors)
-    extra_data          JSONB DEFAULT '{}',
-
-    PRIMARY KEY (scenario_id, map_id),
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
-);
 
 -- ============================================================
 -- SUSPECT (용의자)
@@ -221,8 +207,8 @@ CREATE TABLE chat_message_embedding (
 -- ============================================================
 
 -- Map indexes
-CREATE INDEX idx_map_scenario ON map(scenario_id);
-CREATE INDEX idx_map_type ON map(scenario_id, type);
+-- Location indexes
+CREATE INDEX idx_location_type ON location(scenario_id, type);
 
 -- Suspect indexes
 CREATE INDEX idx_suspect_culprit ON suspect(scenario_id, is_culprit);

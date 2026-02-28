@@ -1,5 +1,5 @@
 """Map schema modules organized by structure."""
-from .common import PositionSchema
+from .common import PositionSchema, MapElementType, MapObjectType
 from .skeleton import (
     RoomSkeletonSchema,
     CorridorConnectionSchema,
@@ -7,7 +7,6 @@ from .skeleton import (
     MapSkeletonSchema
 )
 from .detail import (
-    RoomSchema,
     MapObjectSchema,
     MapOutputSchema
 )
@@ -15,13 +14,14 @@ from .detail import (
 __all__ = [
     # Common
     "PositionSchema",
+    "MapElementType",
+    "MapObjectType",
     # Skeleton
     "RoomSkeletonSchema",
     "CorridorConnectionSchema",
     "CorridorSchema",
     "MapSkeletonSchema",
     # Detail
-    "RoomSchema",
     "MapObjectSchema",
     "MapOutputSchema",
 ]
