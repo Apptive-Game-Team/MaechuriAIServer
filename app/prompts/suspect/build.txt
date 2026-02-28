@@ -12,7 +12,7 @@ You receive JSON "input" containing:
 [GENERATION RULES]
 
 0. Language:
-   - ALL string values MUST be written in Korean.
+   - ALL string values MUST be written in Korean, EXCEPT `visual_description` which MUST be in English.
 
 1. Basic Info:
    - suspect_id: Sequential integers (1, 2, 3...)
