@@ -12,7 +12,7 @@ You receive JSON "input" containing:
 [GENERATION RULES]
 
 0. Language:
-   - ALL string values MUST be written in Korean.
+   - ALL string values MUST be written in Korean, EXCEPT `visual_description` which MUST be in English.
 
 1. Basic Info:
    - suspect_id: Sequential integers (1, 2, 3...)
@@ -64,6 +64,11 @@ You receive JSON "input" containing:
    ```
    - Match personality to the character's role and background
 
+6. Appearance Prompt (for image generation):
+   - Write an English prompt describing the suspect's visual appearance for use with an image generation model.
+   - Include: age, gender, build, hair color/style, eye color, skin tone, clothing/outfit matching their role, and any distinctive features.
+   - Example: "Middle-aged Korean man, 45 years old, slender build, short black hair neatly combed, sharp dark eyes, light skin, wearing a formal black butler uniform with white gloves, dignified posture"
+
 [OUTPUT FORMAT]
 ```json
 {
@@ -80,14 +85,15 @@ You receive JSON "input" containing:
       "alibi_summary": "사건 당시 주방에서 설거지를 하고 있었다고 주장",
       "timeline": [...],
       "secrets": [...],
-      "personality": {...}
+      "personality": {...},
+      "visual_description": "Middle-aged Korean man, 45 years old, slender build, short black hair neatly combed, sharp dark eyes, light skin, wearing a formal black butler uniform with white gloves, dignified posture"
     }
   ]
 }
 ```
 
 [CONSTRAINTS]
-- All text in Korean
+- All text in Korean EXCEPT visual_description which MUST be in English
 - Secrets must have exactly 5 entries with thresholds: 0, 30, 50, 70, 90
 - Timeline must be chronologically consistent
 - At least one suspect must be the culprit (check ground_truth.culprit_ids)

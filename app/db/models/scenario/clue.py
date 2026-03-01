@@ -27,6 +27,9 @@ class Clue(Base):
     decoded_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_red_herring: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Image generation prompt
+    visual_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Map position (within room)
     x: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
     y: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)

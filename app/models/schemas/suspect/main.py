@@ -27,6 +27,9 @@ class SuspectSchema(BaseModel):
     # Personality
     personality: "PersonalitySchema" = Field(description="성격 및 말투")
 
+    # Image generation
+    visual_description: Optional[str] = Field(default=None, description="이미지 생성을 위한 생김새 프롬프트 (영어)")
+
     @classmethod
     def from_generation(cls, generation: "SuspectGenerationSchema") -> "SuspectSchema":
         timeline: List[FactSchema] = [FactSchema.from_timeline(t) for t in generation.timeline]
@@ -43,6 +46,7 @@ class SuspectSchema(BaseModel):
             alibi_summary=generation.alibi_summary,
             facts=timeline + secrets,
             personality=generation.personality,
+            visual_description=generation.visual_description,
         )
 
 
