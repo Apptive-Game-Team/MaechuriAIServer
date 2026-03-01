@@ -18,6 +18,8 @@ DIRECTION_VECTORS = {
     "west": (-1, 0, True, True),     # Lower x, same y (use widths)
 }
 
+OPPOSITE_DIRECTION = {"north": "south", "south": "north", "east": "west", "west": "east"}
+
 
 @dataclass
 class MapElementPosition:
@@ -51,7 +53,7 @@ def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPosit
         for i, conn in enumerate(corridor.connections):
             for j, other in enumerate(corridor.connections):
                 if i != j:
-                    neighbors[conn.room_id].append((other.room_id, other.direction, corridor))
+                    neighbors[conn.room_id].append((other.room_id, OPPOSITE_DIRECTION[other.direction], corridor))
 
     # BFS to place rooms (center positions)
     centers = {map_data.rooms[0].id: (0, 0)}
@@ -71,6 +73,10 @@ def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPosit
             centers[nbr_id] = _calc_neighbor_pos(cx, cy, curr, nbr, direction, length + gap)
             visited.add(nbr_id)
             queue.append(nbr_id)
+
+    # Post-BFS overlap correction
+    placed_order = list(centers.keys())
+    _resolve_overlaps(placed_order, centers, rooms, neighbors, gap)
 
     # Normalize to positive space
     shift_x = -min(cx - rooms[rid].width // 2 for rid, (cx, _) in centers.items())
@@ -95,11 +101,11 @@ def calculate_map_positions(map_data: MapOutputSchema, gap: int = 2) -> MapPosit
     ]
 
     for corridor in map_data.corridors:
-        pos = _calc_corridor_pos(corridor, centers, rooms, shift_x, shift_y)
-        if pos:
+        segments = _calc_corridor_segments(corridor, centers, rooms, shift_x, shift_y)
+        for idx, seg in enumerate(segments):
             elements.append(MapElementPosition(
                 id=corridor.id, type="corridor", name=corridor.name,
-                x=pos[0], y=pos[1], width=pos[2], height=pos[3]
+                x=seg[0], y=seg[1], width=seg[2], height=seg[3]
             ))
 
     return MapPositionResult(
@@ -124,35 +130,119 @@ def _calc_neighbor_pos(
     )
 
 
-def _calc_corridor_pos(
+def _resolve_overlaps(
+    placed_order: List[int],
+    centers: Dict[int, Tuple[int, int]],
+    rooms: Dict[int, RoomSkeletonSchema],
+    neighbors: Dict[int, list],
+    gap: int
+) -> None:
+    """Nudge overlapping rooms along their placement direction until clear."""
+    max_iterations = 50
+    for _ in range(max_iterations):
+        found_overlap = False
+        for i in range(len(placed_order)):
+            for j in range(i + 1, len(placed_order)):
+                rid_a, rid_b = placed_order[i], placed_order[j]
+                if _rooms_overlap(centers[rid_a], rooms[rid_a], centers[rid_b], rooms[rid_b], gap):
+                    found_overlap = True
+                    # Nudge the later-placed room away from the earlier one
+                    ax, ay = centers[rid_a]
+                    bx, by = centers[rid_b]
+                    dx, dy = bx - ax, by - ay
+                    if dx == 0 and dy == 0:
+                        dx = 1  # arbitrary tiebreak
+                    if abs(dx) >= abs(dy):
+                        nudge_x = 1 if dx >= 0 else -1
+                        nudge_y = 0
+                    else:
+                        nudge_x = 0
+                        nudge_y = 1 if dy >= 0 else -1
+                    centers[rid_b] = (bx + nudge_x, by + nudge_y)
+        if not found_overlap:
+            break
+
+
+def _rooms_overlap(
+    c1: Tuple[int, int], r1: RoomSkeletonSchema,
+    c2: Tuple[int, int], r2: RoomSkeletonSchema,
+    gap: int
+) -> bool:
+    """Check AABB overlap between two rooms (with gap margin)."""
+    l1 = c1[0] - r1.width // 2 - gap
+    r1_right = c1[0] + r1.width // 2 + gap
+    b1 = c1[1] - r1.height // 2 - gap
+    t1 = c1[1] + r1.height // 2 + gap
+
+    l2 = c2[0] - r2.width // 2
+    r2_right = c2[0] + r2.width // 2
+    b2 = c2[1] - r2.height // 2
+    t2 = c2[1] + r2.height // 2
+
+    return l1 < r2_right and r1_right > l2 and b1 < t2 and t1 > b2
+
+
+def _calc_corridor_segments(
     corridor: CorridorSchema,
     centers: Dict[int, Tuple[int, int]],
     rooms: Dict[int, RoomSkeletonSchema],
     shift_x: int, shift_y: int
+) -> List[Tuple[int, int, int, int]]:
+    """Calculate corridor as pairwise segments between each adjacent pair of rooms."""
+    valid = [c for c in corridor.connections if c.room_id in centers]
+    if len(valid) < 2:
+        return []
+
+    # For 2-way corridors, just one segment. For 3+, one segment per pair.
+    if len(valid) == 2:
+        seg = _corridor_between_two(
+            valid[0].room_id, valid[1].room_id,
+            corridor.width_hint, centers, rooms, shift_x, shift_y
+        )
+        return [seg] if seg else []
+
+    # 3+ connections: chain pairwise segments (0↔1, 1↔2, ...)
+    segments = []
+    for k in range(len(valid) - 1):
+        seg = _corridor_between_two(
+            valid[k].room_id, valid[k + 1].room_id,
+            corridor.width_hint, centers, rooms, shift_x, shift_y
+        )
+        if seg:
+            segments.append(seg)
+    return segments
+
+
+def _corridor_between_two(
+    rid1: int, rid2: int, width_hint: int,
+    centers: Dict[int, Tuple[int, int]],
+    rooms: Dict[int, RoomSkeletonSchema],
+    shift_x: int, shift_y: int
 ) -> Optional[Tuple[int, int, int, int]]:
-    """Calculate corridor position between two rooms."""
-    if len(corridor.connections) < 2:
-        return None
-
-    c1, c2 = corridor.connections[0], corridor.connections[1]
-    if c1.room_id not in centers or c2.room_id not in centers:
-        return None
-
-    r1_cx, r1_cy = centers[c1.room_id]
-    r2_cx, r2_cy = centers[c2.room_id]
-    r1, r2 = rooms[c1.room_id], rooms[c2.room_id]
+    """Calculate a single corridor rectangle between two rooms."""
+    r1_cx, r1_cy = centers[rid1]
+    r2_cx, r2_cy = centers[rid2]
+    r1, r2 = rooms[rid1], rooms[rid2]
 
     is_horizontal = abs(r2_cx - r1_cx) > abs(r2_cy - r1_cy)
 
     if is_horizontal:
-        min_x = min(r1_cx + r1.width // 2, r2_cx + r2.width // 2)
-        max_x = max(r1_cx - r1.width // 2, r2_cx - r2.width // 2)
-        w, h = max(max_x - min_x, corridor.width_hint), corridor.width_hint
-        x, y = min_x + shift_x, (r1_cy + r2_cy) // 2 - h // 2 + shift_y
+        edge1 = r1_cx + r1.width // 2 if r2_cx > r1_cx else r1_cx - r1.width // 2
+        edge2 = r2_cx - r2.width // 2 if r2_cx > r1_cx else r2_cx + r2.width // 2
+        left = min(edge1, edge2)
+        right = max(edge1, edge2)
+        w = max(right - left, width_hint)
+        h = width_hint
+        x = left + shift_x
+        y = (r1_cy + r2_cy) // 2 - h // 2 + shift_y
     else:
-        min_y = min(r1_cy + r1.height // 2, r2_cy + r2.height // 2)
-        max_y = max(r1_cy - r1.height // 2, r2_cy - r2.height // 2)
-        w, h = corridor.width_hint, max(max_y - min_y, corridor.width_hint)
-        x, y = (r1_cx + r2_cx) // 2 - w // 2 + shift_x, min_y + shift_y
+        edge1 = r1_cy + r1.height // 2 if r2_cy > r1_cy else r1_cy - r1.height // 2
+        edge2 = r2_cy - r2.height // 2 if r2_cy > r1_cy else r2_cy + r2.height // 2
+        bottom = min(edge1, edge2)
+        top = max(edge1, edge2)
+        w = width_hint
+        h = max(top - bottom, width_hint)
+        x = (r1_cx + r2_cx) // 2 - w // 2 + shift_x
+        y = bottom + shift_y
 
     return x, y, w, h
