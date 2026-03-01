@@ -192,16 +192,22 @@ class ScenarioRepository:
             scenario_id = scenario.scenario_id
 
             # 2. Create Locations with visibility and access rules
-            locations = scenario_result.world_detail.locations
-            if not locations:
-                locations = scenario_result.world.locations
+            # Use map.rooms as primary source when available (ensures name matching with calculate_map_positions)
+            map_data = scenario_result.map
+            if map_data and map_data.rooms:
+                loc_entries = [(r.id, r.name) for r in map_data.rooms]
+            else:
+                locations = scenario_result.world_detail.locations
+                if not locations:
+                    locations = scenario_result.world.locations
+                loc_entries = [(idx, name) for idx, name in enumerate(locations, start=1)]
 
             loc_map: Dict[str, int] = {}
             first_loc_id: Optional[int] = None
-            for idx, loc_name in enumerate(locations, start=1):
-                loc_map[loc_name] = idx
+            for loc_id, loc_name in loc_entries:
+                loc_map[loc_name] = loc_id
                 if first_loc_id is None:
-                    first_loc_id = idx
+                    first_loc_id = loc_id
 
             def get_mapped_loc_id(name: str) -> int:
                 """Map location name to ID with fuzzy matching and fallback."""
@@ -228,7 +234,6 @@ class ScenarioRepository:
                     access_map[rule.location] = rule.requires
 
             # Pre-calculate map positions if map data is available
-            map_data = scenario_result.map
             map_result = None
             room_geom = {}
 
@@ -312,8 +317,8 @@ class ScenarioRepository:
                     emotional_tendency=suspect_schema.personality.emotional_tendency,
                     lying_pattern=suspect_schema.personality.lying_pattern,
                     visual_description=suspect_schema.visual_description,
-                    x=suspect_pos[0] if suspect_pos else None,
-                    y=suspect_pos[1] if suspect_pos else None
+                    x=suspect_pos[0] if suspect_pos else 0,
+                    y=suspect_pos[1] if suspect_pos else 0
                 )
                 session.add(suspect)
 
@@ -344,8 +349,8 @@ class ScenarioRepository:
                     decoded_answer=clue_schema.decoded_answer,
                     is_red_herring=clue_schema.is_red_herring,
                     visual_description=clue_schema.visual_description,
-                    x=clue_pos[0] if clue_pos else None,
-                    y=clue_pos[1] if clue_pos else None
+                    x=clue_pos[0] if clue_pos else 0,
+                    y=clue_pos[1] if clue_pos else 0
                 )
                 session.add(clue)
 
