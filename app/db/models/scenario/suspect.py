@@ -36,8 +36,8 @@ class Suspect(Base):
     visual_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Map position (within room)
-    x: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
-    y: Mapped[Optional[int]] = mapped_column(SmallInteger, nullable=True)
+    x: Mapped[int] = mapped_column(SmallInteger)
+    y: Mapped[int] = mapped_column(SmallInteger)
 
     # Embedding for RAG (name + role + description)
     profile_embedding = mapped_column(Vector(1024), nullable=True)

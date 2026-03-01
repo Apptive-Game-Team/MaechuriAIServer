@@ -69,6 +69,7 @@ class MapGenerator(BaseGenerator):
             "clues": {
                 "clues": [
                     {
+                        "id": c.id,
                         "name": c.name,
                         "found_at": c.found_at,
                         "is_red_herring": c.is_red_herring
