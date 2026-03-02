@@ -3,9 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
+      - DB_HOST=host.docker.internal
       - REDIS_HOST=redis-server
       - REDIS_PORT=6379
       - REDIS_DB=0
@@ -14,6 +19,8 @@ services:
       redis-server:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - maechuri-ai-test
 
   redis-server:
     image: redis:alpine
@@ -27,6 +34,13 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - maechuri-ai-test
 
 volumes:
   redis_data:
+
+networks:
+  maechuri-ai-test:
+    name: maechuri-ai-test
+
