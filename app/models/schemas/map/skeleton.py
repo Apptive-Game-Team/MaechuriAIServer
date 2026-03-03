@@ -10,6 +10,8 @@ class RoomSkeletonSchema(BaseModel):
     width: int
     height: int
     mood: str
+    x: int
+    y: int
 
 
 class CorridorConnectionSchema(BaseModel):
@@ -25,6 +27,10 @@ class CorridorSchema(BaseModel):
     connections: List[CorridorConnectionSchema]
     width_hint: int
     length_hint: int
+    x: int
+    y: int
+    width: int
+    height: int
 
 
 class MapSkeletonSchema(BaseModel):

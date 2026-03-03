@@ -19,29 +19,35 @@ Your goal is to generate a map skeleton (room structure and corridor layout) bas
      - Medium rooms (office, bedroom, study): 10-15 tiles
      - Small rooms (bathroom, closet, storage): 8-10 tiles
    - Set `mood` based on the scenario's `meta.tone`.
+   - **CRITICAL: You MUST assign an absolute global `x` and `y` coordinate (bottom-left corner) for each room.**
+   - Rooms MUST NOT OVERLAP with each other. Leave at least 2 tiles of gap between rooms unless they share a specific connecting corridor.
 
 2. **Corridors**:
-   - Ensure corridors reflect the 'visibility_rules'.
+   - Ensure corridors reflect the 'visibility_rules' and 'access_rules'.
    - Create corridors to connect rooms logically.
    - Each corridor must connect at least 2 rooms.
-   - Assign a unique `id` starting from 1.
+   - Assign a unique `id` starting from the next available number after rooms.
    - For each connection, specify:
      - `room_id`: The room being connected
-     - `direction`: The direction from the room to the corridor ("north", "south", "east", "west")
+     - `direction`: The direction from the room to the corridor ("north", "south", "east", "west")        
    - Set `width_hint` (typically 2-4 tiles) and `length_hint` (typically 3-8 tiles).
    - Corridor names should be descriptive (e.g., "Main Hallway", "Service Corridor", "Back Passage").
+   - **CRITICAL: You MUST assign absolute global `x`, `y`, `width`, and `height` for each corridor as well.**
+   - Ensure corridors perfectly bridge the gaps between the rooms they connect according to the provided `direction`.
+   - If multiple rooms connect to a single long corridor (like a train aisle or hotel hallway), make sure they are aligned along the corridor's edge (e.g., all `y` coordinates line up if the corridor runs horizontally).
 
 3. **Spatial Consistency**:
-   - Viewports: If `visibility_rules` state a room can see an "Outside" area (like a Playground), ensure that room is placed at the edge of the map layout to allow for windows.
-   - Ensure the layout is physically possible (no overlapping rooms).
+   - Viewports: If `visibility_rules` state a room can see an "Outside" area, ensure that room is placed at the edge of the map layout.
+   - Ensure the layout is physically possible (no overlapping elements).
    - Consider the incident location - it should be accessible but may require passing through other areas.
+   - For linear structures (like Trains), align all rooms in a straight row (e.g., sharing the same `y` or `x` axis) with a single long corridor running alongside them.
 
 4. **Logical Layout**:
    - Public areas (lobby, reception) should be near entrances.
    - Private areas (bedroom, office) should be deeper in the layout.
    - The crime scene should have limited but plausible access routes.
 
-[OUTPUT]
+[OUTPUT FORMAT]
 Return a JSON object with:
-- `rooms`: List of room structures (id, name, width, height, mood)
-- `corridors`: List of corridor structures (id, name, connections, width_hint, length_hint)
+- `rooms`: List of room structures (id, name, width, height, mood, x, y)
+- `corridors`: List of corridor structures (id, name, connections, width_hint, length_hint, x, y, width, height)

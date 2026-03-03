@@ -285,13 +285,13 @@ class ScenarioRepository:
             scenario.crime_location_id = get_mapped_loc_id(scenario_result.ground_truth_detail.crime_location)
 
             # Build suspect/clue positions from map data (room-relative)
-            suspect_positions: Dict[int, Tuple[int, int]] = {}
+            suspect_positions: Dict[int, Tuple[int, int, int]] = {}
             clue_positions: Dict[int, Tuple[int, int]] = {}
 
             if map_data:
                 for obj in map_data.obj:
                     if obj.type == "suspect":
-                        suspect_positions[obj.id] = (obj.position.x, obj.position.y)
+                        suspect_positions[obj.id] = (obj.position.x, obj.position.y, obj.room_id)
                     elif obj.type == "clue":
                         clue_positions[obj.id] = (obj.position.x, obj.position.y)
 
@@ -317,6 +317,7 @@ class ScenarioRepository:
                     emotional_tendency=suspect_schema.personality.emotional_tendency,
                     lying_pattern=suspect_schema.personality.lying_pattern,
                     visual_description=suspect_schema.visual_description,
+                    location_id=suspect_pos[2] if suspect_pos else None,
                     x=suspect_pos[0] if suspect_pos else 0,
                     y=suspect_pos[1] if suspect_pos else 0
                 )
