@@ -1,13 +1,16 @@
 """Suspect database models."""
-from typing import List, Optional, Any
+from typing import List, Optional, Any, TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, String, Text, Boolean, Integer, SmallInteger, ForeignKey, CheckConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, Integer, SmallInteger, ForeignKey, ForeignKeyConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 from app.db.models.scenario.main import Scenario
+
+if TYPE_CHECKING:
+    from app.db.models import Location
 
 
 class Suspect(Base):
@@ -36,6 +39,7 @@ class Suspect(Base):
     visual_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Map position (within room)
+    location_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     x: Mapped[int] = mapped_column(SmallInteger)
     y: Mapped[int] = mapped_column(SmallInteger)
 
@@ -44,11 +48,24 @@ class Suspect(Base):
 
     # Relationships
     scenario: Mapped["Scenario"] = relationship(back_populates="suspects")
+    location: Mapped["Location"] = relationship(
+        primaryjoin="and_(Suspect.scenario_id==Location.scenario_id, Suspect.location_id==Location.location_id)",
+        foreign_keys=[scenario_id, location_id],
+        overlaps="scenario,suspects"
+    )
     facts: Mapped[List["Fact"]] = relationship(
         back_populates="suspect",
         primaryjoin="and_(Suspect.scenario_id==Fact.scenario_id, Suspect.suspect_id==Fact.suspect_id)",
         foreign_keys="[Fact.scenario_id, Fact.suspect_id]",
         viewonly=True
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["scenario_id", "location_id"],
+            ["location.scenario_id", "location.location_id"],
+            ondelete="CASCADE"
+        ),
     )
 
 

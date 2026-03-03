@@ -106,6 +106,7 @@ CREATE TABLE suspect (
     visual_description   TEXT,
 
     -- Map position (within room)
+    location_id         BIGINT,
     x                   SMALLINT,
     y                   SMALLINT,
 
@@ -113,7 +114,8 @@ CREATE TABLE suspect (
     profile_embedding   vector(1024),
 
     PRIMARY KEY (scenario_id, suspect_id),
-    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE
+    FOREIGN KEY (scenario_id) REFERENCES scenario(scenario_id) ON DELETE CASCADE,
+    FOREIGN KEY (scenario_id, location_id) REFERENCES location(scenario_id, location_id) ON DELETE CASCADE
 );
 
 -- ============================================================
