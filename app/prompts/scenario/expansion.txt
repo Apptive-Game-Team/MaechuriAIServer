@@ -13,9 +13,19 @@ Fields to focus on:
 
 - world_detail: Environmental rules (visibility, access control).
 
-- ground_truth_detail: Causal explanation of the crime and required evidence types.
+- ground_truth_detail: Detailed ground truth of the crime. You MUST include:
 
-    * Use integer IDs (1, 2, 3...) for `culprit_ids`.
+    * `culprit_ids`: Use integer IDs (1, 2, 3...).
+    * `method`: A DETAILED, step-by-step description of HOW the crime was committed.
+      - What weapon or tool was used?
+      - How did the culprit gain access to the crime scene?
+      - What physical actions did the culprit take (approach, attack, escape)?
+      - How did the culprit dispose of evidence or create a false scene?
+      - If it's a locked-room mystery, explain the EXACT trick used.
+    * `required_clues`: Evidence types needed to solve the case.
+      - Each clue must connect to a specific step in the crime method.
+      - Include at least one clue for: identity (WHO), method (HOW), motive (WHY), timing (WHEN).
+    * The method field should read like a forensic reconstruction — specific, concrete, and physically plausible.
 
 - generation_targets: Concrete goals for suspects and evidence.
 

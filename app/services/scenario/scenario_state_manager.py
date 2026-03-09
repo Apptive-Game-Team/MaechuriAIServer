@@ -58,3 +58,10 @@ class ScenarioStateManager:
             # Optionally, clean up corrupted file
             # filepath.unlink(missing_ok=True)
             return None
+
+    def clear_intermediate_state(self, request_id: str, step_name: str):
+        """Delete a cached intermediate state file so it will be regenerated."""
+        filepath = self._get_temp_filepath(request_id, step_name)
+        if filepath.exists():
+            filepath.unlink()
+            logger.info(f"Cleared intermediate state for '{step_name}': {filepath}")

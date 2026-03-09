@@ -28,6 +28,7 @@ from .main import (
     ExpansionPart2,
     ScenarioResult
 )
+from .clearability import ClearabilityEvaluation
 
 __all__ = [
     # Common
@@ -59,4 +60,6 @@ __all__ = [
     "ExpansionPart1",
     "ExpansionPart2",
     "ScenarioResult",
+    # Clearability
+    "ClearabilityEvaluation",
 ]

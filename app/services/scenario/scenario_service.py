@@ -10,11 +10,13 @@ from app.models.schemas.suspect.response import SuspectGenerationListSchema
 from app.models.schemas.clue.response import ClueSetSchema
 from app.models.schemas.map.skeleton import MapSkeletonSchema
 from app.models.schemas.map.detail import MapOutputSchema
+from app.services.agent.clearability_evaluator import ClearabilityEvaluator
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
 from app.services.agent.consistency_validator import ConsistencyValidator
 from app.services.agent.scenario_generator import ScenarioGenerator
 from app.services.agent.suspect_generator import SuspectGenerator
+from app.services.agent.critic import ScenarioRefiner, RegenLevel
 from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.rag import get_rag_service
@@ -24,6 +26,11 @@ from app.services.scenario.scenario_state_manager import ScenarioStateManager
 
 
 logger = logging.getLogger(__name__)
+
+# Max times we'll regenerate skeleton/expansion due to critic failures
+MAX_CRITIC_REGEN = 2
+# Max times we'll regenerate the full scenario due to clearability failures
+MAX_CLEARABILITY_REGEN = 2
 
 
 class ScenarioService:
@@ -42,6 +49,8 @@ class ScenarioService:
         self.map_generator = MapGenerator(llm_client)
         self.suspect_generator = SuspectGenerator(llm_client)
         self.validator = ConsistencyValidator()
+        self.refiner = ScenarioRefiner(llm_client)
+        self.clearability_evaluator = ClearabilityEvaluator(llm_client)
         self.repository = ScenarioRepository()
         self.rag_service = get_rag_service()
 
@@ -72,39 +81,109 @@ class ScenarioService:
 
         time.sleep(3)
 
-        # 2. Skeleton 생성 (재시도 적용)
-        skeleton_result = self.state_manager.load_intermediate_state(request_id, "skeleton_result", ScenarioSkeleton)
-        if skeleton_result is None:
-            skeleton_result = self.json_retry.parse_with_retry(
-                parser_func=lambda: self.scenario_generator.generate_skeleton(case_state),
-                schema_name="ScenarioSkeleton"
-            )
-            if skeleton_result is None:
-                raise RuntimeError("Skeleton generation failed after retries")
-            self.state_manager.save_intermediate_state(request_id, "skeleton_result", skeleton_result)
-            logger.info("Skeleton generated successfully")
-        else:
-            logger.info("Loaded skeleton_result from intermediate file.")
+        # 2-3. Skeleton → Expansion → Critic 평가 루프
+        expansion_result = self._generate_and_validate_expansion(
+            case_state, request_id
+        )
 
         time.sleep(3)
 
-        # 3. Expansion 생성 (재시도 적용)
-        expansion_result = self.state_manager.load_intermediate_state(request_id, "expansion_result", ScenarioExpansion)
-        if expansion_result is None:
-            expansion_result = self.json_retry.parse_with_retry(
-                parser_func=lambda: self.scenario_generator.generate_expansion(skeleton_result),
-                schema_name="ScenarioExpansion"
+        # 4-9. Generate content and validate clearability
+        final_scenario = self._generate_content_with_clearability_check(
+            expansion_result, request_id
+        )
+
+        return final_scenario
+
+    def _generate_content_with_clearability_check(
+        self,
+        expansion_result: ScenarioExpansion,
+        request_id: str,
+    ) -> ScenarioResult:
+        """Generate map/suspects/clues and validate clearability.
+
+        If the clearability check fails, clears the generated content
+        and retries up to MAX_CLEARABILITY_REGEN times.
+
+        Parameters
+        ----------
+        expansion_result : ScenarioExpansion
+            The validated expansion to build content from.
+        request_id : str
+            Request ID for state persistence.
+
+        Returns
+        -------
+        ScenarioResult
+            A clearability-validated final scenario.
+
+        Raises
+        ------
+        RuntimeError
+            If scenario is not clearable after all retry attempts.
+        """
+        content_steps = [
+            "map_skeleton", "suspects_result", "clue_result", "map_detail"
+        ]
+
+        for attempt in range(MAX_CLEARABILITY_REGEN + 1):
+            if attempt > 0:
+                logger.info(
+                    f"Clearability regen attempt {attempt}/{MAX_CLEARABILITY_REGEN}"
+                )
+                for step in content_steps:
+                    self.state_manager.clear_intermediate_state(request_id, step)
+
+            final_scenario = self._generate_content(expansion_result, request_id)
+
+            # 9. Clearability 검증
+            logger.info("Starting clearability evaluation...")
+            scenario_data = final_scenario.model_dump(mode="json")
+            evaluation = self.clearability_evaluator.evaluate(scenario_data)
+
+            # Save clearability evaluation result
+            self.state_manager.save_intermediate_state(
+                request_id,
+                f"clearability_eval_attempt{attempt}",
+                evaluation,
             )
-            if expansion_result is None:
-                raise RuntimeError("Expansion generation failed after retries")
-            self.state_manager.save_intermediate_state(request_id, "expansion_result", expansion_result)
-        else:
-            logger.info("Loaded expansion_result from intermediate file.")
 
-        logger.info("Expansion generated successfully")
+            if evaluation.is_clearable:
+                logger.info("Scenario passed clearability check.")
+                return final_scenario
 
-        time.sleep(3)
+            logger.warning(
+                f"Scenario failed clearability check: {evaluation.reason[:300]}"
+            )
+            if attempt >= MAX_CLEARABILITY_REGEN:
+                break
 
+            time.sleep(3)
+
+        raise RuntimeError(
+            f"Scenario is not clearable after {MAX_CLEARABILITY_REGEN + 1} attempts. "
+            f"Last reason: {evaluation.reason}"
+        )
+
+    def _generate_content(
+        self,
+        expansion_result: ScenarioExpansion,
+        request_id: str,
+    ) -> ScenarioResult:
+        """Generate map, suspects, clues, and assemble the final scenario.
+
+        Parameters
+        ----------
+        expansion_result : ScenarioExpansion
+            The validated expansion to build content from.
+        request_id : str
+            Request ID for state persistence.
+
+        Returns
+        -------
+        ScenarioResult
+            Assembled scenario (not yet clearability-validated).
+        """
         # 4. Map Skeleton 생성 (재시도 적용)
         map_skeleton = self.state_manager.load_intermediate_state(request_id, "map_skeleton", MapSkeletonSchema)
         if map_skeleton is None:
@@ -188,6 +267,158 @@ class ScenarioService:
         )
 
         return final_scenario
+
+    def _save_critic_evaluation_history(
+        self,
+        request_id: str,
+        regen_attempt: int,
+        result,
+    ):
+        """Save all critic evaluation iterations to disk with descriptive names.
+
+        File naming: {request_id}_critic_eval_regen{N}_iter{M}.json
+        where N = outer regen attempt, M = inner refinement iteration.
+        """
+        for aggregated in result.evaluation_history:
+            step_name = (
+                f"critic_eval_regen{regen_attempt}_iter{aggregated.iteration}"
+            )
+            self.state_manager.save_intermediate_state(
+                request_id, step_name, aggregated
+            )
+        # Save the final refinement decision
+        summary = {
+            "regen_level": result.regen_level.value,
+            "last_feedback": result.last_feedback,
+            "total_iterations": len(result.evaluation_history),
+        }
+        self.state_manager.save_intermediate_state(
+            request_id,
+            f"critic_decision_regen{regen_attempt}",
+            summary,
+        )
+
+    def _generate_and_validate_expansion(
+        self,
+        case_state: str,
+        request_id: str,
+    ) -> ScenarioExpansion:
+        """Generate skeleton & expansion, then run critic loop.
+
+        If critics fail on expansion-level issues, re-generate expansion.
+        If critics fail on skeleton-level issues, re-generate from skeleton.
+        Retries up to MAX_CRITIC_REGEN times total.
+
+        Parameters
+        ----------
+        case_state : str
+            The narrative case synopsis.
+        request_id : str
+            Request ID for state persistence.
+
+        Returns
+        -------
+        ScenarioExpansion
+            A critic-approved expansion.
+        """
+        for regen_attempt in range(MAX_CRITIC_REGEN + 1):
+            # 2. Skeleton 생성
+            # On regen, clear cached skeleton/expansion so they're regenerated
+            if regen_attempt > 0:
+                logger.info(
+                    f"Critic regen attempt {regen_attempt}/{MAX_CRITIC_REGEN}"
+                )
+                self.state_manager.clear_intermediate_state(
+                    request_id, "skeleton_result"
+                )
+                self.state_manager.clear_intermediate_state(
+                    request_id, "expansion_result"
+                )
+
+            skeleton_result = self.state_manager.load_intermediate_state(
+                request_id, "skeleton_result", ScenarioSkeleton
+            )
+            if skeleton_result is None:
+                skeleton_result = self.json_retry.parse_with_retry(
+                    parser_func=lambda: self.scenario_generator.generate_skeleton(case_state),
+                    schema_name="ScenarioSkeleton"
+                )
+                if skeleton_result is None:
+                    raise RuntimeError("Skeleton generation failed after retries")
+                self.state_manager.save_intermediate_state(
+                    request_id, "skeleton_result", skeleton_result
+                )
+                logger.info("Skeleton generated successfully")
+            else:
+                logger.info("Loaded skeleton_result from intermediate file.")
+
+            time.sleep(3)
+
+            # 3. Expansion 생성
+            expansion_result = self.state_manager.load_intermediate_state(
+                request_id, "expansion_result", ScenarioExpansion
+            )
+            if expansion_result is None:
+                expansion_result = self.json_retry.parse_with_retry(
+                    parser_func=lambda: self.scenario_generator.generate_expansion(skeleton_result),
+                    schema_name="ScenarioExpansion"
+                )
+                if expansion_result is None:
+                    raise RuntimeError("Expansion generation failed after retries")
+                self.state_manager.save_intermediate_state(
+                    request_id, "expansion_result", expansion_result
+                )
+            else:
+                logger.info("Loaded expansion_result from intermediate file.")
+
+            logger.info("Expansion generated successfully")
+
+            # Critic 평가 및 리파인먼트
+            logger.info("Starting critic evaluation on expansion...")
+            result = self.refiner.evaluate_and_refine(expansion_result)
+
+            # Save critic evaluation history
+            self._save_critic_evaluation_history(
+                request_id, regen_attempt, result
+            )
+
+            if result.regen_level == RegenLevel.NONE:
+                # All critics passed — save approved expansion and return
+                logger.info("Expansion passed all critic evaluations.")
+                self.state_manager.save_intermediate_state(
+                    request_id, "expansion_result", result.expansion
+                )
+                return result.expansion
+
+            if result.regen_level == RegenLevel.SKELETON:
+                # Need to regenerate from skeleton
+                logger.warning(
+                    f"Critics require skeleton regen: {result.last_feedback[:200]}..."
+                )
+                if regen_attempt >= MAX_CRITIC_REGEN:
+                    break
+                # Clear skeleton too so it's regenerated on next loop
+                continue
+
+            if result.regen_level == RegenLevel.EXPANSION:
+                # Need to regenerate expansion only
+                logger.warning(
+                    f"Critics require expansion regen: {result.last_feedback[:200]}..."
+                )
+                if regen_attempt >= MAX_CRITIC_REGEN:
+                    break
+                # Clear only expansion
+                self.state_manager.clear_intermediate_state(
+                    request_id, "expansion_result"
+                )
+                continue
+
+        # Exhausted all regen attempts — use last expansion as fallback
+        logger.error(
+            "Critic validation failed after all regen attempts. "
+            "Using last generated expansion as fallback."
+        )
+        return expansion_result
 
     async def save_to_db(self, scenario: ScenarioResult, db=None) -> int:
         """
