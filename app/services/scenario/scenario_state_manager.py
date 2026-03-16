@@ -41,10 +41,14 @@ class ScenarioStateManager:
     def load_intermediate_state(self, request_id: str, step_name: str, model_type: Optional[Type[BaseModel]] = None) -> Any:
         """Loads intermediate generation state from a file and optionally parses it into a Pydantic model."""
         filepath = self._get_temp_filepath(request_id, step_name)
-        if not filepath.exists():
-            return None
         try:
             content = filepath.read_text(encoding='utf-8')
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            logger.error(f"Failed to read intermediate state for '{step_name}' from {filepath}: {e}")
+            return None
+        try:
             if model_type:
                 instance = model_type.model_validate_json(content)
                 logger.info(f"Intermediate state for '{step_name}' loaded from {filepath}")
@@ -54,14 +58,11 @@ class ScenarioStateManager:
                 logger.info(f"Intermediate string state for '{step_name}' loaded from {filepath}")
                 return content
         except Exception as e:
-            logger.error(f"Failed to load or parse intermediate state for '{step_name}' from {filepath}: {e}")
-            # Optionally, clean up corrupted file
-            # filepath.unlink(missing_ok=True)
+            logger.error(f"Failed to parse intermediate state for '{step_name}' from {filepath}: {e}")
             return None
 
     def clear_intermediate_state(self, request_id: str, step_name: str):
         """Delete a cached intermediate state file so it will be regenerated."""
         filepath = self._get_temp_filepath(request_id, step_name)
-        if filepath.exists():
-            filepath.unlink()
-            logger.info(f"Cleared intermediate state for '{step_name}': {filepath}")
+        filepath.unlink(missing_ok=True)
+        logger.info(f"Cleared intermediate state for '{step_name}': {filepath}")

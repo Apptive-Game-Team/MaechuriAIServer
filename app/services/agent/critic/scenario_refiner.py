@@ -7,9 +7,9 @@ import json
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 from app.core.utils import extract_json, safe_json_load
 from app.models.schemas.critic import (
@@ -44,11 +44,7 @@ class RefinementResult:
     expansion: Optional[ScenarioExpansion]
     regen_level: RegenLevel
     last_feedback: str  # Last critic feedback (empty if passed)
-    evaluation_history: List[AggregatedCriticResult] = None  # All iterations
-
-    def __post_init__(self):
-        if self.evaluation_history is None:
-            self.evaluation_history = []
+    evaluation_history: list[AggregatedCriticResult] = field(default_factory=list)
 
 
 class ScenarioRefiner:
@@ -64,7 +60,7 @@ class ScenarioRefiner:
 
     def __init__(self, llm_client: LLMClient):
         self.llm = llm_client
-        self.critics: List[CriticEvaluator] = [
+        self.critics: list[CriticEvaluator] = [
             LogicianCritic(llm_client),
             DetectiveCritic(llm_client),
             DirectorCritic(llm_client),
@@ -90,7 +86,7 @@ class ScenarioRefiner:
             of regeneration is needed if it still fails.
         """
         expansion_dict = expansion.model_dump(mode="json")
-        history: List[AggregatedCriticResult] = []
+        history: list[AggregatedCriticResult] = []
 
         for iteration in range(1, MAX_RETRIES + 1):
             logger.info(
@@ -175,11 +171,8 @@ class ScenarioRefiner:
                         target_to_fix=[],
                     )
 
-        all_passed = all(ev.status == "Pass" for ev in evaluations.values())
-
         return AggregatedCriticResult(
             iteration=iteration,
-            all_passed=all_passed,
             evaluations=evaluations,
         )
 

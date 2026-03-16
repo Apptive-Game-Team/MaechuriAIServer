@@ -1,7 +1,7 @@
 """Pydantic schemas for Critic AI evaluation output."""
 from enum import Enum
-from typing import ClassVar, List, Optional, Set
-from pydantic import BaseModel, Field
+from typing import ClassVar, Literal, Set
+from pydantic import BaseModel, Field, computed_field
 
 
 class CriticType(str, Enum):
@@ -16,14 +16,14 @@ class CriticEvaluation(BaseModel):
     Each critic must return this exact schema so the aggregator
     can programmatically decide whether refinement is needed.
     """
-    status: str = Field(
+    status: Literal["Pass", "Fail"] = Field(
         description="'Pass' if the scenario meets this critic's criteria, 'Fail' otherwise."
     )
     feedback: str = Field(
         default="",
         description="Detailed explanation of what is wrong. Empty when status is Pass."
     )
-    target_to_fix: List[str] = Field(
+    target_to_fix: list[str] = Field(
         default_factory=list,
         description=(
             "JSON paths / section names the Generator should fix. "
@@ -36,10 +36,15 @@ class CriticEvaluation(BaseModel):
 class AggregatedCriticResult(BaseModel):
     """Aggregation of all critic evaluations for one refinement iteration."""
     iteration: int = Field(description="Current iteration number (1-based)")
-    all_passed: bool = Field(description="True only if every critic returned Pass")
     evaluations: dict[str, CriticEvaluation] = Field(
         description="Mapping of critic_type -> evaluation result"
     )
+
+    @computed_field
+    @property
+    def all_passed(self) -> bool:
+        """True only if every critic returned Pass."""
+        return all(ev.status == "Pass" for ev in self.evaluations.values())
 
     # Skeleton-level fields that, if flagged, mean we need to re-gen skeleton
     SKELETON_FIELDS: ClassVar[Set[str]] = {

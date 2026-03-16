@@ -2,8 +2,10 @@ import time
 import asyncio
 import logging
 import uuid
+from typing import Any, Callable, Optional, Type
 
-from app.models.schemas import ScenarioResult
+from pydantic import BaseModel
+
 from app.models.schemas.scenario import ScenarioResult, ScenarioSkeleton, ScenarioExpansion
 from app.models.schemas.suspect import SuspectGenerationRequest, SuspectSchema
 from app.models.schemas.suspect.response import SuspectGenerationListSchema
@@ -63,6 +65,63 @@ class ScenarioService:
 
         self.state_manager = ScenarioStateManager()
 
+    def _load_or_generate(
+        self,
+        request_id: str,
+        step_name: str,
+        generator_func: Callable[[], Any],
+        schema_name: str,
+        model_type: Optional[Type[BaseModel]] = None,
+        use_retry: bool = True,
+    ) -> Any:
+        """Load a cached intermediate result or generate it.
+
+        Parameters
+        ----------
+        request_id : str
+            Request ID for state persistence.
+        step_name : str
+            Name of the generation step (used as cache key).
+        generator_func : Callable
+            Function that generates the result (called only on cache miss).
+        schema_name : str
+            Human-readable name for error messages.
+        model_type : Type[BaseModel], optional
+            Pydantic model to parse cached JSON into.
+        use_retry : bool
+            Whether to wrap generation in JSONParseRetry.
+
+        Returns
+        -------
+        tuple[Any, bool]
+            (result, was_generated) — was_generated is True if LLM was called.
+        """
+        cached = self.state_manager.load_intermediate_state(
+            request_id, step_name, model_type
+        )
+        if cached is not None:
+            logger.info(f"Loaded {step_name} from intermediate file.")
+            return cached, False
+
+        if use_retry:
+            result = self.json_retry.parse_with_retry(
+                parser_func=generator_func,
+                schema_name=schema_name,
+            )
+        else:
+            result = generator_func()
+
+        if result is None:
+            raise RuntimeError(f"{schema_name} generation failed after retries")
+
+        self.state_manager.save_intermediate_state(request_id, step_name, result)
+        return result, True
+
+    def _sleep_if_generated(self, was_generated: bool, seconds: float = 3):
+        """Sleep only when an LLM call was actually made (rate-limit throttle)."""
+        if was_generated:
+            time.sleep(seconds)
+
     def generate(self,
                  pre_input: str,
                  request_id: str = None) -> ScenarioResult:
@@ -72,21 +131,18 @@ class ScenarioService:
 
         # 생성 시작
         # 1. 평서문 생성
-        case_state = self.state_manager.load_intermediate_state(request_id, "case_state")
-        if case_state is None:
-            case_state = self.scenario_generator.generate_case(pre_input)
-            self.state_manager.save_intermediate_state(request_id, "case_state", case_state)
-        else:
-            logger.info("Loaded case_state from intermediate file.")
+        case_state, generated = self._load_or_generate(
+            request_id, "case_state",
+            lambda: self.scenario_generator.generate_case(pre_input),
+            "CaseState", use_retry=False,
+        )
 
-        time.sleep(3)
+        self._sleep_if_generated(generated)
 
         # 2-3. Skeleton → Expansion → Critic 평가 루프
         expansion_result = self._generate_and_validate_expansion(
             case_state, request_id
         )
-
-        time.sleep(3)
 
         # 4-9. Generate content and validate clearability
         final_scenario = self._generate_content_with_clearability_check(
@@ -184,79 +240,52 @@ class ScenarioService:
         ScenarioResult
             Assembled scenario (not yet clearability-validated).
         """
-        # 4. Map Skeleton 생성 (재시도 적용)
-        map_skeleton = self.state_manager.load_intermediate_state(request_id, "map_skeleton", MapSkeletonSchema)
-        if map_skeleton is None:
-            map_skeleton = self.json_retry.parse_with_retry(
-                parser_func=lambda: self.map_generator.generate_skeleton(expansion_result),
-                schema_name="MapSkeleton"
-            )
-            if map_skeleton is None:
-                raise RuntimeError("Map skeleton generation failed after retries")
-            self.state_manager.save_intermediate_state(request_id, "map_skeleton", map_skeleton)
-        else:
-            logger.info("Loaded map_skeleton from intermediate file.")
-
+        # 4. Map Skeleton 생성
+        map_skeleton, generated = self._load_or_generate(
+            request_id, "map_skeleton",
+            lambda: self.map_generator.generate_skeleton(expansion_result),
+            "MapSkeleton", MapSkeletonSchema,
+        )
         logger.info("Map skeleton generated successfully")
+        self._sleep_if_generated(generated)
 
-        time.sleep(3)
-
-        # 5. Suspects 생성 (재시도 적용)
-        suspects_result = self.state_manager.load_intermediate_state(request_id, "suspects_result", SuspectGenerationListSchema)
-        if suspects_result is None:
+        # 5. Suspects 생성
+        def _generate_suspects():
             suspect_req = SuspectGenerationRequest.from_expansion(
                 expansion_result, map_skeleton
             )
-            suspects_result = self.json_retry.parse_with_retry(
-                parser_func=lambda: self.suspect_generator.generate(suspect_req),
-                schema_name="SuspectList"
-            )
-            if suspects_result is None:
-                raise RuntimeError("Suspect generation failed after retries")
-            inject_sequential_id(suspects_result, "fact_id")
-            self.state_manager.save_intermediate_state(request_id, "suspects_result", suspects_result)
-        else:
-            logger.info("Loaded suspects_result from intermediate file.")
+            result = self.suspect_generator.generate(suspect_req)
+            if result is not None:
+                inject_sequential_id(result, "fact_id")
+            return result
 
+        suspects_result, generated = self._load_or_generate(
+            request_id, "suspects_result",
+            _generate_suspects,
+            "SuspectList", SuspectGenerationListSchema,
+        )
         logger.info("Suspects generated successfully")
+        self._sleep_if_generated(generated)
 
-        time.sleep(3)
-
-        # 6. Clues 생성 (재시도 적용)
-        clue_result = self.state_manager.load_intermediate_state(request_id, "clue_result", ClueSetSchema)
-        if clue_result is None:
-            clue_result = self.json_retry.parse_with_retry(
-                parser_func=lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
-                schema_name="ClueSet"
-            )
-            if clue_result is None:
-                raise RuntimeError("Clue generation failed after retries")
-            self.state_manager.save_intermediate_state(request_id, "clue_result", clue_result)
-        else:
-            logger.info("Loaded clue_result from intermediate file.")
-
+        # 6. Clues 생성
+        clue_result, generated = self._load_or_generate(
+            request_id, "clue_result",
+            lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
+            "ClueSet", ClueSetSchema,
+        )
         logger.info("Clues generated successfully")
+        self._sleep_if_generated(generated)
 
-        time.sleep(3)
-
-        # 7. Map Detail 생성 (재시도 적용)
-        map_result = self.state_manager.load_intermediate_state(request_id, "map_detail", MapOutputSchema)
-        if map_result is None:
-            map_result = self.json_retry.parse_with_retry(
-                parser_func=lambda: self.map_generator.generate_detail(
-                    expansion_result, map_skeleton, clue_result
-                ),
-                schema_name="MapDetail"
-            )
-            if map_result is None:
-                raise RuntimeError("Map detail generation failed after retries")
-            self.state_manager.save_intermediate_state(request_id, "map_detail", map_result)
-        else:
-            logger.info("Loaded map_detail from intermediate file.")
-
+        # 7. Map Detail 생성
+        map_result, generated = self._load_or_generate(
+            request_id, "map_detail",
+            lambda: self.map_generator.generate_detail(
+                expansion_result, map_skeleton, clue_result
+            ),
+            "MapDetail", MapOutputSchema,
+        )
         logger.info("Map detail generated successfully")
-
-        time.sleep(3)
+        self._sleep_if_generated(generated)
 
         # 8. 최종 결과 조합
         final_scenario = ScenarioResult(
@@ -335,41 +364,20 @@ class ScenarioService:
                     request_id, "expansion_result"
                 )
 
-            skeleton_result = self.state_manager.load_intermediate_state(
-                request_id, "skeleton_result", ScenarioSkeleton
+            skeleton_result, generated = self._load_or_generate(
+                request_id, "skeleton_result",
+                lambda: self.scenario_generator.generate_skeleton(case_state),
+                "ScenarioSkeleton", ScenarioSkeleton,
             )
-            if skeleton_result is None:
-                skeleton_result = self.json_retry.parse_with_retry(
-                    parser_func=lambda: self.scenario_generator.generate_skeleton(case_state),
-                    schema_name="ScenarioSkeleton"
-                )
-                if skeleton_result is None:
-                    raise RuntimeError("Skeleton generation failed after retries")
-                self.state_manager.save_intermediate_state(
-                    request_id, "skeleton_result", skeleton_result
-                )
-                logger.info("Skeleton generated successfully")
-            else:
-                logger.info("Loaded skeleton_result from intermediate file.")
-
-            time.sleep(3)
+            logger.info("Skeleton generated successfully")
+            self._sleep_if_generated(generated)
 
             # 3. Expansion 생성
-            expansion_result = self.state_manager.load_intermediate_state(
-                request_id, "expansion_result", ScenarioExpansion
+            expansion_result, generated = self._load_or_generate(
+                request_id, "expansion_result",
+                lambda: self.scenario_generator.generate_expansion(skeleton_result),
+                "ScenarioExpansion", ScenarioExpansion,
             )
-            if expansion_result is None:
-                expansion_result = self.json_retry.parse_with_retry(
-                    parser_func=lambda: self.scenario_generator.generate_expansion(skeleton_result),
-                    schema_name="ScenarioExpansion"
-                )
-                if expansion_result is None:
-                    raise RuntimeError("Expansion generation failed after retries")
-                self.state_manager.save_intermediate_state(
-                    request_id, "expansion_result", expansion_result
-                )
-            else:
-                logger.info("Loaded expansion_result from intermediate file.")
 
             logger.info("Expansion generated successfully")
 
