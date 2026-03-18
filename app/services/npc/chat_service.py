@@ -1,14 +1,18 @@
-from typing import Optional,  TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
+import asyncio
 import logging
 
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
     from app.db.repositories.scenario_repository import ScenarioRepository
     from app.services.rag import RAGService
+from app.db.database import async_session_factory
 from app.db.repositories.game_session_repository import GameSessionRepository
 from app.services.agent.pressure_judge import PressureJudge
 from app.services.agent.suspect_actor import SuspectActor
+from app.services.agent.suspect_responder import SuspectResponder
 from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.rag import get_rag_service
@@ -37,12 +41,14 @@ class ChatService:
         pressure_judge: PressureJudge,
         suspect_actor: SuspectActor,
         clue_agent: ClueAgent,
+        suspect_responder: SuspectResponder,
         detective_agent: Optional[DetectiveAgent] = None,
-        rag_service: Optional["RAGService"] = None
+        rag_service: Optional["RAGService"] = None,
     ):
         self.scenario_repository = scenario_repository
         self.judge = pressure_judge
         self.actor = suspect_actor
+        self.suspect_responder = suspect_responder
         self.clue_agent = clue_agent
         self.detective_agent = detective_agent
         self.rag_service = rag_service or get_rag_service()
@@ -52,7 +58,8 @@ class ChatService:
         session_id: str,
         scenario_id: int,
         user_message: str,
-        db: AsyncSession
+        db: AsyncSession,
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> GeneralChatResponse:
         """형사와의 통합 대화
 
@@ -64,6 +71,7 @@ class ChatService:
             scenario_id: 시나리오 ID
             user_message: 유저 메시지
             db: 데이터베이스 세션 (필수)
+            background_tasks: FastAPI BackgroundTasks for deferred work
 
         Returns:
             GeneralChatResponse: 형사의 응답
@@ -103,16 +111,14 @@ class ChatService:
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
-        # 4. 참조된 단서 정보 로드 (있으면)
+        # 4. 참조된 단서 정보 로드 (병렬)
         clue_infos = []
         if clue_ids:
-            for clue_id in clue_ids:
-                clue = await self.scenario_repository.get_clue_info(
-                    scenario_id=scenario_id,
-                    clue_id=clue_id
-                )
-                if clue:
-                    clue_infos.append(clue.model_dump())
+            clue_results = await asyncio.gather(
+                *(self.scenario_repository.get_clue_info(scenario_id=scenario_id, clue_id=cid)
+                  for cid in clue_ids)
+            )
+            clue_infos = [c.model_dump() for c in clue_results if c]
 
         # 5. Detective Agent로 응답 생성
         if not self.detective_agent:
@@ -128,47 +134,44 @@ class ChatService:
             clue_infos=clue_infos if clue_infos else None
         )
 
-        # 6. RAG용 메시지 임베딩 저장
-        try:
-            general_interactions = game_session.suspect_interactions.get("general", 0)
-            message_idx = general_interactions * 2
+        # 6. RAG 인덱싱 + 세션 업데이트를 백그라운드로 이동
+        general_interactions = game_session.suspect_interactions.get("general", 0)
+        message_idx = general_interactions * 2
 
-            # 컨텍스트 라벨 결정 (단서 참조 시 첫 번째 단서 이름 사용)
-            if clue_infos:
-                context_label = clue_infos[0].get("name", "형사")
-                indexed_clue_id = clue_ids[0]
-            else:
-                context_label = "형사"
-                indexed_clue_id = None
+        if clue_infos:
+            context_label = clue_infos[0].get("name", "형사")
+            indexed_clue_id = clue_ids[0]
+        else:
+            context_label = "형사"
+            indexed_clue_id = None
 
-            await self.rag_service.index_chat_message(
-                db=db,
+        if background_tasks:
+            background_tasks.add_task(
+                self._background_general_index,
                 scenario_id=scenario_id,
                 session_id=session_id,
-                message_index=message_idx,
-                role="user",
-                content=user_message,
+                message_idx=message_idx,
+                user_message=user_message,
+                response=response,
                 clue_id=indexed_clue_id,
-                context=context_label
+                context_label=context_label,
+                general_interactions=general_interactions,
             )
-            await self.rag_service.index_chat_message(
+        else:
+            # Fallback: inline indexing (e.g., in tests without BackgroundTasks)
+            await self._inline_general_index(
                 db=db,
+                session_repo=session_repo,
+                game_session=game_session,
                 scenario_id=scenario_id,
                 session_id=session_id,
-                message_index=message_idx + 1,
-                role="detective",
-                content=response,
+                message_idx=message_idx,
+                user_message=user_message,
+                response=response,
                 clue_id=indexed_clue_id,
-                context=context_label
+                context_label=context_label,
+                general_interactions=general_interactions,
             )
-
-            # general 상호작용 카운트 증가
-            new_interactions = game_session.suspect_interactions.copy()
-            new_interactions["general"] = general_interactions + 1
-            game_session.suspect_interactions = new_interactions
-            await db.commit()
-        except Exception as e:
-            logger.warning(f"Chat message indexing failed: {e}")
 
         # 7. 응답 반환
         return GeneralChatResponse(
@@ -182,7 +185,8 @@ class ChatService:
         scenario_id: int,
         suspect_id: int,
         user_message: str,
-        db: AsyncSession
+        db: AsyncSession,
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> SuspectChatResponse:
         """용의자와 대화 (Stateful with GameSession).
 
@@ -195,23 +199,18 @@ class ChatService:
             suspect_id: 용의자 ID
             user_message: 유저 메시지 ([c:ID]로 단서 참조 가능)
             db: 데이터베이스 세션 (필수)
+            background_tasks: FastAPI BackgroundTasks for deferred work
         """
-        # 1. GameSession 로드 및 검증/생성
+        # 1. GameSession + 용의자 데이터 병렬 로드
         session_repo = GameSessionRepository(db)
-        game_session = await session_repo.get_session(session_id, scenario_id)
+
+        game_session, suspect = await asyncio.gather(
+            session_repo.get_session(session_id, scenario_id),
+            self.scenario_repository.get_suspect_info(scenario_id, suspect_id)
+        )
 
         if not game_session:
-            # 세션이 없으면 생성 (Lazy Creation)
             game_session = await session_repo.create_session(session_id, scenario_id)
-
-        # 2. user_message 파싱 [c:XX] 정보 확인
-        clue_ids, _ = MessageParser.parse_references(user_message)
-
-        # 3. 용의자 데이터 로드
-        suspect = await self.scenario_repository.get_suspect_info(
-            scenario_id=game_session.scenario_id,
-            suspect_id=suspect_id
-        )
 
         if not suspect:
             return SuspectChatResponse(
@@ -222,7 +221,10 @@ class ChatService:
                 revealed_fact_ids=[]
             )
 
-        # 4. 상태 복원 (GameSession 기반)
+        # 2. user_message 파싱 [c:XX] 정보 확인
+        clue_ids, _ = MessageParser.parse_references(user_message)
+
+        # 3. 상태 복원 (GameSession 기반)
         suspect_pressure = game_session.suspect_pressures.get(str(suspect_id), 0)
 
         state = SuspectState(
@@ -231,16 +233,16 @@ class ChatService:
             clue_seen_ids=list(game_session.clue_seen_ids),
         )
 
-        # 5. 단서 처리 (메시지에서 파싱된 경우)
+        # 4. 단서 처리 (메시지에서 파싱된 경우)
         clue = None
         if clue_ids:
             clue_id = clue_ids[0]  # 첫 번째 단서 사용
             clue = await self._get_clue(scenario_id, clue_id)
             if clue:
                 state.add_clue(clue_id)
-                await session_repo.add_clue_seen(session_id, scenario_id, clue_id)
+                await session_repo.add_clue_seen_on_session(game_session, clue_id)
 
-        # 6. RAG 컨텍스트 검색
+        # 5. RAG 컨텍스트 검색
         rag_context = None
         rag_relevant_fact_ids = []
         try:
@@ -254,73 +256,62 @@ class ChatService:
                 top_k_secrets=2,
                 top_k_history=5
             )
-            if rag_result.full_context:
-                rag_context = rag_result.full_context
-            rag_relevant_fact_ids = rag_result.retrieved_fact_ids
+            if rag_result:
+                if rag_result.full_context:
+                    rag_context = rag_result.full_context
+                rag_relevant_fact_ids = rag_result.retrieved_fact_ids
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
-        # 7. Judge: pressure 변화량 평가
-        judge_result = self.judge.evaluate(
+        # 6. 단일 LLM 호출: Judge + Actor 통합 (SuspectResponder)
+        responder_result = await self.suspect_responder.arespond(
             user_message=user_message,
-            suspect_summary=ChatFormatter.format_suspect_summary(suspect),
-            current_pressure=state.current_pressure,
-            clue_presented=clue,
-            suspect_alibi=suspect.alibi_summary,
-            suspect_facts=ChatFormatter.format_facts(suspect.facts)
-        )
-
-        # 8. Pressure 업데이트
-        new_pressure = state.update_pressure(judge_result.pressure_delta)
-        await session_repo.update_suspect_pressure(session_id, scenario_id, suspect_id, new_pressure)
-
-        # 9. Actor: 응답 생성 (RAG 컨텍스트 포함)
-        response = self.actor.generate_response(
             suspect=suspect,
             state=state,
-            user_message=user_message,
             clue_presented=clue,
-            rag_context=rag_context
+            rag_context=rag_context,
+            suspect_facts=ChatFormatter.format_facts(suspect.facts),
         )
 
-        # 10. RAG용 메시지 임베딩 저장
-        try:
-            suspect_interactions = game_session.suspect_interactions.get(str(suspect_id), 0)
-            message_idx = suspect_interactions * 2
+        # 7. Pressure 업데이트
+        new_pressure = state.update_pressure(responder_result.pressure_delta)
+        await session_repo.update_suspect_pressure_on_session(game_session, suspect_id, new_pressure)
+        response = responder_result.response
 
-            await self.rag_service.index_chat_message(
-                db=db,
+        # 8. RAG 인덱싱 + 상호작용 증가를 백그라운드로 이동
+        suspect_interactions = game_session.suspect_interactions.get(str(suspect_id), 0)
+        message_idx = suspect_interactions * 2
+
+        if background_tasks:
+            background_tasks.add_task(
+                self._background_suspect_index,
                 scenario_id=scenario_id,
                 session_id=session_id,
-                message_index=message_idx,
-                role="user",
-                content=user_message,
                 suspect_id=suspect_id,
-                context=suspect.name
+                suspect_name=suspect.name,
+                message_idx=message_idx,
+                user_message=user_message,
+                response=response,
             )
-            await self.rag_service.index_chat_message(
+        else:
+            await self._inline_suspect_index(
                 db=db,
+                session_repo=session_repo,
+                game_session=game_session,
                 scenario_id=scenario_id,
                 session_id=session_id,
-                message_index=message_idx + 1,
-                role="suspect",
-                content=response,
                 suspect_id=suspect_id,
-                context=suspect.name
+                suspect_name=suspect.name,
+                message_idx=message_idx,
+                user_message=user_message,
+                response=response,
             )
-        except Exception as e:
-            logger.warning(f"Chat message indexing failed: {e}")
 
-        # 11. GameSession 진행도 업데이트
-        await session_repo.increment_suspect_interaction(session_id, scenario_id, suspect_id)
-        await db.commit()
-
-        # 12. 현재 pressure로 공개된 fact ID 계산
-        # - secret: pressure threshold 기반
-        # - timeline: RAG 유사도 기반 (관련된 것만 공개)
+        # 9. 현재 pressure로 공개된 fact ID 계산
+        rag_relevant_fact_set = set(rag_relevant_fact_ids)
         revealed_fact_ids = [
             fact.fact_id for fact in suspect.facts
-            if (fact.fact_id in rag_relevant_fact_ids and (
+            if (fact.fact_id in rag_relevant_fact_set and (
             (fact.type == "secret" and fact.threshold <= new_pressure) or
             (fact.type == "timeline")
             ))
@@ -330,7 +321,7 @@ class ChatService:
             user_message=user_message,
             answer=response,
             pressure=new_pressure,
-            pressure_delta=judge_result.pressure_delta,
+            pressure_delta=responder_result.pressure_delta,
             revealed_fact_ids=revealed_fact_ids
         )
 
@@ -340,7 +331,8 @@ class ChatService:
         scenario_id: int,
         clue_id: int,
         user_message: str,
-        db: AsyncSession
+        db: AsyncSession,
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> ClueChatResponse:
         """단서와 대화 (Stateful with GameSession).
 
@@ -355,6 +347,7 @@ class ChatService:
             clue_id: 단서 ID
             user_message: 유저 메시지
             db: 데이터베이스 세션 (필수)
+            background_tasks: FastAPI BackgroundTasks for deferred work
         """
         import warnings
         warnings.warn(
@@ -410,42 +403,234 @@ class ChatService:
             user_message,
         )
 
-        # 5. RAG용 메시지 임베딩 저장
-        try:
-            clue_interactions = game_session.clue_interactions.get(str(clue_id), 0)
-            message_idx = clue_interactions * 2
+        # 5. RAG 인덱싱 + 세션 업데이트를 백그라운드로 이동
+        clue_interactions = game_session.clue_interactions.get(str(clue_id), 0)
+        message_idx = clue_interactions * 2
 
-            await self.rag_service.index_chat_message(
-                db=db,
+        if background_tasks:
+            background_tasks.add_task(
+                self._background_clue_index,
                 scenario_id=scenario_id,
                 session_id=session_id,
-                message_index=message_idx,
-                role="user",
-                content=user_message,
                 clue_id=clue_id,
-                context=clue.name
+                clue_name=clue.name,
+                message_idx=message_idx,
+                user_message=user_message,
+                response=response_message,
             )
-            await self.rag_service.index_chat_message(
+        else:
+            await self._inline_clue_index(
                 db=db,
+                session_repo=session_repo,
+                game_session=game_session,
                 scenario_id=scenario_id,
                 session_id=session_id,
-                message_index=message_idx + 1,
-                role="detective",
-                content=response_message,
                 clue_id=clue_id,
-                context=clue.name
+                clue_name=clue.name,
+                message_idx=message_idx,
+                user_message=user_message,
+                response=response_message,
             )
-        except Exception as e:
-            logger.warning(f"Chat message indexing failed: {e}")
-
-        # 6. GameSession 진행도 업데이트
-        await session_repo.increment_clue_interaction(session_id, scenario_id, clue_id)
-        await db.commit()
 
         return ClueChatResponse(
             user_message=user_message,
             answer=response_message
         )
+
+    # ── Background task functions (use their own DB session) ──
+
+    async def _background_suspect_index(
+        self,
+        scenario_id: int,
+        session_id: str,
+        suspect_id: int,
+        suspect_name: str,
+        message_idx: int,
+        user_message: str,
+        response: str,
+    ) -> None:
+        """Background: index suspect chat messages + increment interaction."""
+        try:
+            async with async_session_factory() as db:
+                # Batch index both messages in a single embedding forward pass
+                await self.rag_service.index_chat_messages_batch(
+                    db=db,
+                    scenario_id=scenario_id,
+                    session_id=session_id,
+                    messages=[
+                        {"role": "user", "content": user_message, "message_index": message_idx},
+                        {"role": "suspect", "content": response, "message_index": message_idx + 1},
+                    ],
+                    suspect_id=suspect_id,
+                    context=suspect_name
+                )
+                # Increment interaction count
+                session_repo = GameSessionRepository(db)
+                await session_repo.increment_suspect_interaction(session_id, scenario_id, suspect_id)
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Background suspect indexing failed: {e}")
+
+    async def _background_general_index(
+        self,
+        scenario_id: int,
+        session_id: str,
+        message_idx: int,
+        user_message: str,
+        response: str,
+        clue_id: Optional[int],
+        context_label: str,
+        general_interactions: int,
+    ) -> None:
+        """Background: index general chat messages + update interaction count."""
+        try:
+            async with async_session_factory() as db:
+                await self.rag_service.index_chat_messages_batch(
+                    db=db,
+                    scenario_id=scenario_id,
+                    session_id=session_id,
+                    messages=[
+                        {"role": "user", "content": user_message, "message_index": message_idx},
+                        {"role": "detective", "content": response, "message_index": message_idx + 1},
+                    ],
+                    clue_id=clue_id,
+                    context=context_label
+                )
+                # Update general interaction count
+                session_repo = GameSessionRepository(db)
+                game_session = await session_repo.get_session(session_id, scenario_id)
+                if game_session:
+                    new_interactions = game_session.suspect_interactions.copy()
+                    new_interactions["general"] = general_interactions + 1
+                    game_session.suspect_interactions = new_interactions
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Background general indexing failed: {e}")
+
+    async def _background_clue_index(
+        self,
+        scenario_id: int,
+        session_id: str,
+        clue_id: int,
+        clue_name: str,
+        message_idx: int,
+        user_message: str,
+        response: str,
+    ) -> None:
+        """Background: index clue chat messages + increment interaction."""
+        try:
+            async with async_session_factory() as db:
+                await self.rag_service.index_chat_messages_batch(
+                    db=db,
+                    scenario_id=scenario_id,
+                    session_id=session_id,
+                    messages=[
+                        {"role": "user", "content": user_message, "message_index": message_idx},
+                        {"role": "detective", "content": response, "message_index": message_idx + 1},
+                    ],
+                    clue_id=clue_id,
+                    context=clue_name
+                )
+                session_repo = GameSessionRepository(db)
+                await session_repo.increment_clue_interaction(session_id, scenario_id, clue_id)
+                await db.commit()
+        except Exception as e:
+            logger.warning(f"Background clue indexing failed: {e}")
+
+    # ── Inline fallbacks (for tests / when no BackgroundTasks available) ──
+
+    async def _inline_suspect_index(
+        self,
+        db: AsyncSession,
+        session_repo: GameSessionRepository,
+        game_session,
+        scenario_id: int,
+        session_id: str,
+        suspect_id: int,
+        suspect_name: str,
+        message_idx: int,
+        user_message: str,
+        response: str,
+    ) -> None:
+        try:
+            await self.rag_service.index_chat_messages_batch(
+                db=db,
+                scenario_id=scenario_id,
+                session_id=session_id,
+                messages=[
+                    {"role": "user", "content": user_message, "message_index": message_idx},
+                    {"role": "suspect", "content": response, "message_index": message_idx + 1},
+                ],
+                suspect_id=suspect_id,
+                context=suspect_name
+            )
+        except Exception as e:
+            logger.warning(f"Chat message indexing failed: {e}")
+        await session_repo.increment_suspect_interaction_on_session(game_session, suspect_id)
+        await db.commit()
+
+    async def _inline_general_index(
+        self,
+        db: AsyncSession,
+        session_repo: GameSessionRepository,
+        game_session,
+        scenario_id: int,
+        session_id: str,
+        message_idx: int,
+        user_message: str,
+        response: str,
+        clue_id: Optional[int],
+        context_label: str,
+        general_interactions: int,
+    ) -> None:
+        try:
+            await self.rag_service.index_chat_messages_batch(
+                db=db,
+                scenario_id=scenario_id,
+                session_id=session_id,
+                messages=[
+                    {"role": "user", "content": user_message, "message_index": message_idx},
+                    {"role": "detective", "content": response, "message_index": message_idx + 1},
+                ],
+                clue_id=clue_id,
+                context=context_label
+            )
+        except Exception as e:
+            logger.warning(f"Chat message indexing failed: {e}")
+        new_interactions = game_session.suspect_interactions.copy()
+        new_interactions["general"] = general_interactions + 1
+        game_session.suspect_interactions = new_interactions
+        await db.commit()
+
+    async def _inline_clue_index(
+        self,
+        db: AsyncSession,
+        session_repo: GameSessionRepository,
+        game_session,
+        scenario_id: int,
+        session_id: str,
+        clue_id: int,
+        clue_name: str,
+        message_idx: int,
+        user_message: str,
+        response: str,
+    ) -> None:
+        try:
+            await self.rag_service.index_chat_messages_batch(
+                db=db,
+                scenario_id=scenario_id,
+                session_id=session_id,
+                messages=[
+                    {"role": "user", "content": user_message, "message_index": message_idx},
+                    {"role": "detective", "content": response, "message_index": message_idx + 1},
+                ],
+                clue_id=clue_id,
+                context=clue_name
+            )
+        except Exception as e:
+            logger.warning(f"Chat message indexing failed: {e}")
+        await session_repo.increment_clue_interaction_on_session(game_session, clue_id)
+        await db.commit()
 
     async def _get_clue(self, scenario_id: int, clue_id: int) -> Optional[dict]:
         """단서 정보 조회"""

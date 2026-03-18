@@ -1,8 +1,9 @@
-import json
 from typing import Optional
 
+from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
 from app.services.rag.context_builder import get_context_builder, ContextBuilder
+from app.services.npc.formatters import ChatFormatter
 from app.models.schemas.suspect import SuspectSchema
 from app.models.domain.suspect_state import SuspectState
 
@@ -13,7 +14,7 @@ class SuspectActor:
     현재 pressure와 공개된 비밀을 기반으로 응답 생성.
     """
 
-    def __init__(self, llm_client, context_builder: Optional[ContextBuilder] = None):
+    def __init__(self, llm_client: LLMClient, context_builder: Optional[ContextBuilder] = None):
         self.llm = llm_client
         self.context_builder = context_builder or get_context_builder()
         self.system_prompt_template = PromptLoader.load("app/prompts/actor/system.txt")
@@ -41,28 +42,40 @@ class SuspectActor:
         """
 
         # 프롬프트 데이터 구성
-        prompt_data = {
-            "name": suspect.name,
-            "role": suspect.role,
-            "age": suspect.age,
-            "gender": suspect.gender,
-            "description": suspect.description,
-            "speech_style": suspect.personality.speech_style,
-            "emotional_tendency": suspect.personality.emotional_tendency,
-            "lying_pattern": suspect.personality.lying_pattern,
-            "alibi_summary": suspect.alibi_summary,
-            "pressure_tier": state.get_pressure_tier(),
-            "pressure_level": state.current_pressure,
-            "is_culprit": suspect.is_culprit,
-            "clue_presented": json.dumps(clue_presented, ensure_ascii=False) if clue_presented else "None",
-            "rag_context": rag_context or "",
-        }
+        prompt_data = ChatFormatter.build_suspect_prompt_data(
+            suspect=suspect, state=state,
+            clue_presented=clue_presented, rag_context=rag_context,
+        )
 
         # 3. 시스템 프롬프트 포맷팅
         formatted_prompt = self.system_prompt_template.format(**prompt_data)
 
         # 4. LLM 호출
         response = self.llm.complete(
+            system=formatted_prompt,
+            user=user_message
+        )
+
+        return response
+
+    async def agenerate_response(
+        self,
+        suspect: SuspectSchema,
+        state: SuspectState,
+        user_message: str,
+        clue_presented: Optional[dict] = None,
+        rag_context: Optional[str] = None
+    ) -> str:
+        """generate_response()의 비동기 버전."""
+
+        prompt_data = ChatFormatter.build_suspect_prompt_data(
+            suspect=suspect, state=state,
+            clue_presented=clue_presented, rag_context=rag_context,
+        )
+
+        formatted_prompt = self.system_prompt_template.format(**prompt_data)
+
+        response = await self.llm.acomplete(
             system=formatted_prompt,
             user=user_message
         )

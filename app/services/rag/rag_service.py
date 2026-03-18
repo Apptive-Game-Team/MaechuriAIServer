@@ -414,6 +414,50 @@ class RAGService:
             context=context
         )
 
+    async def index_chat_messages_batch(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        session_id: str,
+        messages: list[dict],
+        suspect_id: Optional[int] = None,
+        clue_id: Optional[int] = None,
+        context: str = ""
+    ) -> list[int]:
+        """Index multiple chat messages in a single batch (one embedding forward pass).
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+        scenario_id : int
+            The scenario ID.
+        session_id : str
+            Unique session identifier.
+        messages : list[dict]
+            List of dicts with 'role', 'content', and 'message_index' keys.
+        suspect_id : int, optional
+            Suspect ID if suspect chat.
+        clue_id : int, optional
+            Clue ID if clue chat.
+        context : str, optional
+            Additional context for embedding.
+
+        Returns
+        -------
+        list[int]
+            List of created message embedding IDs.
+        """
+        return await self.indexer.index_chat_messages_batch(
+            db=db,
+            scenario_id=scenario_id,
+            session_id=session_id,
+            messages=messages,
+            suspect_id=suspect_id,
+            clue_id=clue_id,
+            context=context
+        )
+
 
 # Singleton instance
 _service_instance: Optional[RAGService] = None
