@@ -12,7 +12,6 @@ from app.db.database import async_session_factory
 from app.db.repositories.game_session_repository import GameSessionRepository
 from app.services.agent.pressure_judge import PressureJudge
 from app.services.agent.suspect_actor import SuspectActor
-from app.services.agent.suspect_responder import SuspectResponder
 from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.rag import get_rag_service
@@ -41,14 +40,12 @@ class ChatService:
         pressure_judge: PressureJudge,
         suspect_actor: SuspectActor,
         clue_agent: ClueAgent,
-        suspect_responder: SuspectResponder,
         detective_agent: Optional[DetectiveAgent] = None,
         rag_service: Optional["RAGService"] = None,
     ):
         self.scenario_repository = scenario_repository
         self.judge = pressure_judge
         self.actor = suspect_actor
-        self.suspect_responder = suspect_responder
         self.clue_agent = clue_agent
         self.detective_agent = detective_agent
         self.rag_service = rag_service or get_rag_service()
@@ -263,8 +260,8 @@ class ChatService:
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
-        # 6. 단일 LLM 호출: Judge + Actor 통합 (SuspectResponder)
-        responder_result = await self.suspect_responder.arespond(
+        # 6. 단일 LLM 호출: Judge + Actor 통합
+        responder_result = await self.actor.arespond(
             user_message=user_message,
             suspect=suspect,
             state=state,

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 
-class SuspectResponderOutput(BaseModel):
+class SuspectActorOutput(BaseModel):
     """Combined judge evaluation + actor response."""
     # Judge fields
     pressure_delta: int = Field(
