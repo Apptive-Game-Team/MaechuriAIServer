@@ -1,7 +1,9 @@
 """Formatter functions for chat service."""
-from typing import List
+import json
+from typing import List, Optional
 
 from app.models.schemas.suspect import SuspectSchema, FactSchema
+from app.models.domain.suspect_state import SuspectState
 
 
 class ChatFormatter:
@@ -84,3 +86,31 @@ class ChatFormatter:
             return f"- (압박 {fact.threshold}+) {str(fact.content)}"
 
         return f"- (압박 {fact.threshold}+) {content}"
+
+    @staticmethod
+    def build_suspect_prompt_data(
+        suspect: SuspectSchema,
+        state: SuspectState,
+        clue_presented: Optional[dict] = None,
+        rag_context: Optional[str] = None,
+        **extra_fields,
+    ) -> dict:
+        """Build shared prompt template data for suspect-facing agents."""
+        data = {
+            "name": suspect.name,
+            "role": suspect.role,
+            "age": suspect.age,
+            "gender": suspect.gender,
+            "description": suspect.description,
+            "speech_style": suspect.personality.speech_style,
+            "emotional_tendency": suspect.personality.emotional_tendency,
+            "lying_pattern": suspect.personality.lying_pattern,
+            "alibi_summary": suspect.alibi_summary,
+            "pressure_tier": state.get_pressure_tier(),
+            "pressure_level": state.current_pressure,
+            "is_culprit": suspect.is_culprit,
+            "clue_presented": json.dumps(clue_presented, ensure_ascii=False) if clue_presented else "None",
+            "rag_context": rag_context or "",
+        }
+        data.update(extra_fields)
+        return data

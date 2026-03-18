@@ -53,7 +53,7 @@ class DetectiveAgent:
         )
 
         # LLM 호출
-        response = self.llm.complete(
+        response = await self.llm.acomplete(
             system=system_prompt,
             user=user_message
         )

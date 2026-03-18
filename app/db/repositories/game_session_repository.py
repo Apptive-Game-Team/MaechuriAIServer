@@ -137,6 +137,22 @@ class GameSessionRepository:
         game_session.last_activity_at = datetime.now()
         await self.session.flush()
 
+    async def update_suspect_pressure_on_session(
+        self,
+        game_session: GameSession,
+        suspect_id: int,
+        new_pressure: int
+    ) -> None:
+        """Update pressure on an already-loaded GameSession (avoids re-fetch)."""
+        suspect_key = str(suspect_id)
+        pressures = dict(game_session.suspect_pressures or {})
+        pressures[suspect_key] = new_pressure
+        game_session.suspect_pressures = pressures
+        if pressures:
+            game_session.current_pressure = max(pressures.values())
+        game_session.last_activity_at = datetime.now()
+        await self.session.flush()
+
     async def add_clue_seen(self, session_id: str, scenario_id: int, clue_id: int) -> None:
         """
         Add clue to seen list.
@@ -155,6 +171,39 @@ class GameSessionRepository:
             game_session.clue_seen_ids.append(clue_id)
             game_session.last_activity_at = datetime.now()
             await self.session.flush()
+
+    async def add_clue_seen_on_session(self, game_session: GameSession, clue_id: int) -> None:
+        """Add clue to seen list on an already-loaded GameSession (avoids re-fetch)."""
+        if clue_id not in game_session.clue_seen_ids:
+            game_session.clue_seen_ids.append(clue_id)
+            game_session.last_activity_at = datetime.now()
+            await self.session.flush()
+
+    async def increment_suspect_interaction_on_session(
+        self,
+        game_session: GameSession,
+        suspect_id: int
+    ) -> None:
+        """Increment suspect interaction on an already-loaded GameSession (avoids re-fetch)."""
+        suspect_key = str(suspect_id)
+        interactions = game_session.suspect_interactions or {}
+        interactions[suspect_key] = interactions.get(suspect_key, 0) + 1
+        game_session.suspect_interactions = interactions
+        game_session.last_activity_at = datetime.now()
+        await self.session.flush()
+
+    async def increment_clue_interaction_on_session(
+        self,
+        game_session: GameSession,
+        clue_id: int
+    ) -> None:
+        """Increment clue interaction on an already-loaded GameSession (avoids re-fetch)."""
+        clue_key = str(clue_id)
+        interactions = game_session.clue_interactions or {}
+        interactions[clue_key] = interactions.get(clue_key, 0) + 1
+        game_session.clue_interactions = interactions
+        game_session.last_activity_at = datetime.now()
+        await self.session.flush()
 
     async def increment_suspect_interaction(
         self,

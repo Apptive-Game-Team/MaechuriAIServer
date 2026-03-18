@@ -365,7 +365,7 @@ class RAGIndexer:
                 session_id=session_id,
                 suspect_id=suspect_id,
                 clue_id=clue_id,
-                message_index=i,
+                message_index=msg.get("message_index", i),
                 role=msg["role"],
                 content=msg["content"],
                 embedding=embedding,

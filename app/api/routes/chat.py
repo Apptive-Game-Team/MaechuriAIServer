@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
@@ -22,7 +22,8 @@ router = APIRouter(prefix="/api/chats", tags=["chats"])
 async def chat_with_suspect(
     request: SuspectChatRequest,
     chat_service: Annotated[ChatService, Depends(get_chat_service)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks
 ) -> SuspectChatResponse:
     """
     용의자와 심문 대화를 진행합니다 (Stateful with GameSession).
@@ -41,7 +42,8 @@ async def chat_with_suspect(
         scenario_id=request.scenario_id,
         suspect_id=request.suspect_id,
         user_message=request.user_message,
-        db=db
+        db=db,
+        background_tasks=background_tasks
     )
 
 
@@ -49,7 +51,8 @@ async def chat_with_suspect(
 async def chat_with_clue(
     request: ClueChatRequest,
     chat_service: Annotated[ChatService, Depends(get_chat_service)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks
 ) -> ClueChatResponse:
     """
     증거와 대화합니다 (증거 분석, Stateful with GameSession).
@@ -66,7 +69,8 @@ async def chat_with_clue(
         scenario_id=request.scenario_id,
         clue_id=request.clue_id,
         user_message=request.user_message,
-        db=db
+        db=db,
+        background_tasks=background_tasks
     )
 
 
@@ -74,7 +78,8 @@ async def chat_with_clue(
 async def chat_with_detective(
     request: GeneralChatRequest,
     chat_service: Annotated[ChatService, Depends(get_chat_service)],
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks
 ) -> GeneralChatResponse:
     """
     형사와 통합 대화를 진행합니다 (Stateful with GameSession).
@@ -95,5 +100,6 @@ async def chat_with_detective(
         session_id=request.session_id,
         scenario_id=request.scenario_id,
         user_message=request.user_message,
-        db=db
+        db=db,
+        background_tasks=background_tasks
     )

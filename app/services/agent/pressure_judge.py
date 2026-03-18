@@ -61,3 +61,34 @@ class PressureJudge:
         data = safe_json_load(json_text)
 
         return PressureJudgeOutput.model_validate(data)
+
+    async def aevaluate(
+        self,
+        user_message: str,
+        suspect_summary: str,
+        current_pressure: int,
+        clue_presented: Optional[dict] = None,
+        suspect_alibi: Optional[str] = None,
+        suspect_facts: Optional[str] = None
+    ) -> PressureJudgeOutput:
+        """evaluate()의 비동기 버전."""
+
+        input_data = {
+            "user_message": user_message,
+            "clue_presented": clue_presented,
+            "current_pressure": current_pressure,
+            "suspect_summary": suspect_summary,
+            "suspect_alibi": suspect_alibi or "정보 없음",
+            "suspect_facts": suspect_facts or "정보 없음",
+        }
+
+        raw = await self.llm.acomplete(
+            system=self.system_prompt,
+            user=json.dumps(input_data, ensure_ascii=False),
+            response_schema=PressureJudgeOutput.model_json_schema()
+        )
+
+        json_text = extract_json(raw)
+        data = safe_json_load(json_text)
+
+        return PressureJudgeOutput.model_validate(data)

@@ -1,7 +1,6 @@
 """Critic AI evaluators that check scenario quality from different perspectives."""
 import json
 import logging
-from typing import Type
 
 from app.core.utils import extract_json, safe_json_load
 from app.models.schemas.critic import CriticType, CriticEvaluation
