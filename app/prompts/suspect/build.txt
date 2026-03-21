@@ -12,65 +12,93 @@ You receive JSON "input" containing:
 [GENERATION RULES]
 
 0. Language:
-   - ALL string values MUST be written in Korean, EXCEPT `visual_description` which MUST be in English.
+   - ALL content fields (name, role, description, timeline activity, secret/heard content, alibi_summary, motive) MUST be in Korean.
+   - EXCEPTION: visual_description MUST be in English.
+   - All field keys and knowledge_type values are in English.
 
 1. Basic Info:
    - suspect_id: Sequential integers (1, 2, 3...)
    - name, role, description: Korean
    - is_culprit: true if suspect_id in ground_truth.culprit_ids
-   - motive: Only for culprit, explain why they committed the crime
+   - motive: Only for culprit (Korean); null for innocents
 
 2. Alibi Summary:
    - One Korean sentence summarizing their alibi claim
    - Example: "사건 당시 주방에서 설거지를 하고 있었다고 주장"
 
-3. Timeline:
+3. Timeline (first-hand direct knowledge, knowledge_type = "timeline"):
    - Cover the entire incident_time with entries
-   - Format: {"time": "HH:MM-HH:MM", "location": "...", "activity": "...", "can_prove": bool, "witness": "..."}
-   - [STRICT LOCATION RULE]: Use ONLY location names provided in 'world_context.locations'. DO NOT create new locations like 'corridors', 'hallways', or 'stairs' if they are not in the list. Every timeline entry must occur in a pre-defined room.
-   - CULPRIT: Must have gap or weak alibi during crime time
-   - INNOCENT: At least one unprovable period for suspicion
+   - Format: {"time": "HH:MM-HH:MM", "location": "...", "activity": "..."}
+   - [STRICT LOCATION RULE]: Use ONLY location names from world_context.locations. Do NOT invent new locations.
+   - CULPRIT: Must have a gap or weak alibi during the crime time window
+   - INNOCENT: At least one unprovable period to create suspicion
+   - Each timeline entry must have "knowledge_type": "timeline"
 
-4. Secrets (PRESSURE-TIERED):
-   Generate exactly 5 secrets with these thresholds:
+4. Secrets (PRESSURE-TIERED) — exactly 5 entries, thresholds: 0, 30, 50, 70, 90:
 
-   ```json
-   "secrets": [
-     {"threshold": 0, "content": "기본 부인/입장", "trigger_evidence_ids": []},
-     {"threshold": 30, "content": "사소한 인정 (근처에 있었다 등)", "trigger_evidence_ids": []},
-     {"threshold": 50, "content": "중요 사실 (피해자와 갈등 등)", "trigger_evidence_ids": [관련증거ID]},
-     {"threshold": 70, "content": "핵심 비밀 (현장 목격/진입 등)", "trigger_evidence_ids": [관련증거ID]},
-     {"threshold": 90, "content": "최종 (범인: 자백 / 무고: 결백 증명)", "trigger_evidence_ids": []}
-   ]
-   ```
+   KNOWLEDGE_TYPE RULES FOR SECRETS:
+   - INNOCENT suspects: ALL 5 secrets get knowledge_type = "secret"
+     (they are reluctant but honest when pressure breaks them)
+   - CULPRIT suspects:
+     - threshold 0 and 30: knowledge_type = "secret"
+       (general reluctance, embarrassment — NOT the crime itself)
+     - threshold 50, 70, 90: knowledge_type = "hidden"
+       (culprit KNOWS these and is ACTIVELY LYING about them — crime-related)
+
+   Content guidelines:
+   - threshold 0:  Initial stance — denial, basic alibi statement
+   - threshold 30: Minor admission — "I was nearby", "I knew them well"
+   - threshold 50: Important fact — conflict with victim, suspicious activity
+   - threshold 70: Critical secret — was at the scene, saw something key
+   - threshold 90: Final revelation
+                   CULPRIT: Full confession of the crime
+                   INNOCENT: The truth that proves their innocence
+
+   Format each secret as:
+   {
+     "fact_id": <sequential int>,
+     "threshold": <0|30|50|70|90>,
+     "knowledge_type": <"secret" or "hidden">,
+     "content": {"content": "<Korean text>"}
+   }
+
+5. Heard Facts (second-hand knowledge, 2-4 per suspect):
+   These are things this suspect heard, saw, or learned about OTHER suspects.
+   They are HONEST observations and will be expressed with uncertainty ("I heard that...", "I noticed...").
 
    Rules:
-   - threshold 0: Initial stance (denial, basic alibi)
-   - threshold 30: Minor admission under light pressure
-   - threshold 50: Important fact that looks suspicious
-   - threshold 70: Critical secret they've been hiding
-   - threshold 90: Final revelation
-     - CULPRIT: Full confession of the crime
-     - INNOCENT: Reveal what they were hiding that proves innocence
-   - trigger_evidence_ids: If ANY of these evidence IDs are presented, reveal this secret immediately (regardless of pressure)
+   - about_suspect_id must match a valid suspect_id in this scenario
+   - threshold: always 0 (freely shared)
+   - knowledge_type: always "heard"
+   - Content in Korean: what they heard/observed about the other person
 
-5. Personality:
-   ```json
-   "personality": {
-     "speech_style": "존댓말/반말/차갑게/친근하게 중 선택",
-     "emotional_tendency": "침착함/쉽게 흥분/방어적/소심함 중 선택",
-     "lying_pattern": "deflect(화제 전환)/deny(강하게 부인)/partial_truth(일부만 인정) 중 선택"
+   Format:
+   {
+     "fact_id": <sequential int, continuing from secrets>,
+     "threshold": 0,
+     "knowledge_type": "heard",
+     "content": {
+       "about_suspect_id": <int>,
+       "content": "<Korean: e.g., '피해자와 사흘 전에 크게 싸웠다고 들었어요'>"
+     }
    }
-   ```
-   - Match personality to the character's role and background
 
-6. Appearance Prompt (for image generation):
-   - Write an English prompt describing the suspect's visual appearance for use with an image generation model.
-   - Include: age, gender, build, hair color/style, eye color, skin tone, clothing/outfit matching their role, and any distinctive features.
+6. Personality:
+   {
+     "speech_style": "존댓말 / 반말 / 차갑게 / 친근하게",
+     "emotional_tendency": "침착함 / 쉽게 흥분 / 방어적 / 소심함",
+     "lying_pattern": "deflect / deny / partial_truth"
+   }
+   - Match personality to the character's role and background
+   - Ensure each suspect has a UNIQUE personality
+
+7. Appearance Prompt (English only, for image generation):
+   - Age, gender, build, hair color/style, eye color, skin tone
+   - Clothing matching their role
+   - Any distinctive features
    - Example: "Middle-aged Korean man, 45 years old, slender build, short black hair neatly combed, sharp dark eyes, light skin, wearing a formal black butler uniform with white gloves, dignified posture"
 
 [OUTPUT FORMAT]
-```json
 {
   "suspects": [
     {
@@ -83,18 +111,45 @@ You receive JSON "input" containing:
       "is_culprit": false,
       "motive": null,
       "alibi_summary": "사건 당시 주방에서 설거지를 하고 있었다고 주장",
-      "timeline": [...],
-      "secrets": [...],
-      "personality": {...},
+      "timeline": [
+        {
+          "fact_id": 1,
+          "threshold": 0,
+          "knowledge_type": "timeline",
+          "content": {"time": "14:00-15:30", "location": "주방", "activity": "저녁 준비 및 설거지"}
+        }
+      ],
+      "secrets": [
+        {"fact_id": 2, "threshold": 0,  "knowledge_type": "secret", "content": {"content": "특별히 숨기는 건 없습니다."}},
+        {"fact_id": 3, "threshold": 30, "knowledge_type": "secret", "content": {"content": "사실 그날 피해자와 짧게 대화를 나눴습니다."}},
+        {"fact_id": 4, "threshold": 50, "knowledge_type": "secret", "content": {"content": "피해자가 최근 누군가에게 협박을 받고 있다고 털어놓았습니다."}},
+        {"fact_id": 5, "threshold": 70, "knowledge_type": "secret", "content": {"content": "피해자 방 앞에서 이상한 소리를 들었지만 무서워서 그냥 지나쳤습니다."}},
+        {"fact_id": 6, "threshold": 90, "knowledge_type": "secret", "content": {"content": "사실 그날 밤 범행을 목격했습니다. 하지만 보복이 두려워 말하지 못했습니다."}}
+      ],
+      "heard": [
+        {
+          "fact_id": 7,
+          "threshold": 0,
+          "knowledge_type": "heard",
+          "content": {"about_suspect_id": 2, "content": "2번 용의자가 최근 피해자에게 돈을 빌렸다는 이야기를 들었습니다."}
+        }
+      ],
+      "personality": {
+        "speech_style": "존댓말",
+        "emotional_tendency": "침착함",
+        "lying_pattern": "deflect"
+      },
       "visual_description": "Middle-aged Korean man, 45 years old, slender build, short black hair neatly combed, sharp dark eyes, light skin, wearing a formal black butler uniform with white gloves, dignified posture"
     }
   ]
 }
-```
 
 [CONSTRAINTS]
-- All text in Korean EXCEPT visual_description which MUST be in English
-- Secrets must have exactly 5 entries with thresholds: 0, 30, 50, 70, 90
-- Timeline must be chronologically consistent
+- All content fields in Korean; visual_description in English; all structural keys in English
+- Timeline: knowledge_type = "timeline" for every entry
+- Secrets: exactly 5 entries (thresholds 0, 30, 50, 70, 90); knowledge_type = "secret" or "hidden" per rules above
+- Heard: 2-4 entries per suspect; knowledge_type = "heard"; about_suspect_id must be valid
+- fact_id must be unique and sequential across timeline + secrets + heard for each suspect
 - At least one suspect must be the culprit (check ground_truth.culprit_ids)
-- Each suspect needs unique personality to make interrogation interesting
+- Each suspect needs unique personality
+- Timeline must be chronologically consistent and cover the incident time window
