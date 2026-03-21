@@ -8,9 +8,9 @@ class FactEntrySchema[T](BaseModel):
     fact_id: int = Field()
     threshold: int = Field(ge=0, le=100, description="Minimum pressure required to reveal this fact")
     content: T = Field(description="Fact content")
-    knowledge_type: str = Field(
+    type: str = Field(
         default="timeline",
-        description="Knowledge classification: timeline | heard | secret | hidden"
+        description="Fact type: timeline | heard | secret | hidden"
     )
 
 class TimelineContentSchema(BaseModel):
@@ -42,11 +42,7 @@ class FactSchema(BaseModel):
     fact_id: int = Field()
     threshold: int = Field(ge=0, le=100, description="Minimum pressure required to reveal this fact")
     content: Any = Field(description="Fact content")
-    type: str = Field(description="Fact type (timeline, heard, secret, hidden, or context)")
-    knowledge_type: str = Field(
-        default="timeline",
-        description="Knowledge classification: timeline | heard | secret | hidden"
-    )
+    type: str = Field(description="Fact type: timeline | heard | secret | hidden | context")
 
     @classmethod
     def from_timeline(
@@ -58,21 +54,19 @@ class FactSchema(BaseModel):
             threshold=fact.threshold,
             content=fact.content,
             type="timeline",
-            knowledge_type="timeline",
         )
 
     @classmethod
     def from_secret(
             cls,
             fact: FactEntrySchema["SecretContentSchema"],
-            knowledge_type: str = "secret"
+            fact_type: str = "secret"
     ) -> "FactSchema":
         return cls(
             fact_id=fact.fact_id,
             threshold=fact.threshold,
             content=fact.content,
-            type="secret",
-            knowledge_type=knowledge_type,
+            type=fact_type,
         )
 
     @classmethod
@@ -85,5 +79,4 @@ class FactSchema(BaseModel):
             threshold=fact.threshold,
             content=fact.content if isinstance(fact.content, dict) else fact.content.model_dump(),
             type="heard",
-            knowledge_type="heard",
         )

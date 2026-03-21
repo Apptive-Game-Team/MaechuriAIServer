@@ -22,11 +22,10 @@ class SuspectGenerationSchema(BaseModel):
     # Timeline
     timeline: List[FactEntrySchema[TimelineContentSchema]] = Field(description="시간대별 행적")
 
-    # Secrets by pressure threshold (innocent: all "secret" knowledge_type;
-    # culprit threshold 0/30 = "secret", threshold 50/70/90 = "hidden")
+    # Secrets by pressure threshold (innocent: all type="secret";
+    # culprit threshold 0/30 = type="secret", threshold 50/70/90 = type="hidden")
     secrets: List[FactEntrySchema[SecretContentSchema]] = Field(
-        description="Pressure-gated secrets (exactly 5: thresholds 0, 30, 50, 70, 90). "
-                    "knowledge_type must be set per entry: secret or hidden."
+        description="Pressure-gated secrets (exactly 5: thresholds 0, 30, 50, 70, 90)."
     )
 
     # Second-hand information about other suspects (usually threshold=0)

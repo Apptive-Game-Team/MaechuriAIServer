@@ -14,7 +14,7 @@ You receive JSON "input" containing:
 0. Language:
    - ALL content fields (name, role, description, timeline activity, secret/heard content, alibi_summary, motive) MUST be in Korean.
    - EXCEPTION: visual_description MUST be in English.
-   - All field keys and knowledge_type values are in English.
+   - All field keys and type values are in English.
 
 1. Basic Info:
    - suspect_id: Sequential integers (1, 2, 3...)
@@ -26,23 +26,23 @@ You receive JSON "input" containing:
    - One Korean sentence summarizing their alibi claim
    - Example: "사건 당시 주방에서 설거지를 하고 있었다고 주장"
 
-3. Timeline (first-hand direct knowledge, knowledge_type = "timeline"):
+3. Timeline (first-hand direct knowledge, type = "timeline"):
    - Cover the entire incident_time with entries
    - Format: {"time": "HH:MM-HH:MM", "location": "...", "activity": "..."}
    - [STRICT LOCATION RULE]: Use ONLY location names from world_context.locations. Do NOT invent new locations.
    - CULPRIT: Must have a gap or weak alibi during the crime time window
    - INNOCENT: At least one unprovable period to create suspicion
-   - Each timeline entry must have "knowledge_type": "timeline"
+   - Each timeline entry must have "type": "timeline"
 
 4. Secrets (PRESSURE-TIERED) — exactly 5 entries, thresholds: 0, 30, 50, 70, 90:
 
-   KNOWLEDGE_TYPE RULES FOR SECRETS:
-   - INNOCENT suspects: ALL 5 secrets get knowledge_type = "secret"
+   TYPE RULES FOR SECRETS:
+   - INNOCENT suspects: ALL 5 secrets get type = "secret"
      (they are reluctant but honest when pressure breaks them)
    - CULPRIT suspects:
-     - threshold 0 and 30: knowledge_type = "secret"
+     - threshold 0 and 30: type = "secret"
        (general reluctance, embarrassment — NOT the crime itself)
-     - threshold 50, 70, 90: knowledge_type = "hidden"
+     - threshold 50, 70, 90: type = "hidden"
        (culprit KNOWS these and is ACTIVELY LYING about them — crime-related)
 
    Content guidelines:
@@ -58,7 +58,7 @@ You receive JSON "input" containing:
    {
      "fact_id": <sequential int>,
      "threshold": <0|30|50|70|90>,
-     "knowledge_type": <"secret" or "hidden">,
+     "type": <"secret" or "hidden">,
      "content": {"content": "<Korean text>"}
    }
 
@@ -69,14 +69,14 @@ You receive JSON "input" containing:
    Rules:
    - about_suspect_id must match a valid suspect_id in this scenario
    - threshold: always 0 (freely shared)
-   - knowledge_type: always "heard"
+   - type: always "heard"
    - Content in Korean: what they heard/observed about the other person
 
    Format:
    {
      "fact_id": <sequential int, continuing from secrets>,
      "threshold": 0,
-     "knowledge_type": "heard",
+     "type": "heard",
      "content": {
        "about_suspect_id": <int>,
        "content": "<Korean: e.g., '피해자와 사흘 전에 크게 싸웠다고 들었어요'>"
@@ -115,22 +115,22 @@ You receive JSON "input" containing:
         {
           "fact_id": 1,
           "threshold": 0,
-          "knowledge_type": "timeline",
+          "type": "timeline",
           "content": {"time": "14:00-15:30", "location": "주방", "activity": "저녁 준비 및 설거지"}
         }
       ],
       "secrets": [
-        {"fact_id": 2, "threshold": 0,  "knowledge_type": "secret", "content": {"content": "특별히 숨기는 건 없습니다."}},
-        {"fact_id": 3, "threshold": 30, "knowledge_type": "secret", "content": {"content": "사실 그날 피해자와 짧게 대화를 나눴습니다."}},
-        {"fact_id": 4, "threshold": 50, "knowledge_type": "secret", "content": {"content": "피해자가 최근 누군가에게 협박을 받고 있다고 털어놓았습니다."}},
-        {"fact_id": 5, "threshold": 70, "knowledge_type": "secret", "content": {"content": "피해자 방 앞에서 이상한 소리를 들었지만 무서워서 그냥 지나쳤습니다."}},
-        {"fact_id": 6, "threshold": 90, "knowledge_type": "secret", "content": {"content": "사실 그날 밤 범행을 목격했습니다. 하지만 보복이 두려워 말하지 못했습니다."}}
+        {"fact_id": 2, "threshold": 0,  "type": "secret", "content": {"content": "특별히 숨기는 건 없습니다."}},
+        {"fact_id": 3, "threshold": 30, "type": "secret", "content": {"content": "사실 그날 피해자와 짧게 대화를 나눴습니다."}},
+        {"fact_id": 4, "threshold": 50, "type": "secret", "content": {"content": "피해자가 최근 누군가에게 협박을 받고 있다고 털어놓았습니다."}},
+        {"fact_id": 5, "threshold": 70, "type": "secret", "content": {"content": "피해자 방 앞에서 이상한 소리를 들었지만 무서워서 그냥 지나쳤습니다."}},
+        {"fact_id": 6, "threshold": 90, "type": "secret", "content": {"content": "사실 그날 밤 범행을 목격했습니다. 하지만 보복이 두려워 말하지 못했습니다."}}
       ],
       "heard": [
         {
           "fact_id": 7,
           "threshold": 0,
-          "knowledge_type": "heard",
+          "type": "heard",
           "content": {"about_suspect_id": 2, "content": "2번 용의자가 최근 피해자에게 돈을 빌렸다는 이야기를 들었습니다."}
         }
       ],
@@ -146,9 +146,9 @@ You receive JSON "input" containing:
 
 [CONSTRAINTS]
 - All content fields in Korean; visual_description in English; all structural keys in English
-- Timeline: knowledge_type = "timeline" for every entry
-- Secrets: exactly 5 entries (thresholds 0, 30, 50, 70, 90); knowledge_type = "secret" or "hidden" per rules above
-- Heard: 2-4 entries per suspect; knowledge_type = "heard"; about_suspect_id must be valid
+- Timeline: type = "timeline" for every entry
+- Secrets: exactly 5 entries (thresholds 0, 30, 50, 70, 90); type = "secret" or "hidden" per rules above
+- Heard: 2-4 entries per suspect; type = "heard"; about_suspect_id must be valid
 - fact_id must be unique and sequential across timeline + secrets + heard for each suspect
 - At least one suspect must be the culprit (check ground_truth.culprit_ids)
 - Each suspect needs unique personality

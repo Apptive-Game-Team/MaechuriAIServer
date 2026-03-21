@@ -505,10 +505,9 @@ class ContextBuilder:
         # 1. 사실(Facts) 분류
         buckets = {"timeline": [], "heard": [], "secret": [], "hidden": []}
         for f in facts:
-            # f.knowledge_type이 없으면 f.type 사용
-            kt = getattr(f, "knowledge_type", getattr(f, "type", None))
-            if kt in buckets:
-                buckets[kt].append(f)
+            ft = getattr(f, "type", None)
+            if ft in buckets:
+                buckets[ft].append(f)
 
         sections = []
 

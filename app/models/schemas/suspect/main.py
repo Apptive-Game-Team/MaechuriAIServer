@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from app.models.schemas.suspect import PersonalitySchema, SuspectGenerationSchema
-from app.models.schemas.suspect.common import FactSchema, HeardContentSchema
+from app.models.schemas.suspect.common import FactSchema
 
 
 class SuspectSchema(BaseModel):
@@ -33,9 +33,9 @@ class SuspectSchema(BaseModel):
     @classmethod
     def from_generation(cls, generation: "SuspectGenerationSchema") -> "SuspectSchema":
         timeline: List[FactSchema] = [FactSchema.from_timeline(t) for t in generation.timeline]
-        # Pass knowledge_type through for each secret (secret vs hidden)
+        # Pass type through for each secret (secret vs hidden)
         secrets: List[FactSchema] = [
-            FactSchema.from_secret(s, knowledge_type=s.knowledge_type)
+            FactSchema.from_secret(s, fact_type=s.type)
             for s in generation.secrets
         ]
         # Convert heard facts (second-hand cross-suspect knowledge)

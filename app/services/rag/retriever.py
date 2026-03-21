@@ -24,7 +24,6 @@ class RetrievedFact:
     threshold: int
     content: Any
     type: str
-    knowledge_type: str
     similarity: float
 
 @dataclass
@@ -199,7 +198,6 @@ class RAGRetriever:
                 threshold=fact.threshold,
                 content=fact.content,
                 type=fact.type,
-                knowledge_type=getattr(fact, "knowledge_type", fact.type),
                 similarity=similarity
             )
 
@@ -269,7 +267,6 @@ class RAGRetriever:
                 threshold=row.threshold,
                 content=row.content,
                 type=row.type,
-                knowledge_type=getattr(row, "knowledge_type", row.type),
                 similarity=1.0  # No semantic score; all are fully accessible
             )
             for row in rows

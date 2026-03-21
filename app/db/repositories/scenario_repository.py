@@ -331,7 +331,6 @@ class ScenarioRepository:
                         threshold=fact_schema.threshold,
                         content=fact_schema.content if isinstance(fact_schema.content, dict) else fact_schema.content.model_dump() if hasattr(fact_schema.content, 'model_dump') else fact_schema.content,
                         type=fact_schema.type,
-                        knowledge_type=fact_schema.knowledge_type,
                     )
                     session.add(fact_entry)
 

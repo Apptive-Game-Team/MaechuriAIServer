@@ -128,7 +128,7 @@ class RAGService:
 
         Uses the knowledge-partition approach: loads ALL accessible facts
         (threshold <= current_pressure) without semantic filtering, then
-        builds a context partitioned by knowledge_type. Chat history uses
+        builds a context partitioned by fact type. Chat history uses
         a recency + semantic hybrid to preserve contradiction context.
 
         Parameters
