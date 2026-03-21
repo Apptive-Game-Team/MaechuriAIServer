@@ -11,7 +11,7 @@ def test_scenario():
     print("SCENARIO TEST START")
 
     agent = ScenarioService(GeminiClient())
-    test_str = "690d68a8-a3d7-46c7-a5e3-77b4149dee9d"
+    test_str = "896d297e-c9ee-499b-aa57-b945aabf10e8"
     # request_id = datetime.now().strftime("%y_%m_%d_%H_%M_test")
     scenario_result = agent.generate("밀실 방화 사망 사건", test_str)
 
@@ -41,7 +41,7 @@ async def test_save_scenario(
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     if file_path == "":
-        file_path = os.path.join(base_dir, 'result_20260301_070154.json')
+        file_path = os.path.join(base_dir, 'result_20260319_094242.json')
     else:
         file_path = os.path.join(base_dir, file_path)
 

@@ -331,6 +331,7 @@ class ScenarioRepository:
                         threshold=fact_schema.threshold,
                         content=fact_schema.content if isinstance(fact_schema.content, dict) else fact_schema.content.model_dump() if hasattr(fact_schema.content, 'model_dump') else fact_schema.content,
                         type=fact_schema.type,
+                        knowledge_type=fact_schema.knowledge_type,
                     )
                     session.add(fact_entry)
 
@@ -407,6 +408,15 @@ class ScenarioRepository:
 
             await session.commit()
             return scenario_id
+
+    async def get_suspect_names(self, scenario_id: int) -> Dict[int, str]:
+        """Lightweight query: only suspect IDs and names, no facts loaded."""
+        async with self._get_session() as session:
+            result = await session.execute(
+                select(Suspect.suspect_id, Suspect.name)
+                .where(Suspect.scenario_id == scenario_id)
+            )
+            return {row[0]: row[1] for row in result.all()}
 
     async def get_location_dict(self, scenario_id: int) -> Dict[int, str]:
         async with self._get_session() as session:

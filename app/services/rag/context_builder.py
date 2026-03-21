@@ -486,6 +486,80 @@ class ContextBuilder:
 
         return "\n\n".join(sections)
 
+    @staticmethod
+    def _extract_text_content(fact) -> str:
+        """Extract plain text from a fact's content dict (or stringify as fallback)."""
+        if hasattr(fact, 'content') and isinstance(fact.content, dict):
+            return fact.content.get('content', str(fact.content))
+        return str(getattr(fact, 'content', fact))
+
+    def build_suspect_knowledge_context(
+            self,
+            facts: list,
+            chat_history: list,
+            suspect_names: dict = None,
+    ) -> str:
+        if suspect_names is None:
+            suspect_names = {}
+
+        # 1. 사실(Facts) 분류
+        buckets = {"timeline": [], "heard": [], "secret": [], "hidden": []}
+        for f in facts:
+            # f.knowledge_type이 없으면 f.type 사용
+            kt = getattr(f, "knowledge_type", getattr(f, "type", None))
+            if kt in buckets:
+                buckets[kt].append(f)
+
+        sections = []
+
+        # 2. 각 섹션 빌드
+        if buckets["timeline"]:
+            lines = []
+            for f in buckets["timeline"]:
+                c = f.content if isinstance(f.content, dict) else {}
+                t = c.get("time", "")
+                loc = c.get("location", "")
+                act = c.get("activity", "")
+                if t and loc and act:
+                    lines.append(f"- {t}: {loc}에서 {act}")
+                else:
+                    lines.append(f"- {self._extract_text_content(f)}")
+            content = "\n".join(lines)
+            sections.append(f"[YOUR TIMELINE — speak freely and honestly]\n{content}")
+
+        if buckets["heard"]:
+            lines = []
+            for f in buckets["heard"]:
+                c = f.content if isinstance(f.content, dict) else {}
+                about_id = c.get("about_suspect_id")
+                about_name = suspect_names.get(about_id, f"suspect {about_id}") if about_id else "someone"
+                lines.append(f"- About {about_name}: {c.get('content', str(c))}")
+            content = "\n".join(lines)
+            sections.append(
+                f"[WHAT YOU HEARD ABOUT OTHERS — express with uncertainty: '들었는데...', '본 것 같아요...']\n{content}")
+
+        if buckets["secret"]:
+            lines = [f"- {self._extract_text_content(f)}" for f in buckets["secret"]]
+            content = "\n".join(lines)
+            sections.append(f"[YOUR RELUCTANT SECRETS — honest when pressure finally breaks you]\n{content}")
+
+        if buckets["hidden"]:
+            lines = [f"- {self._extract_text_content(f)}" for f in buckets["hidden"]]
+            content = "\n".join(lines)
+            sections.append(
+                "[WHAT YOU ARE ACTIVELY HIDING — you KNOW these facts but are LYING about them.\n"
+                "Use your lying_pattern to conceal. Show cracks only under sustained high pressure.]\n"
+                + content
+            )
+
+        if chat_history:
+            role_map = {"user": "Detective", "detective": "Detective", "suspect": "You"}
+            hist_lines = [f"- {role_map.get(getattr(m, 'role', 'user'), 'Detective')}: {getattr(m, 'content', '')}" for
+                          m in chat_history]
+            content = "\n".join(hist_lines)
+            sections.append(f"[PRIOR CONVERSATION — stay consistent with what you already said]\n{content}")
+
+        return "\n\n".join(sections) if sections else ""
 
 # Singleton instance
 _builder_instance: Optional[ContextBuilder] = None

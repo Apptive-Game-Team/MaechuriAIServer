@@ -92,10 +92,18 @@ class ChatFormatter:
         suspect: SuspectSchema,
         state: SuspectState,
         clue_presented: Optional[dict] = None,
-        rag_context: Optional[str] = None,
+        knowledge_context: str = "",
         **extra_fields,
     ) -> dict:
-        """Build shared prompt template data for suspect-facing agents."""
+        """Build shared prompt template data for suspect-facing agents.
+
+        Args:
+            suspect: Suspect schema data
+            state: Current pressure state
+            clue_presented: Clue being shown to suspect, if any
+            knowledge_context: Structured knowledge context from build_suspect_knowledge_context().
+                Passed as {knowledge_context} template variable.
+        """
         data = {
             "name": suspect.name,
             "role": suspect.role,
@@ -110,7 +118,7 @@ class ChatFormatter:
             "pressure_level": state.current_pressure,
             "is_culprit": suspect.is_culprit,
             "clue_presented": json.dumps(clue_presented, ensure_ascii=False) if clue_presented else "None",
-            "rag_context": rag_context or "",
+            "knowledge_context": knowledge_context,
         }
         data.update(extra_fields)
         return data

@@ -80,6 +80,12 @@ class Fact(Base):
     threshold: Mapped[int] = mapped_column(Integer, default=0)
     content: Mapped[Any] = mapped_column(JSONB)
     type: Mapped[str] = mapped_column(String(50))
+    knowledge_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="timeline",
+        comment="timeline|heard|secret|hidden for suspect facts; context for suspect_id=0"
+    )
 
     # Embedding for RAG
     embedding = mapped_column(Vector(1024), nullable=True)

@@ -6,8 +6,12 @@ from pydantic import BaseModel, Field
 class FactEntrySchema[T](BaseModel):
     """Fact entry schema."""
     fact_id: int = Field()
-    threshold: int = Field(ge=0, le=100, description="이 사실이 공개되는 최소 pressure")
-    content: T = Field(description="사실 내용")
+    threshold: int = Field(ge=0, le=100, description="Minimum pressure required to reveal this fact")
+    content: T = Field(description="Fact content")
+    knowledge_type: str = Field(
+        default="timeline",
+        description="Knowledge classification: timeline | heard | secret | hidden"
+    )
 
 class TimelineContentSchema(BaseModel):
     """Timeline entry for suspect activity. Time format: 'HH:MM-HH:MM' (e.g., '14:00-15:00')."""
@@ -18,7 +22,13 @@ class TimelineContentSchema(BaseModel):
 
 class SecretContentSchema(BaseModel):
     """Secret revealed at pressure threshold."""
-    content: str = Field(description="비밀 내용")
+    content: str = Field(description="Secret content")
+
+
+class HeardContentSchema(BaseModel):
+    """Second-hand information about another suspect."""
+    about_suspect_id: int = Field(description="Suspect ID this information is about")
+    content: str = Field(description="What this suspect heard or observed about them")
 
 
 class PersonalitySchema(BaseModel):
@@ -30,9 +40,13 @@ class PersonalitySchema(BaseModel):
 class FactSchema(BaseModel):
     """Fact entry schema."""
     fact_id: int = Field()
-    threshold: int = Field(ge=0, le=100, description="이 사실이 공개되는 최소 pressure")
-    content: Any = Field(description="사실 내용")
-    type: str = Field(description="사실의 종류 (예: timeline, secret)")
+    threshold: int = Field(ge=0, le=100, description="Minimum pressure required to reveal this fact")
+    content: Any = Field(description="Fact content")
+    type: str = Field(description="Fact type (timeline, heard, secret, hidden, or context)")
+    knowledge_type: str = Field(
+        default="timeline",
+        description="Knowledge classification: timeline | heard | secret | hidden"
+    )
 
     @classmethod
     def from_timeline(
@@ -44,16 +58,32 @@ class FactSchema(BaseModel):
             threshold=fact.threshold,
             content=fact.content,
             type="timeline",
+            knowledge_type="timeline",
         )
 
     @classmethod
     def from_secret(
             cls,
-            fact: FactEntrySchema["SecretContentSchema"]
+            fact: FactEntrySchema["SecretContentSchema"],
+            knowledge_type: str = "secret"
     ) -> "FactSchema":
         return cls(
             fact_id=fact.fact_id,
             threshold=fact.threshold,
             content=fact.content,
             type="secret",
+            knowledge_type=knowledge_type,
+        )
+
+    @classmethod
+    def from_heard(
+            cls,
+            fact: FactEntrySchema["HeardContentSchema"]
+    ) -> "FactSchema":
+        return cls(
+            fact_id=fact.fact_id,
+            threshold=fact.threshold,
+            content=fact.content if isinstance(fact.content, dict) else fact.content.model_dump(),
+            type="heard",
+            knowledge_type="heard",
         )

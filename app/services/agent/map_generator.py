@@ -21,7 +21,7 @@ class MapGenerator(BaseGenerator):
         return self._generate(
             skeleton_input,
             MapSkeletonSchema,
-            system_prompt=self.skeleton_prompt
+            system_prompt=self.skeleton_prompt,
         )
 
     def generate_detail(
@@ -37,7 +37,7 @@ class MapGenerator(BaseGenerator):
         return self._generate(
             detail_input,
             MapOutputSchema,
-            system_prompt=self.detail_prompt
+            system_prompt=self.detail_prompt,
         )
 
     def _extract_skeleton_input(self,

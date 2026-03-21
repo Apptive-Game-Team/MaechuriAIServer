@@ -73,6 +73,7 @@ class ScenarioService:
         schema_name: str,
         model_type: Optional[Type[BaseModel]] = None,
         use_retry: bool = True,
+        generator=None,
     ) -> Any:
         """Load a cached intermediate result or generate it.
 
@@ -107,6 +108,7 @@ class ScenarioService:
             result = self.json_retry.parse_with_retry(
                 parser_func=generator_func,
                 schema_name=schema_name,
+                generator=generator,
             )
         else:
             result = generator_func()
@@ -245,6 +247,7 @@ class ScenarioService:
             request_id, "map_skeleton",
             lambda: self.map_generator.generate_skeleton(expansion_result),
             "MapSkeleton", MapSkeletonSchema,
+            generator=self.map_generator,
         )
         logger.info("Map skeleton generated successfully")
         self._sleep_if_generated(generated)
@@ -263,6 +266,7 @@ class ScenarioService:
             request_id, "suspects_result",
             _generate_suspects,
             "SuspectList", SuspectGenerationListSchema,
+            generator=self.suspect_generator,
         )
         logger.info("Suspects generated successfully")
         self._sleep_if_generated(generated)
@@ -272,6 +276,7 @@ class ScenarioService:
             request_id, "clue_result",
             lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
             "ClueSet", ClueSetSchema,
+            generator=self.clue_generator,
         )
         logger.info("Clues generated successfully")
         self._sleep_if_generated(generated)
@@ -283,6 +288,7 @@ class ScenarioService:
                 expansion_result, map_skeleton, clue_result
             ),
             "MapDetail", MapOutputSchema,
+            generator=self.map_generator,
         )
         logger.info("Map detail generated successfully")
         self._sleep_if_generated(generated)
@@ -368,6 +374,7 @@ class ScenarioService:
                 request_id, "skeleton_result",
                 lambda: self.scenario_generator.generate_skeleton(case_state),
                 "ScenarioSkeleton", ScenarioSkeleton,
+                generator=self.scenario_generator,
             )
             logger.info("Skeleton generated successfully")
             self._sleep_if_generated(generated)
@@ -377,6 +384,7 @@ class ScenarioService:
                 request_id, "expansion_result",
                 lambda: self.scenario_generator.generate_expansion(skeleton_result),
                 "ScenarioExpansion", ScenarioExpansion,
+                generator=self.scenario_generator,
             )
 
             logger.info("Expansion generated successfully")

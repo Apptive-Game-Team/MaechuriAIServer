@@ -1,11 +1,11 @@
 """RAG Service - Orchestrates retrieval and context building for agents."""
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from dataclasses import dataclass, field
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.rag.retriever import RAGRetriever, get_rag_retriever, RetrievedChatMessage
+from app.services.rag.retriever import RAGRetriever, get_rag_retriever, RetrievedChatMessage, RetrievedFact
 from app.services.rag.context_builder import ContextBuilder, get_context_builder
 from app.services.rag.indexer import RAGIndexer, get_rag_indexer
 
@@ -122,14 +122,14 @@ class RAGService:
         query: str,
         current_pressure: int,
         session_id: Optional[str] = None,
-        top_k_secrets: int = 2,
-        top_k_history: int = 5,
-        similarity_threshold: float = 0.5
+        suspect_names: Optional[dict] = None,
     ) -> SuspectRAGContext:
-        """Get RAG context for suspect interrogation.
+        """Get structured knowledge context for suspect interrogation.
 
-        Retrieves relevant timeline entries, secrets, and chat history
-        based on the user's query.
+        Uses the knowledge-partition approach: loads ALL accessible facts
+        (threshold <= current_pressure) without semantic filtering, then
+        builds a context partitioned by knowledge_type. Chat history uses
+        a recency + semantic hybrid to preserve contradiction context.
 
         Parameters
         ----------
@@ -140,47 +140,50 @@ class RAGService:
         suspect_id : int
             The suspect ID.
         query : str
-            The user's query/message.
+            The detective's current message (used for semantic history search).
         current_pressure : int
             Current pressure level (0-100).
         session_id : str, optional
-            Session ID for history search.
-        top_k_secrets : int, optional
-            Number of secrets to retrieve. Defaults to 2.
-        top_k_history : int, optional
-            Number of history messages to retrieve. Defaults to 5.
-        similarity_threshold : float, optional
-            Minimum similarity threshold. Defaults to 0.5.
+            Session ID for history retrieval.
+        suspect_names : dict, optional
+            {suspect_id: name} mapping for heard-fact display.
 
         Returns
         -------
         SuspectRAGContext
-            Context containing relevant information.
+            Structured context ready for the SuspectActor prompt.
         """
-
-        facts = await self.retriever.search_facts(
+        # Load ALL accessible facts (no semantic miss)
+        facts = await self.retriever.get_all_accessible_facts(
             db=db,
             scenario_id=scenario_id,
             suspect_id=suspect_id,
-            query=query,
             current_pressure=current_pressure,
-            top_k=top_k_secrets,
-            threshold=similarity_threshold
         )
 
-        history, history_str = await self._get_history(
-            db, scenario_id, session_id, query,
-            top_k=top_k_history, threshold=similarity_threshold, suspect_id=suspect_id
-        )
+        # Hybrid chat history: recency + semantic
+        history: List[RetrievedChatMessage] = []
+        if session_id:
+            history = await self.retriever.search_chat_history_hybrid(
+                db=db,
+                scenario_id=scenario_id,
+                session_id=session_id,
+                query=query,
+                suspect_id=suspect_id,
+                recency_k=4,
+                semantic_k=3,
+                threshold=0.3,
+            )
 
-        facts_str = self.context_builder.build_fact_context(facts)
-        full_context = self.context_builder.build_suspect_interrogation_context(
-            facts=facts, chat_history=history
+        full_context = self.context_builder.build_suspect_knowledge_context(
+            facts=facts,
+            chat_history=history,
+            suspect_names=suspect_names or {},
         )
 
         return SuspectRAGContext(
-            relevant_facts=facts_str,
-            relevant_history=history_str,
+            relevant_facts=full_context,
+            relevant_history="",   # Merged into full_context above
             full_context=full_context,
             retrieved_fact_ids=[f.fact_id for f in facts]
         )
