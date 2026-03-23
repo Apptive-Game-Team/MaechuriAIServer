@@ -160,8 +160,9 @@ class ScenarioService:
     ) -> ScenarioResult:
         """Generate map/suspects/clues and validate clearability.
 
-        If the clearability check fails, clears the generated content
-        and retries up to MAX_CLEARABILITY_REGEN times.
+        If the clearability check fails, keeps the map (unlikely cause) and
+        regenerates only suspects and clues with targeted feedback from the
+        evaluator, saving ~2 LLM calls per retry.
 
         Parameters
         ----------
@@ -180,21 +181,28 @@ class ScenarioService:
         RuntimeError
             If scenario is not clearable after all retry attempts.
         """
-        content_steps = [
-            "map_skeleton", "suspects_result", "clue_result", "map_detail"
-        ]
+        clearability_feedback: str = ""
 
         for attempt in range(MAX_CLEARABILITY_REGEN + 1):
             if attempt > 0:
                 logger.info(
-                    f"Clearability regen attempt {attempt}/{MAX_CLEARABILITY_REGEN}"
+                    f"Clearability regen attempt {attempt}/{MAX_CLEARABILITY_REGEN} "
+                    f"— regenerating suspects + clues with feedback"
                 )
-                for step in content_steps:
-                    self.state_manager.clear_intermediate_state(request_id, step)
+                # Only clear suspects and clues; keep map_skeleton and map_detail
+                self.state_manager.clear_intermediate_state(
+                    request_id, "suspects_result"
+                )
+                self.state_manager.clear_intermediate_state(
+                    request_id, "clue_result"
+                )
 
-            final_scenario = self._generate_content(expansion_result, request_id)
+            final_scenario = self._generate_content(
+                expansion_result, request_id,
+                clearability_feedback=clearability_feedback,
+            )
 
-            # 9. Clearability 검증
+            # 9. Clearability evaluation
             logger.info("Starting clearability evaluation...")
             scenario_data = final_scenario.model_dump(mode="json")
             evaluation = self.clearability_evaluator.evaluate(scenario_data)
@@ -216,6 +224,8 @@ class ScenarioService:
             if attempt >= MAX_CLEARABILITY_REGEN:
                 break
 
+            # Pass evaluator feedback to next generation attempt
+            clearability_feedback = evaluation.reason
             time.sleep(3)
 
         raise RuntimeError(
@@ -227,6 +237,7 @@ class ScenarioService:
         self,
         expansion_result: ScenarioExpansion,
         request_id: str,
+        clearability_feedback: str = "",
     ) -> ScenarioResult:
         """Generate map, suspects, clues, and assemble the final scenario.
 
@@ -236,13 +247,16 @@ class ScenarioService:
             The validated expansion to build content from.
         request_id : str
             Request ID for state persistence.
+        clearability_feedback : str
+            If non-empty, feedback from a previous clearability failure.
+            Injected into suspect/clue generation prompts for targeted fixes.
 
         Returns
         -------
         ScenarioResult
             Assembled scenario (not yet clearability-validated).
         """
-        # 4. Map Skeleton 생성
+        # 4. Map Skeleton
         map_skeleton, generated = self._load_or_generate(
             request_id, "map_skeleton",
             lambda: self.map_generator.generate_skeleton(expansion_result),
@@ -252,12 +266,15 @@ class ScenarioService:
         logger.info("Map skeleton generated successfully")
         self._sleep_if_generated(generated)
 
-        # 5. Suspects 생성
+        # 5. Suspects — with optional clearability feedback
         def _generate_suspects():
             suspect_req = SuspectGenerationRequest.from_expansion(
                 expansion_result, map_skeleton
             )
-            result = self.suspect_generator.generate(suspect_req)
+            result = self.suspect_generator.generate(
+                suspect_req,
+                clearability_feedback=clearability_feedback,
+            )
             if result is not None:
                 inject_sequential_id(result, "fact_id")
             return result
@@ -271,17 +288,20 @@ class ScenarioService:
         logger.info("Suspects generated successfully")
         self._sleep_if_generated(generated)
 
-        # 6. Clues 생성
+        # 6. Clues — with optional clearability feedback
         clue_result, generated = self._load_or_generate(
             request_id, "clue_result",
-            lambda: self.clue_generator.generate_clues(expansion_result, map_skeleton),
+            lambda: self.clue_generator.generate_clues(
+                expansion_result, map_skeleton,
+                clearability_feedback=clearability_feedback,
+            ),
             "ClueSet", ClueSetSchema,
             generator=self.clue_generator,
         )
         logger.info("Clues generated successfully")
         self._sleep_if_generated(generated)
 
-        # 7. Map Detail 생성
+        # 7. Map Detail
         map_result, generated = self._load_or_generate(
             request_id, "map_detail",
             lambda: self.map_generator.generate_detail(
@@ -293,12 +313,15 @@ class ScenarioService:
         logger.info("Map detail generated successfully")
         self._sleep_if_generated(generated)
 
-        # 8. 최종 결과 조합
+        # 8. Assemble final scenario
         final_scenario = ScenarioResult(
-            **expansion_result.model_dump(),  # 본인
-            clues=clue_result.clues,  # List[ClueItemSchema]
-            map=map_result,  # 추가
-            suspects=[SuspectSchema.from_generation(generation) for generation in suspects_result.suspects]  # 추가
+            **expansion_result.model_dump(),
+            clues=clue_result.clues,
+            map=map_result,
+            suspects=[
+                SuspectSchema.from_generation(generation)
+                for generation in suspects_result.suspects
+            ],
         )
 
         return final_scenario

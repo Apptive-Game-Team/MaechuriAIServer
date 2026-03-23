@@ -11,9 +11,9 @@ class CriticType(str, Enum):
 
 
 class CriticEvaluation(BaseModel):
-    """Structured output from a single Critic AI.
+    """Structured output from a single Critic AI perspective.
 
-    Each critic must return this exact schema so the aggregator
+    Each perspective must return this exact schema so the aggregator
     can programmatically decide whether refinement is needed.
     """
     status: Literal["Pass", "Fail"] = Field(
@@ -31,6 +31,30 @@ class CriticEvaluation(BaseModel):
             "Empty when status is Pass."
         )
     )
+
+
+class UnifiedCriticOutput(BaseModel):
+    """Output from the unified critic — all 3 perspectives in one LLM call."""
+    logician: CriticEvaluation = Field(
+        description="Physical, temporal, and spatial consistency evaluation"
+    )
+    detective: CriticEvaluation = Field(
+        description="Solvability, clue sufficiency, and fairness evaluation"
+    )
+    director: CriticEvaluation = Field(
+        description="Tone, data completeness, and narrative evaluation"
+    )
+
+    def to_aggregated(self, iteration: int) -> "AggregatedCriticResult":
+        """Convert to AggregatedCriticResult for backward compatibility."""
+        return AggregatedCriticResult(
+            iteration=iteration,
+            evaluations={
+                CriticType.LOGICIAN.value: self.logician,
+                CriticType.DETECTIVE.value: self.detective,
+                CriticType.DIRECTOR.value: self.director,
+            },
+        )
 
 
 class AggregatedCriticResult(BaseModel):
