@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 class JSONParseRetry:
     """JSON 파싱 실패 시 재시도 로직"""
 
+    BASE_OUTPUT_TOKENS = 8192
+
     def __init__(
         self,
         max_attempts: int = 3,
@@ -24,7 +26,8 @@ class JSONParseRetry:
     def parse_with_retry(
         self,
         parser_func: Callable[[], T],
-        schema_name: str
+        schema_name: str,
+        generator=None,
     ) -> T | None:
         """
         JSON 파싱 함수를 재시도와 함께 실행
@@ -45,6 +48,13 @@ class JSONParseRetry:
 
         for attempt in range(1, self.max_attempts + 1):
             try:
+                # Escalate max_output_tokens on each attempt: 8192 → 16384 → 32768 ...
+                if generator is not None:
+                    generator._max_output_tokens = self.BASE_OUTPUT_TOKENS * (2 ** (attempt - 1))
+                    logger.info(
+                        f"[{schema_name}] max_output_tokens={generator._max_output_tokens}"
+                    )
+
                 logger.info(f"[{schema_name}] Parsing attempt {attempt}/{self.max_attempts}")
                 result = parser_func()
                 logger.info(f"[{schema_name}] ✅ Success on attempt {attempt}")
@@ -78,6 +88,8 @@ class JSONParseRetry:
                 logger.info(f"[{schema_name}] Retrying in {wait_time:.1f}s...")
                 time.sleep(wait_time)
 
-        # 모든 시도 실패
+        # 모든 시도 실패 — reset token override
+        if generator is not None:
+            generator._max_output_tokens = None
         logger.error(f"[{schema_name}] ❌ All {self.max_attempts} attempts failed. Last error: {last_error}")
         return None

@@ -1,83 +1,59 @@
 from typing import Optional
 
+from app.core.utils import extract_json, safe_json_load
 from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
-from app.services.rag.context_builder import get_context_builder, ContextBuilder
 from app.services.npc.formatters import ChatFormatter
 from app.models.schemas.suspect import SuspectSchema
+from app.models.schemas.suspect_responder import SuspectActorOutput
 from app.models.domain.suspect_state import SuspectState
 
 
 class SuspectActor:
     """
-    용의자를 연기하며 대화를 생성하는 Actor LLM.
-    현재 pressure와 공개된 비밀을 기반으로 응답 생성.
+    Judge + Actor를 단일 LLM 호출로 통합한 에이전트.
+    pressure 평가와 인캐릭터 응답을 동시에 생성하여 레이턴시를 줄임.
     """
 
-    def __init__(self, llm_client: LLMClient, context_builder: Optional[ContextBuilder] = None):
+    def __init__(self, llm_client: LLMClient):
         self.llm = llm_client
-        self.context_builder = context_builder or get_context_builder()
-        self.system_prompt_template = PromptLoader.load("app/prompts/actor/system.txt")
+        self.system_prompt_template = PromptLoader.load("app/prompts/suspect_responder/system.txt")
 
-    def generate_response(
+    async def arespond(
         self,
+        user_message: str,
         suspect: SuspectSchema,
         state: SuspectState,
-        user_message: str,
         clue_presented: Optional[dict] = None,
-        rag_context: Optional[str] = None
-    ) -> str:
-        """
-        용의자 응답 생성.
+        knowledge_context: str = "",
+    ) -> SuspectActorOutput:
+        """Single LLM call: pressure evaluation + in-character response.
 
         Args:
-            suspect: 용의자 스키마 데이터
-            state: 현재 런타임 상태 (pressure, revealed secrets 등)
-            user_message: 유저 메시지
-            clue_presented: 제시된 단서 (있다면)
-            rag_context: RAG로 검색된 관련 컨텍스트 (있다면)
+            user_message: Detective message
+            suspect: Suspect schema data
+            state: Current runtime state (pressure etc.)
+            clue_presented: Clue being presented (if any)
+            knowledge_context: Structured knowledge context from build_suspect_knowledge_context()
 
         Returns:
-            용의자의 응답 문자열
+            SuspectActorOutput: pressure_delta + reasoning + response
         """
-
-        # 프롬프트 데이터 구성
         prompt_data = ChatFormatter.build_suspect_prompt_data(
             suspect=suspect, state=state,
-            clue_presented=clue_presented, rag_context=rag_context,
-        )
-
-        # 3. 시스템 프롬프트 포맷팅
-        formatted_prompt = self.system_prompt_template.format(**prompt_data)
-
-        # 4. LLM 호출
-        response = self.llm.complete(
-            system=formatted_prompt,
-            user=user_message
-        )
-
-        return response
-
-    async def agenerate_response(
-        self,
-        suspect: SuspectSchema,
-        state: SuspectState,
-        user_message: str,
-        clue_presented: Optional[dict] = None,
-        rag_context: Optional[str] = None
-    ) -> str:
-        """generate_response()의 비동기 버전."""
-
-        prompt_data = ChatFormatter.build_suspect_prompt_data(
-            suspect=suspect, state=state,
-            clue_presented=clue_presented, rag_context=rag_context,
+            clue_presented=clue_presented,
+            knowledge_context=knowledge_context,
         )
 
         formatted_prompt = self.system_prompt_template.format(**prompt_data)
 
-        response = await self.llm.acomplete(
+        raw = await self.llm.acomplete(
             system=formatted_prompt,
-            user=user_message
+            user=user_message,
+            response_schema=SuspectActorOutput.model_json_schema()
         )
 
-        return response
+        json_text = extract_json(raw)
+        data = safe_json_load(json_text)
+
+        return SuspectActorOutput.model_validate(data)

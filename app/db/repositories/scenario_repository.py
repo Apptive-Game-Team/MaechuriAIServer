@@ -408,6 +408,15 @@ class ScenarioRepository:
             await session.commit()
             return scenario_id
 
+    async def get_suspect_names(self, scenario_id: int) -> Dict[int, str]:
+        """Lightweight query: only suspect IDs and names, no facts loaded."""
+        async with self._get_session() as session:
+            result = await session.execute(
+                select(Suspect.suspect_id, Suspect.name)
+                .where(Suspect.scenario_id == scenario_id)
+            )
+            return {row[0]: row[1] for row in result.all()}
+
     async def get_location_dict(self, scenario_id: int) -> Dict[int, str]:
         async with self._get_session() as session:
             loc_result = await session.execute(

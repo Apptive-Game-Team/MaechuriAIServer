@@ -33,7 +33,13 @@ class SuspectSchema(BaseModel):
     @classmethod
     def from_generation(cls, generation: "SuspectGenerationSchema") -> "SuspectSchema":
         timeline: List[FactSchema] = [FactSchema.from_timeline(t) for t in generation.timeline]
-        secrets: List[FactSchema] = [FactSchema.from_secret(s) for s in generation.secrets]
+        # Pass type through for each secret (secret vs hidden)
+        secrets: List[FactSchema] = [
+            FactSchema.from_secret(s, fact_type=s.type)
+            for s in generation.secrets
+        ]
+        # Convert heard facts (second-hand cross-suspect knowledge)
+        heard: List[FactSchema] = [FactSchema.from_heard(h) for h in generation.heard]
         return cls(
             suspect_id=generation.suspect_id,
             name=generation.name,
@@ -44,7 +50,7 @@ class SuspectSchema(BaseModel):
             is_culprit=generation.is_culprit,
             motive=generation.motive,
             alibi_summary=generation.alibi_summary,
-            facts=timeline + secrets,
+            facts=timeline + secrets + heard,
             personality=generation.personality,
             visual_description=generation.visual_description,
         )

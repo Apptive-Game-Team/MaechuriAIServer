@@ -12,7 +12,6 @@ from app.db.database import async_session_factory
 from app.db.repositories.game_session_repository import GameSessionRepository
 from app.services.agent.pressure_judge import PressureJudge
 from app.services.agent.suspect_actor import SuspectActor
-from app.services.agent.suspect_responder import SuspectResponder
 from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.rag import get_rag_service
@@ -41,14 +40,12 @@ class ChatService:
         pressure_judge: PressureJudge,
         suspect_actor: SuspectActor,
         clue_agent: ClueAgent,
-        suspect_responder: SuspectResponder,
         detective_agent: Optional[DetectiveAgent] = None,
         rag_service: Optional["RAGService"] = None,
     ):
         self.scenario_repository = scenario_repository
         self.judge = pressure_judge
         self.actor = suspect_actor
-        self.suspect_responder = suspect_responder
         self.clue_agent = clue_agent
         self.detective_agent = detective_agent
         self.rag_service = rag_service or get_rag_service()
@@ -201,12 +198,13 @@ class ChatService:
             db: 데이터베이스 세션 (필수)
             background_tasks: FastAPI BackgroundTasks for deferred work
         """
-        # 1. GameSession + 용의자 데이터 병렬 로드
+        # 1. GameSession + 용의자 데이터 + 시나리오 용의자 목록 병렬 로드
         session_repo = GameSessionRepository(db)
 
-        game_session, suspect = await asyncio.gather(
+        game_session, suspect, suspect_names = await asyncio.gather(
             session_repo.get_session(session_id, scenario_id),
-            self.scenario_repository.get_suspect_info(scenario_id, suspect_id)
+            self.scenario_repository.get_suspect_info(scenario_id, suspect_id),
+            self.scenario_repository.get_suspect_names(scenario_id)
         )
 
         if not game_session:
@@ -253,8 +251,7 @@ class ChatService:
                 query=user_message,
                 current_pressure=state.current_pressure,
                 session_id=session_id,
-                top_k_secrets=2,
-                top_k_history=5
+                suspect_names=suspect_names,
             )
             if rag_result:
                 if rag_result.full_context:
@@ -263,19 +260,19 @@ class ChatService:
         except Exception as e:
             logger.warning(f"RAG context retrieval failed: {e}")
 
-        # 6. 단일 LLM 호출: Judge + Actor 통합 (SuspectResponder)
-        responder_result = await self.suspect_responder.arespond(
+        # 6. 단일 LLM 호출: Judge + Actor 통합
+        responder_result = await self.actor.arespond(
             user_message=user_message,
             suspect=suspect,
             state=state,
             clue_presented=clue,
-            rag_context=rag_context,
-            suspect_facts=ChatFormatter.format_facts(suspect.facts),
+            knowledge_context=rag_context,
         )
 
         # 7. Pressure 업데이트
         new_pressure = state.update_pressure(responder_result.pressure_delta)
         await session_repo.update_suspect_pressure_on_session(game_session, suspect_id, new_pressure)
+        await db.commit()
         response = responder_result.response
 
         # 8. RAG 인덱싱 + 상호작용 증가를 백그라운드로 이동
@@ -308,13 +305,12 @@ class ChatService:
             )
 
         # 9. 현재 pressure로 공개된 fact ID 계산
+        # get_all_accessible_facts() already filters by threshold <= pressure,
+        # so every fact in rag_relevant_fact_ids is already unlocked.
         rag_relevant_fact_set = set(rag_relevant_fact_ids)
         revealed_fact_ids = [
             fact.fact_id for fact in suspect.facts
-            if (fact.fact_id in rag_relevant_fact_set and (
-            (fact.type == "secret" and fact.threshold <= new_pressure) or
-            (fact.type == "timeline")
-            ))
+            if fact.fact_id in rag_relevant_fact_set
         ]
 
         return SuspectChatResponse(

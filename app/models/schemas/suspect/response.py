@@ -1,7 +1,7 @@
 """Suspect response schemas."""
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from .common import PersonalitySchema, FactEntrySchema, TimelineContentSchema, SecretContentSchema
+from .common import PersonalitySchema, FactEntrySchema, TimelineContentSchema, SecretContentSchema, HeardContentSchema
 
 
 class SuspectGenerationSchema(BaseModel):
@@ -22,9 +22,16 @@ class SuspectGenerationSchema(BaseModel):
     # Timeline
     timeline: List[FactEntrySchema[TimelineContentSchema]] = Field(description="시간대별 행적")
 
-    # Secrets by pressure threshold
+    # Secrets by pressure threshold (innocent: all type="secret";
+    # culprit threshold 0/30 = type="secret", threshold 50/70/90 = type="hidden")
     secrets: List[FactEntrySchema[SecretContentSchema]] = Field(
-        description="pressure threshold 순으로 정렬된 비밀 목록 (최소 5개: 0, 30, 50, 70, 90)"
+        description="Pressure-gated secrets (exactly 5: thresholds 0, 30, 50, 70, 90)."
+    )
+
+    # Second-hand information about other suspects (usually threshold=0)
+    heard: List[FactEntrySchema[HeardContentSchema]] = Field(
+        default_factory=list,
+        description="2-4 facts this suspect heard or observed about other suspects (threshold=0)."
     )
 
     # Personality

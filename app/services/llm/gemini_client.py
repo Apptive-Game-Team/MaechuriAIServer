@@ -24,6 +24,7 @@ class GeminiClient(LLMClient):
         system: str,
         user: str = "",
         response_schema: dict | None = None,
+        max_output_tokens: int | None = None,
     ) -> str:
         prompt = (
             "=== SYSTEM ===\n"
@@ -34,7 +35,7 @@ class GeminiClient(LLMClient):
 
         config_params = {
             "temperature": 0.2,
-            "max_output_tokens": 8192,
+            "max_output_tokens": max_output_tokens or 8192,
         }
 
         if response_schema:
@@ -75,6 +76,7 @@ class GeminiClient(LLMClient):
         system: str,
         user: str = "",
         response_schema: dict | None = None,
+        max_output_tokens: int | None = None,
     ) -> str:
         prompt = (
             "=== SYSTEM ===\n"
@@ -85,7 +87,7 @@ class GeminiClient(LLMClient):
 
         config_params = {
             "temperature": 0.2,
-            "max_output_tokens": 8192,
+            "max_output_tokens": max_output_tokens or 8192,
         }
 
         if response_schema:

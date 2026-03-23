@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.models.schemas import ClueItemSchema
-from app.services.agent.pressure_judge import PressureJudge
 from app.services.agent.suspect_actor import SuspectActor
 from app.services.agent.suspect_generator import SuspectGenerator
+from app.services.npc.formatters import ChatFormatter
 from app.services.llm.gemini_client import GeminiClient
 from app.models.schemas.suspect import (
     SuspectGenerationRequest,
@@ -40,7 +40,7 @@ class JsonlHistoryStore:
         pressure: int,
         pressure_delta: int,
         tier: str,
-        evidence_added: Optional[List[Dict[str, Any]]] = None,
+        clue_added: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         record = {
             "ts": datetime.utcnow().isoformat() + "Z",
@@ -50,7 +50,7 @@ class JsonlHistoryStore:
             "pressure": pressure,
             "pressure_delta": pressure_delta,
             "tier": tier,
-            "evidence_added": evidence_added or [],
+            "clue_added": clue_added or [],
         }
         with self.session_path(session_id).open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -131,11 +131,10 @@ def test_suspect_generator():
 
 def test_suspect_chat():
     """
-    새로운 Pressure 시스템으로 Suspect와 대화 테스트.
-    PressureJudge + SuspectActor 사용.
+    SuspectActor 단일 LLM 호출로 대화 테스트.
+    Judge + Actor 통합된 arespond() 사용.
     """
     llm = GeminiClient()
-    judge = PressureJudge(llm)
     actor = SuspectActor(llm)
 
     session_id = datetime.now().strftime("suspect_chat_%Y%m%d_%H%M%S")
@@ -156,6 +155,9 @@ def test_suspect_chat():
     # Initialize state
     state = SuspectState(suspect_id=suspect.suspect_id)
 
+    # Pre-compute immutable suspect facts
+    suspect_facts = ChatFormatter.format_facts(suspect.facts)
+
     print(f"\n{'='*60}")
     print(f"  Session: {session_id}")
     print(f"  Suspect: {suspect.name} ({suspect.role})")
@@ -164,7 +166,7 @@ def test_suspect_chat():
     print("\nCommands:")
     print("  'exit'     - 대화 종료")
     print("  'status'   - 현재 pressure 상태 확인")
-    print("  'evidence' - 증거 제시 (ID 입력)")
+    print("  'clue'     - 단서 제시 (ID 입력)")
     print("  'cheat'    - pressure +30 (테스트용)")
     print(f"{'='*60}\n")
 
@@ -180,7 +182,7 @@ def test_suspect_chat():
 
         if user_input.lower() == 'status':
             print(f"\n[STATUS] Pressure: {state.current_pressure}/100 | Tier: {state.get_pressure_tier()}")
-            print(f"[STATUS] Evidence Seen: {state.evidence_seen_ids}\n")
+            print(f"[STATUS] Clue Seen: {state.clue_seen_ids}\n")
             continue
 
         if user_input.lower() == 'cheat':
@@ -189,74 +191,47 @@ def test_suspect_chat():
             print(f"\n[CHEAT] Pressure: {old_pressure} -> {state.current_pressure} ({state.get_pressure_tier()})\n")
             continue
 
-        # Evidence presentation
-        evidence = None
-        if user_input.lower() == 'evidence':
+        # Clue presentation
+        clue = None
+        if user_input.lower() == 'clue':
             try:
-                eid = int(input("Evidence ID: ").strip())
-                evidence = {"id": eid, "name": f"증거 #{eid}", "description": "테스트 증거"}
-                state.add_evidence(eid)
-                user_input = f"이 증거를 보세요. (증거 ID: {eid})"
-                print(f"[EVIDENCE] 증거 #{eid} 제시됨")
+                cid = int(input("Clue ID: ").strip())
+                clue = {"id": cid, "name": f"단서 #{cid}", "description": "테스트 단서"}
+                state.add_clue(cid)
+                user_input = f"이 단서를 보세요. (단서 ID: {cid})"
+                print(f"[CLUE] 단서 #{cid} 제시됨")
             except ValueError:
                 print("잘못된 ID입니다.")
                 continue
 
-        # Create suspect summary for judge
-        suspect_summary = f"이름: {suspect.name}, 역할: {suspect.role}, 범인여부: {suspect.is_culprit}"
-
-        # Format timeline for judge
-        timeline_str = "\n".join([
-            f"- {t.time}: {t.location}에서 {t.activity} ({'증명가능' if t.can_prove else '미확인'})"
-            for t in suspect.timeline
-        ])
-
-        # Format recent context
-        recent_history = state.get_recent_history(5)
-        context = "\n".join([f"{h['role']}: {h['content']}" for h in recent_history]) if recent_history else "(대화 시작)"
-
-        # 1. Judge: pressure 변화량 평가 (alibi/timeline 정보 포함)
-        judge_result = judge.evaluate(
-            user_message=user_input,
-            suspect_summary=suspect_summary,
-            current_pressure=state.current_pressure,
-            conversation_context=context,
-            evidence_presented=evidence,
-            suspect_alibi=suspect.alibi_summary,
-            suspect_timeline=timeline_str
-        )
-
-        # 2. Update pressure
+        # Single LLM call: Judge + Actor
         old_pressure = state.current_pressure
-        new_pressure = state.update_pressure(judge_result.pressure_delta)
-
-        # 3. Actor: 응답 생성
-        response = actor.generate_response(
+        result = asyncio.run(actor.arespond(
+            user_message=user_input,
             suspect=suspect,
             state=state,
-            user_message=user_input,
-            evidence_presented=evidence
-        )
+            clue_presented=clue,
+            suspect_facts=suspect_facts,
+        ))
 
-        # 4. Update history
-        state.add_message("user", user_input)
-        state.add_message("suspect", response)
+        # Update pressure
+        new_pressure = state.update_pressure(result.pressure_delta)
 
-        # 5. Display
-        delta_str = f"+{judge_result.pressure_delta}" if judge_result.pressure_delta >= 0 else str(judge_result.pressure_delta)
+        # Display
+        delta_str = f"+{result.pressure_delta}" if result.pressure_delta >= 0 else str(result.pressure_delta)
         print(f"\n[Pressure: {old_pressure} -> {new_pressure} ({delta_str}) | {state.get_pressure_tier()}]")
-        print(f"[Strategy: {judge_result.detected_strategy}]")
-        print(f"\n{suspect.name}: {response}\n")
+        print(f"[Strategy: {result.detected_strategy}]")
+        print(f"\n{suspect.name}: {result.response}\n")
 
-        # 6. Save to log
+        # Save to log
         store.append_turn(
             session_id=session_id,
             user_message=user_input,
-            assistant_message=response,
+            assistant_message=result.response,
             pressure=new_pressure,
-            pressure_delta=judge_result.pressure_delta,
+            pressure_delta=result.pressure_delta,
             tier=state.get_pressure_tier(),
-            evidence_added=[evidence] if evidence else []
+            clue_added=[clue] if clue else []
         )
 
 
