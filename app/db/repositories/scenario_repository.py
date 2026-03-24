@@ -12,13 +12,13 @@ from app.db.models import (
     Suspect,
     Fact,
     Clue,
+    Furniture,
 )
 from app.db.mappers import ScenarioMapper
 from app.models.schemas.scenario import ScenarioResult
 from app.core.map_position import calculate_map_positions
 from app.models.schemas.suspect import SuspectSchema
 from app.models.schemas.clue import ClueItemSchema
-
 
 class ScenarioRepository:
     """
@@ -405,6 +405,20 @@ class ScenarioRepository:
             )
             session.add(world_fact)
 
+            # 6. Create Furniture
+            for item in scenario_result.furniture:
+                entry = Furniture(
+                    scenario_id=scenario_id,
+                    location_id=item.room_id,
+                    name=item.name,
+                    description=item.description,
+                    origin_x=item.origin_x,
+                    origin_y=item.origin_y,
+                    width=item.width,
+                    height=item.height,
+                )
+                session.add(entry)
+
             await session.commit()
             return scenario_id
 
@@ -424,3 +438,4 @@ class ScenarioRepository:
             )
             locations = loc_result.scalars().all()
             return {loc.location_id: loc.name for loc in locations}
+

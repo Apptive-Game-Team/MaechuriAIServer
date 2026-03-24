@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from ..clue import ClueItemSchema
 from ..map import MapOutputSchema
+from ..map.detail import FurnitureSchema
 from ..suspect import SuspectSchema
 from .meta import MetaSchema
 from .incident import IncidentSchema
@@ -49,7 +50,8 @@ class ExpansionPart2(BaseModel):
 
 
 class ScenarioResult(ScenarioExpansion):
-    """Complete scenario result with clues, map, and suspects."""
+    """Complete scenario result with clues, map, suspects, and furniture."""
     clues: List[ClueItemSchema]
     map: Optional[MapOutputSchema] = None
     suspects: List[SuspectSchema] = []
+    furniture: List[FurnitureSchema] = []

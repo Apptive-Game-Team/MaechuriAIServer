@@ -1,17 +1,17 @@
 """Map skeleton schemas for basic structure."""
 from typing import List, Literal
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RoomSkeletonSchema(BaseModel):
     """Basic room information for skeleton."""
     id: int
     name: str
-    width: int
-    height: int
+    width: int = Field(ge=4, le=12)
+    height: int = Field(ge=4, le=12)
     mood: str
-    x: int
-    y: int
+    x: int = Field(ge=0)
+    y: int = Field(ge=0)
 
 
 class CorridorConnectionSchema(BaseModel):

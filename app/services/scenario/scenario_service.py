@@ -11,7 +11,7 @@ from app.models.schemas.suspect import SuspectGenerationRequest, SuspectSchema
 from app.models.schemas.suspect.response import SuspectGenerationListSchema
 from app.models.schemas.clue.response import ClueSetSchema
 from app.models.schemas.map.skeleton import MapSkeletonSchema
-from app.models.schemas.map.detail import MapOutputSchema
+from app.models.schemas.map.detail import MapOutputSchema, RoomFurnitureSchema
 from app.services.agent.clearability_evaluator import ClearabilityEvaluator
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
@@ -301,11 +301,23 @@ class ScenarioService:
         logger.info("Clues generated successfully")
         self._sleep_if_generated(generated)
 
-        # 7. Map Detail
+        # 7. Furniture 생성 (skeleton만 필요 — detail보다 먼저)
+        furniture_result, generated = self._load_or_generate(
+            request_id, "furniture_result",
+            lambda: self.map_generator.generate_furniture(
+                expansion_result, map_skeleton
+            ),
+            "Furniture", RoomFurnitureSchema,
+            generator=self.map_generator,
+        )
+        logger.info("Furniture generated successfully")
+        self._sleep_if_generated(generated)
+
+        # 8. Map Detail 생성 (가구 위치를 피해 단서·용의자 배치)
         map_result, generated = self._load_or_generate(
             request_id, "map_detail",
             lambda: self.map_generator.generate_detail(
-                expansion_result, map_skeleton, clue_result
+                expansion_result, map_skeleton, clue_result, furniture_result
             ),
             "MapDetail", MapOutputSchema,
             generator=self.map_generator,
@@ -313,15 +325,13 @@ class ScenarioService:
         logger.info("Map detail generated successfully")
         self._sleep_if_generated(generated)
 
-        # 8. Assemble final scenario
+        # 9. 최종 결과 조합
         final_scenario = ScenarioResult(
             **expansion_result.model_dump(),
             clues=clue_result.clues,
             map=map_result,
-            suspects=[
-                SuspectSchema.from_generation(generation)
-                for generation in suspects_result.suspects
-            ],
+            suspects=[SuspectSchema.from_generation(generation) for generation in suspects_result.suspects],
+            furniture=furniture_result.furniture,
         )
 
         return final_scenario
