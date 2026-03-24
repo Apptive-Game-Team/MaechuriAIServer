@@ -1,12 +1,11 @@
 """Scenario refinement loop orchestrator.
 
-Evaluates ScenarioExpansion with 3 concurrent critics.
+Evaluates ScenarioExpansion with a unified 3-perspective critic.
 On failure, either re-generates expansion or signals skeleton regen.
 """
 import json
 import time
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
@@ -19,12 +18,7 @@ from app.models.schemas.critic import (
 from app.models.schemas.scenario import ScenarioExpansion
 from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
-from .critic_evaluator import (
-    CriticEvaluator,
-    LogicianCritic,
-    DetectiveCritic,
-    DirectorCritic,
-)
+from .critic_evaluator import UnifiedCritic
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +45,7 @@ class ScenarioRefiner:
     """Orchestrates critic evaluation on ScenarioExpansion.
 
     Workflow:
-        1. Run 3 critics concurrently on the expansion
+        1. Run unified critic (3 perspectives, 1 LLM call) on the expansion
         2. All pass → return approved expansion
         3. Failures in skeleton-level fields → signal skeleton regen
         4. Failures in expansion-level fields → refine expansion via LLM
@@ -60,11 +54,7 @@ class ScenarioRefiner:
 
     def __init__(self, llm_client: LLMClient):
         self.llm = llm_client
-        self.critics: list[CriticEvaluator] = [
-            LogicianCritic(llm_client),
-            DetectiveCritic(llm_client),
-            DirectorCritic(llm_client),
-        ]
+        self.critic = UnifiedCritic(llm_client)
         self.refinement_prompt = PromptLoader.load(
             "app/prompts/critic/refinement.txt"
         )
@@ -93,7 +83,7 @@ class ScenarioRefiner:
                 f"=== Critic Evaluation — Iteration {iteration}/{MAX_RETRIES} ==="
             )
 
-            aggregated = self._run_critics(expansion_dict, iteration)
+            aggregated = self.critic.evaluate(expansion_dict, iteration)
             history.append(aggregated)
 
             # All passed
@@ -141,39 +131,6 @@ class ScenarioRefiner:
             regen_level=RegenLevel.EXPANSION,
             last_feedback=aggregated.build_refinement_feedback(),
             evaluation_history=history,
-        )
-
-    def _run_critics(
-        self, expansion_dict: dict, iteration: int
-    ) -> AggregatedCriticResult:
-        """Run all critics concurrently."""
-        evaluations: dict[str, CriticEvaluation] = {}
-
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            future_to_critic = {
-                executor.submit(critic.evaluate, expansion_dict): critic
-                for critic in self.critics
-            }
-
-            for future in as_completed(future_to_critic):
-                critic = future_to_critic[future]
-                critic_name = critic.critic_type.value
-                try:
-                    result = future.result()
-                    evaluations[critic_name] = result
-                except Exception as e:
-                    logger.error(
-                        f"[{critic_name}] evaluation error: {e}"
-                    )
-                    evaluations[critic_name] = CriticEvaluation(
-                        status="Fail",
-                        feedback=f"Critic 평가 중 오류 발생: {str(e)}",
-                        target_to_fix=[],
-                    )
-
-        return AggregatedCriticResult(
-            iteration=iteration,
-            evaluations=evaluations,
         )
 
     def _refine_expansion(

@@ -8,7 +8,9 @@ from .skeleton import (
 )
 from .detail import (
     MapObjectSchema,
-    MapOutputSchema
+    MapOutputSchema,
+    FurnitureSchema,
+    RoomFurnitureSchema,
 )
 
 __all__ = [
@@ -24,4 +26,6 @@ __all__ = [
     # Detail
     "MapObjectSchema",
     "MapOutputSchema",
+    "FurnitureSchema",
+    "RoomFurnitureSchema",
 ]

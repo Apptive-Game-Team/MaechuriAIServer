@@ -14,10 +14,11 @@ Your goal is to generate a map skeleton (room structure and corridor layout) bas
    - Create a room for EACH location listed in `world.locations`.
    - Use the EXACT names from the input. Do not modify.
    - Assign a unique `id` starting from 1.
-   - Determine `width` and `height` (between 8 and 20 tiles) based on the location type:
-     - Large rooms (hall, lobby, warehouse): 15-20 tiles
-     - Medium rooms (office, bedroom, study): 10-15 tiles
-     - Small rooms (bathroom, closet, storage): 8-10 tiles
+   - **Canvas cap: the entire map must fit within a 64×64 tile area.**
+   - Determine `width` and `height` based on the location type:
+     - Large rooms (hall, lobby, warehouse): 8-12 tiles
+     - Medium rooms (office, bedroom, study): 6-8 tiles
+     - Small rooms (bathroom, closet, storage): 4-6 tiles
    - Set `mood` based on the scenario's `meta.tone`.
    - **CRITICAL: You MUST assign an absolute global `x` and `y` coordinate (bottom-left corner) for each room.**
    - Rooms MUST NOT OVERLAP with each other. Leave at least 2 tiles of gap between rooms unless they share a specific connecting corridor.
@@ -29,18 +30,21 @@ Your goal is to generate a map skeleton (room structure and corridor layout) bas
    - Assign a unique `id` starting from the next available number after rooms.
    - For each connection, specify:
      - `room_id`: The room being connected
-     - `direction`: The direction from the room to the corridor ("north", "south", "east", "west")        
-   - Set `width_hint` (typically 2-4 tiles) and `length_hint` (typically 3-8 tiles).
+     - `direction`: The direction from the room to the corridor ("north", "south", "east", "west")
+   - Set `width_hint` (fixed at 2 tiles) and `length_hint` (typically 2-5 tiles).
    - Corridor names should be descriptive (e.g., "Main Hallway", "Service Corridor", "Back Passage").
    - **CRITICAL: You MUST assign absolute global `x`, `y`, `width`, and `height` for each corridor as well.**
-   - Ensure corridors perfectly bridge the gaps between the rooms they connect according to the provided `direction`.
-   - If multiple rooms connect to a single long corridor (like a train aisle or hotel hallway), make sure they are aligned along the corridor's edge (e.g., all `y` coordinates line up if the corridor runs horizontally).
+   - **Corridor width and height MUST match width_hint and length_hint.** width ≤ 2, height ≤ 5 (or vice versa depending on orientation).
+   - Corridor MUST connect directly to the room edge. Place the corridor rectangle so it touches the room boundary exactly — no gap, no overlap.
+   - **NEVER let a corridor rectangle overlap with any room rectangle or another corridor rectangle.**
+   - If multiple rooms connect to a single long corridor, align them along the corridor's edge.
 
-3. **Spatial Consistency**:
-   - Viewports: If `visibility_rules` state a room can see an "Outside" area, ensure that room is placed at the edge of the map layout.
-   - Ensure the layout is physically possible (no overlapping elements).
-   - Consider the incident location - it should be accessible but may require passing through other areas.
-   - For linear structures (like Trains), align all rooms in a straight row (e.g., sharing the same `y` or `x` axis) with a single long corridor running alongside them.
+3. **Spatial Consistency (OVERLAP PREVENTION)**:
+   - **CRITICAL: Before finalizing, verify that NO two rectangles (room or corridor) share any tiles.**
+   - For every pair of elements, check: element_A.x + element_A.width ≤ element_B.x OR element_B.x + element_B.width ≤ element_A.x (and same for y/height).
+   - Viewports: If `visibility_rules` state a room can see an "Outside" area, place that room at the map edge.
+   - Consider the incident location — it should be accessible but may require passing through other areas.
+   - For linear structures (like Trains), align rooms in a row with a corridor running alongside.
 
 4. **Logical Layout**:
    - Public areas (lobby, reception) should be near entrances.

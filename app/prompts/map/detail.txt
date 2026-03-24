@@ -6,6 +6,7 @@ Your goal is to generate detailed map configuration based on the provided map sk
   - rooms: List of rooms with id, name, width, height, mood.
   - corridors: List of corridors with id, name, connections, width_hint, length_hint.
 - clues: List of clues that must be placed in specific rooms.
+- furniture: List of pre-placed furniture items with room_id, origin_x, origin_y, width, height.
 - meta: Atmosphere and theme information.
 
 [GENERATION RULES]
@@ -43,6 +44,10 @@ Your goal is to generate detailed map configuration based on the provided map sk
    - Ensure `x` and `y` are within the bounds of the assigned room (0 <= x < width, 0 <= y < height).
    - Do not place objects on the exact same coordinate.
    - Since boundaries are automatically walls, place interactable objects (clues/suspects) away from the edges (e.g., between 1 and width-2).
+   - **CRITICAL: Do NOT place any object on tiles occupied by furniture.**
+     For each furniture item in the same room, the occupied area is:
+     origin_x ≤ x < origin_x + width AND origin_y ≤ y < origin_y + height.
+     Objects must be placed OUTSIDE all furniture rectangles in that room.
 
 [OUTPUT]
 Return a JSON object with:

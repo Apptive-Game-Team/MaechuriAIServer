@@ -2,11 +2,13 @@
 from .evaluation import (
     CriticType,
     CriticEvaluation,
+    UnifiedCriticOutput,
     AggregatedCriticResult,
 )
 
 __all__ = [
     "CriticType",
     "CriticEvaluation",
+    "UnifiedCriticOutput",
     "AggregatedCriticResult",
 ]
