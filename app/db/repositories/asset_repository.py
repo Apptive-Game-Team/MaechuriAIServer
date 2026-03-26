@@ -116,6 +116,67 @@ class AssetRepository:
             result = await session.execute(stmt)
             return list(result.scalars().all())
 
+    async def get_unindexed(self) -> List[Asset]:
+        """Retrieve all assets that have no embedding yet.
+
+        Returns
+        -------
+        List[Asset]
+            Assets whose ``embedding`` column is NULL and that have a non-empty prompt.
+        """
+        async with self._get_session() as session:
+            stmt = (
+                select(Asset)
+                .where(Asset.embedding.is_(None))
+                .where(Asset.prompt.isnot(None))
+            )
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+
+    async def search_with_scores(
+        self,
+        query_embedding: List[float],
+        top_k: int = 5,
+        status: Optional[str] = None,
+    ) -> List[tuple]:
+        """Search assets and return (Asset, similarity_score) tuples.
+
+        Similarity is computed as ``1 - cosine_distance`` so that a value of
+        1.0 means identical and 0.0 means completely dissimilar.
+
+        Parameters
+        ----------
+        query_embedding : List[float]
+            The 1024-dimensional query vector produced by BGE-M3.
+        top_k : int, optional
+            Number of top results to return. Defaults to 5.
+        status : str, optional
+            Filter results to assets with this status (e.g. 'COMPLETED').
+            If None, all statuses are returned.
+
+        Returns
+        -------
+        List[tuple[Asset, float]]
+            Pairs of (Asset, similarity) ordered from most similar to least.
+        """
+        async with self._get_session() as session:
+            distance_expr = Asset.embedding.cosine_distance(query_embedding)
+            similarity_expr = (1 - distance_expr).label("similarity")
+
+            conditions = [Asset.embedding.isnot(None)]
+            if status is not None:
+                conditions.append(Asset.status == status)
+
+            stmt = (
+                select(Asset, similarity_expr)
+                .where(*conditions)
+                .order_by(distance_expr)
+                .limit(top_k)
+            )
+
+            result = await session.execute(stmt)
+            return [(row[0], float(row[1])) for row in result.all()]
+
     async def update_embedding(self, asset_id: int, embedding: List[float]) -> bool:
         """Store or replace the embedding for an existing asset.
 
