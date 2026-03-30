@@ -2,16 +2,9 @@ import time
 import asyncio
 import logging
 import uuid
-from typing import Any, Callable, Optional, Type
 
-from pydantic import BaseModel
-
-from app.models.schemas.scenario import ScenarioResult, ScenarioSkeleton, ScenarioExpansion
-from app.models.schemas.suspect import SuspectGenerationRequest, SuspectSchema
-from app.models.schemas.suspect.response import SuspectGenerationListSchema
-from app.models.schemas.clue.response import ClueSetSchema
-from app.models.schemas.map.skeleton import MapSkeletonSchema
-from app.models.schemas.map.detail import MapOutputSchema, RoomFurnitureSchema
+from app.models.schemas.scenario import ScenarioResult, ScenarioExpansion
+from app.models.schemas.suspect import SuspectSchema
 from app.services.agent.clearability_evaluator import ClearabilityEvaluator
 from app.services.agent.clue_generator import ClueGenerator
 from app.services.agent.map_generator import MapGenerator
@@ -23,8 +16,18 @@ from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.rag import get_rag_service
 from app.core.json_retry import JSONParseRetry
-from app.services.scenario.scenario_generate_helper import inject_sequential_id
 from app.services.scenario.scenario_state_manager import ScenarioStateManager
+from app.services.scenario.pipeline import (
+    PipelineRunner,
+    CaseGenerationStep,
+    SkeletonGenerationStep,
+    ExpansionGenerationStep,
+    MapSkeletonStep,
+    SuspectGenerationStep,
+    ClueGenerationStep,
+    FurnitureGenerationStep,
+    MapDetailStep,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -36,178 +39,262 @@ MAX_CLEARABILITY_REGEN = 2
 
 
 class ScenarioService:
+    """Orchestrates the full scenario generation pipeline.
+
+    The generation is split into two declarative pipelines:
+
+    Narrative pipeline
+        ``theme`` → ``case_state`` → ``skeleton`` → ``expansion``
+
+        Each step is an independent :class:`PipelineStep` that declares
+        its inputs and output.  The :class:`PipelineRunner` auto-schedules
+        execution in topological order.  After the expansion is produced it
+        is validated by a critic loop that may request regeneration.
+
+    Content pipeline
+        ``expansion`` → ``map_skeleton`` / ``suspects`` / ``clues`` /
+        ``furniture`` → ``map_detail``
+
+        Suspects and clues also accept ``clearability_feedback`` so they
+        can be refined when the clearability evaluator rejects the first
+        attempt.
+
+    Both pipelines cache every intermediate result to disk via
+    :class:`ScenarioStateManager`, enabling crash recovery and
+    incremental regeneration.
+    """
 
     def __init__(self, llm_client: LLMClient):
-        """
-        Initialize ScenarioService with dependency injection.
+        """Initialise ScenarioService with all required sub-agents.
 
         Parameters
         ----------
         llm_client : LLMClient
-            LLM client instance (e.g., GeminiClient)
+            LLM client instance (e.g. GeminiClient).
         """
-        self.scenario_generator = ScenarioGenerator(llm_client)
-        self.clue_generator = ClueGenerator(llm_client)
-        self.map_generator = MapGenerator(llm_client)
-        self.suspect_generator = SuspectGenerator(llm_client)
+        scenario_generator = ScenarioGenerator(llm_client)
+        clue_generator = ClueGenerator(llm_client)
+        map_generator = MapGenerator(llm_client)
+        suspect_generator = SuspectGenerator(llm_client)
+
         self.validator = ConsistencyValidator()
         self.refiner = ScenarioRefiner(llm_client)
         self.clearability_evaluator = ClearabilityEvaluator(llm_client)
         self.repository = ScenarioRepository()
         self.rag_service = get_rag_service()
-
-        # JSON 재시도 정책
-        self.json_retry = JSONParseRetry(
-            max_attempts=3,
-            backoff_seconds=2.0,
-            backoff_multiplier=1.5  # 2초 → 3초 → 4.5초
-        )
-
         self.state_manager = ScenarioStateManager()
 
-    def _load_or_generate(
-        self,
-        request_id: str,
-        step_name: str,
-        generator_func: Callable[[], Any],
-        schema_name: str,
-        model_type: Optional[Type[BaseModel]] = None,
-        use_retry: bool = True,
-        generator=None,
-    ) -> Any:
-        """Load a cached intermediate result or generate it.
+        # Shared JSON retry policy (token escalation on each attempt)
+        json_retry = JSONParseRetry(
+            max_attempts=3,
+            backoff_seconds=2.0,
+            backoff_multiplier=1.5,
+        )
+
+        # ── Narrative pipeline ──────────────────────────────────────────
+        # theme → case_state → skeleton → expansion
+        self._narrative_pipeline = PipelineRunner(
+            steps=[
+                CaseGenerationStep(scenario_generator),
+                SkeletonGenerationStep(scenario_generator),
+                ExpansionGenerationStep(scenario_generator),
+            ],
+            state_manager=self.state_manager,
+            json_retry=json_retry,
+        )
+
+        # ── Content pipeline ────────────────────────────────────────────
+        # expansion + clearability_feedback →
+        #   map_skeleton / suspects / clues / furniture → map_detail
+        self._content_pipeline = PipelineRunner(
+            steps=[
+                MapSkeletonStep(map_generator),
+                SuspectGenerationStep(suspect_generator),
+                ClueGenerationStep(clue_generator),
+                FurnitureGenerationStep(map_generator),
+                MapDetailStep(map_generator),
+            ],
+            state_manager=self.state_manager,
+            json_retry=json_retry,
+        )
+
+    def generate(self, pre_input: str, request_id: str = None) -> ScenarioResult:
+        """Generate a complete, critic- and clearability-validated scenario.
 
         Parameters
         ----------
-        request_id : str
-            Request ID for state persistence.
-        step_name : str
-            Name of the generation step (used as cache key).
-        generator_func : Callable
-            Function that generates the result (called only on cache miss).
-        schema_name : str
-            Human-readable name for error messages.
-        model_type : Type[BaseModel], optional
-            Pydantic model to parse cached JSON into.
-        use_retry : bool
-            Whether to wrap generation in JSONParseRetry.
+        pre_input : str
+            Theme or seed text for the mystery case.
+        request_id : str, optional
+            Unique run identifier for intermediate caching.  A UUID is
+            generated when not supplied.
 
         Returns
         -------
-        tuple[Any, bool]
-            (result, was_generated) — was_generated is True if LLM was called.
+        ScenarioResult
+            Fully assembled scenario ready for database persistence.
         """
-        cached = self.state_manager.load_intermediate_state(
-            request_id, step_name, model_type
-        )
-        if cached is not None:
-            logger.info(f"Loaded {step_name} from intermediate file.")
-            return cached, False
-
-        if use_retry:
-            result = self.json_retry.parse_with_retry(
-                parser_func=generator_func,
-                schema_name=schema_name,
-                generator=generator,
-            )
-        else:
-            result = generator_func()
-
-        if result is None:
-            raise RuntimeError(f"{schema_name} generation failed after retries")
-
-        self.state_manager.save_intermediate_state(request_id, step_name, result)
-        return result, True
-
-    def _sleep_if_generated(self, was_generated: bool, seconds: float = 3):
-        """Sleep only when an LLM call was actually made (rate-limit throttle)."""
-        if was_generated:
-            time.sleep(seconds)
-
-    def generate(self,
-                 pre_input: str,
-                 request_id: str = None) -> ScenarioResult:
-
         if request_id is None:
             request_id = str(uuid.uuid4())
 
-        # 생성 시작
-        # 1. 평서문 생성
-        case_state, generated = self._load_or_generate(
-            request_id, "case_state",
-            lambda: self.scenario_generator.generate_case(pre_input),
-            "CaseState", use_retry=False,
-        )
-
-        self._sleep_if_generated(generated)
-
-        # 2-3. Skeleton → Expansion → Critic 평가 루프
+        # Phase 1: narrative pipeline + critic loop
         expansion_result = self._generate_and_validate_expansion(
-            case_state, request_id
+            pre_input, request_id
         )
 
-        # 4-9. Generate content and validate clearability
-        final_scenario = self._generate_content_with_clearability_check(
+        # Phase 2: content pipeline + clearability loop
+        return self._generate_content_with_clearability_check(
             expansion_result, request_id
         )
 
-        return final_scenario
+    # ------------------------------------------------------------------
+    # Phase 1: narrative pipeline with critic retry loop
+    # ------------------------------------------------------------------
+
+    def _generate_and_validate_expansion(
+        self,
+        theme: str,
+        request_id: str,
+    ) -> ScenarioExpansion:
+        """Run the narrative pipeline and validate the expansion with critics.
+
+        Retries up to ``MAX_CRITIC_REGEN`` times, clearing cached skeleton
+        or expansion as directed by the critic feedback.
+
+        Parameters
+        ----------
+        theme : str
+            Theme / seed text passed to :class:`CaseGenerationStep`.
+        request_id : str
+            Used for intermediate state caching.
+
+        Returns
+        -------
+        ScenarioExpansion
+            A critic-approved expansion (or the last generated one as a
+            fallback when all retries are exhausted).
+        """
+        expansion_result = None
+
+        for regen_attempt in range(MAX_CRITIC_REGEN + 1):
+            if regen_attempt > 0:
+                logger.info(
+                    "Critic regen attempt %d/%d", regen_attempt, MAX_CRITIC_REGEN
+                )
+
+            state = self._narrative_pipeline.run(
+                initial_state={"theme": theme},
+                request_id=request_id,
+            )
+            expansion_result = state["expansion"]
+
+            logger.info("Starting critic evaluation on expansion...")
+            result = self.refiner.evaluate_and_refine(expansion_result)
+            self._save_critic_evaluation_history(request_id, regen_attempt, result)
+
+            if result.regen_level == RegenLevel.NONE:
+                logger.info("Expansion passed all critic evaluations.")
+                self.state_manager.save_intermediate_state(
+                    request_id, "expansion", result.expansion
+                )
+                return result.expansion
+
+            if result.regen_level == RegenLevel.SKELETON:
+                logger.warning(
+                    "Critics require skeleton regen: %s...",
+                    result.last_feedback[:200],
+                )
+                if regen_attempt >= MAX_CRITIC_REGEN:
+                    break
+                self._narrative_pipeline.clear(
+                    request_id, "skeleton", "expansion"
+                )
+                continue
+
+            if result.regen_level == RegenLevel.EXPANSION:
+                logger.warning(
+                    "Critics require expansion regen: %s...",
+                    result.last_feedback[:200],
+                )
+                if regen_attempt >= MAX_CRITIC_REGEN:
+                    break
+                self._narrative_pipeline.clear(request_id, "expansion")
+                continue
+
+        logger.error(
+            "Critic validation failed after all regen attempts. "
+            "Using last generated expansion as fallback."
+        )
+        return expansion_result
+
+    # ------------------------------------------------------------------
+    # Phase 2: content pipeline with clearability retry loop
+    # ------------------------------------------------------------------
 
     def _generate_content_with_clearability_check(
         self,
         expansion_result: ScenarioExpansion,
         request_id: str,
     ) -> ScenarioResult:
-        """Generate map/suspects/clues and validate clearability.
+        """Run the content pipeline and validate clearability.
 
-        If the clearability check fails, keeps the map (unlikely cause) and
-        regenerates only suspects and clues with targeted feedback from the
-        evaluator, saving ~2 LLM calls per retry.
+        On failure the suspects and clues are regenerated with targeted
+        feedback from the clearability evaluator, keeping the map skeleton
+        and detail intact.
 
         Parameters
         ----------
         expansion_result : ScenarioExpansion
-            The validated expansion to build content from.
+            The critic-approved expansion.
         request_id : str
-            Request ID for state persistence.
+            Used for intermediate state caching.
 
         Returns
         -------
         ScenarioResult
-            A clearability-validated final scenario.
+            A clearability-validated, fully assembled scenario.
 
         Raises
         ------
         RuntimeError
-            If scenario is not clearable after all retry attempts.
+            If the scenario fails clearability after all retry attempts.
         """
         clearability_feedback: str = ""
+        evaluation = None
 
         for attempt in range(MAX_CLEARABILITY_REGEN + 1):
             if attempt > 0:
                 logger.info(
-                    f"Clearability regen attempt {attempt}/{MAX_CLEARABILITY_REGEN} "
-                    f"— regenerating suspects + clues with feedback"
+                    "Clearability regen attempt %d/%d — regenerating suspects + clues",
+                    attempt,
+                    MAX_CLEARABILITY_REGEN,
                 )
-                # Only clear suspects and clues; keep map_skeleton and map_detail
-                self.state_manager.clear_intermediate_state(
-                    request_id, "suspects_result"
-                )
-                self.state_manager.clear_intermediate_state(
-                    request_id, "clue_result"
+                self._content_pipeline.clear(
+                    request_id, "suspects", "clues"
                 )
 
-            final_scenario = self._generate_content(
-                expansion_result, request_id,
-                clearability_feedback=clearability_feedback,
+            state = self._content_pipeline.run(
+                initial_state={
+                    "expansion": expansion_result,
+                    "clearability_feedback": clearability_feedback,
+                },
+                request_id=request_id,
             )
 
-            # 9. Clearability evaluation
+            final_scenario = ScenarioResult(
+                **expansion_result.model_dump(),
+                clues=state["clues"].clues,
+                map=state["map_detail"],
+                suspects=[
+                    SuspectSchema.from_generation(g)
+                    for g in state["suspects"].suspects
+                ],
+                furniture=state["furniture"].furniture,
+            )
+
             logger.info("Starting clearability evaluation...")
             scenario_data = final_scenario.model_dump(mode="json")
             evaluation = self.clearability_evaluator.evaluate(scenario_data)
-
-            # Save clearability evaluation result
             self.state_manager.save_intermediate_state(
                 request_id,
                 f"clearability_eval_attempt{attempt}",
@@ -219,12 +306,12 @@ class ScenarioService:
                 return final_scenario
 
             logger.warning(
-                f"Scenario failed clearability check: {evaluation.reason[:300]}"
+                "Scenario failed clearability check: %s",
+                evaluation.reason[:300],
             )
             if attempt >= MAX_CLEARABILITY_REGEN:
                 break
 
-            # Pass evaluator feedback to next generation attempt
             clearability_feedback = evaluation.reason
             time.sleep(3)
 
@@ -233,120 +320,17 @@ class ScenarioService:
             f"Last reason: {evaluation.reason}"
         )
 
-    def _generate_content(
-        self,
-        expansion_result: ScenarioExpansion,
-        request_id: str,
-        clearability_feedback: str = "",
-    ) -> ScenarioResult:
-        """Generate map, suspects, clues, and assemble the final scenario.
-
-        Parameters
-        ----------
-        expansion_result : ScenarioExpansion
-            The validated expansion to build content from.
-        request_id : str
-            Request ID for state persistence.
-        clearability_feedback : str
-            If non-empty, feedback from a previous clearability failure.
-            Injected into suspect/clue generation prompts for targeted fixes.
-
-        Returns
-        -------
-        ScenarioResult
-            Assembled scenario (not yet clearability-validated).
-        """
-        # 4. Map Skeleton
-        map_skeleton, generated = self._load_or_generate(
-            request_id, "map_skeleton",
-            lambda: self.map_generator.generate_skeleton(expansion_result),
-            "MapSkeleton", MapSkeletonSchema,
-            generator=self.map_generator,
-        )
-        logger.info("Map skeleton generated successfully")
-        self._sleep_if_generated(generated)
-
-        # 5. Suspects — with optional clearability feedback
-        def _generate_suspects():
-            suspect_req = SuspectGenerationRequest.from_expansion(
-                expansion_result, map_skeleton
-            )
-            result = self.suspect_generator.generate(
-                suspect_req,
-                clearability_feedback=clearability_feedback,
-            )
-            if result is not None:
-                inject_sequential_id(result, "fact_id")
-            return result
-
-        suspects_result, generated = self._load_or_generate(
-            request_id, "suspects_result",
-            _generate_suspects,
-            "SuspectList", SuspectGenerationListSchema,
-            generator=self.suspect_generator,
-        )
-        logger.info("Suspects generated successfully")
-        self._sleep_if_generated(generated)
-
-        # 6. Clues — with optional clearability feedback
-        clue_result, generated = self._load_or_generate(
-            request_id, "clue_result",
-            lambda: self.clue_generator.generate_clues(
-                expansion_result, map_skeleton,
-                clearability_feedback=clearability_feedback,
-            ),
-            "ClueSet", ClueSetSchema,
-            generator=self.clue_generator,
-        )
-        logger.info("Clues generated successfully")
-        self._sleep_if_generated(generated)
-
-        # 7. Furniture 생성 (skeleton만 필요 — detail보다 먼저)
-        furniture_result, generated = self._load_or_generate(
-            request_id, "furniture_result",
-            lambda: self.map_generator.generate_furniture(
-                expansion_result, map_skeleton
-            ),
-            "Furniture", RoomFurnitureSchema,
-            generator=self.map_generator,
-        )
-        logger.info("Furniture generated successfully")
-        self._sleep_if_generated(generated)
-
-        # 8. Map Detail 생성 (가구 위치를 피해 단서·용의자 배치)
-        map_result, generated = self._load_or_generate(
-            request_id, "map_detail",
-            lambda: self.map_generator.generate_detail(
-                expansion_result, map_skeleton, clue_result, furniture_result
-            ),
-            "MapDetail", MapOutputSchema,
-            generator=self.map_generator,
-        )
-        logger.info("Map detail generated successfully")
-        self._sleep_if_generated(generated)
-
-        # 9. 최종 결과 조합
-        final_scenario = ScenarioResult(
-            **expansion_result.model_dump(),
-            clues=clue_result.clues,
-            map=map_result,
-            suspects=[SuspectSchema.from_generation(generation) for generation in suspects_result.suspects],
-            furniture=furniture_result.furniture,
-        )
-
-        return final_scenario
+    # ------------------------------------------------------------------
+    # Shared helpers
+    # ------------------------------------------------------------------
 
     def _save_critic_evaluation_history(
         self,
         request_id: str,
         regen_attempt: int,
         result,
-    ):
-        """Save all critic evaluation iterations to disk with descriptive names.
-
-        File naming: {request_id}_critic_eval_regen{N}_iter{M}.json
-        where N = outer regen attempt, M = inner refinement iteration.
-        """
+    ) -> None:
+        """Persist every critic iteration and the final decision to disk."""
         for aggregated in result.evaluation_history:
             step_name = (
                 f"critic_eval_regen{regen_attempt}_iter{aggregated.iteration}"
@@ -354,7 +338,6 @@ class ScenarioService:
             self.state_manager.save_intermediate_state(
                 request_id, step_name, aggregated
             )
-        # Save the final refinement decision
         summary = {
             "regen_level": result.regen_level.value,
             "last_feedback": result.last_feedback,
@@ -365,109 +348,6 @@ class ScenarioService:
             f"critic_decision_regen{regen_attempt}",
             summary,
         )
-
-    def _generate_and_validate_expansion(
-        self,
-        case_state: str,
-        request_id: str,
-    ) -> ScenarioExpansion:
-        """Generate skeleton & expansion, then run critic loop.
-
-        If critics fail on expansion-level issues, re-generate expansion.
-        If critics fail on skeleton-level issues, re-generate from skeleton.
-        Retries up to MAX_CRITIC_REGEN times total.
-
-        Parameters
-        ----------
-        case_state : str
-            The narrative case synopsis.
-        request_id : str
-            Request ID for state persistence.
-
-        Returns
-        -------
-        ScenarioExpansion
-            A critic-approved expansion.
-        """
-        for regen_attempt in range(MAX_CRITIC_REGEN + 1):
-            # 2. Skeleton 생성
-            # On regen, clear cached skeleton/expansion so they're regenerated
-            if regen_attempt > 0:
-                logger.info(
-                    f"Critic regen attempt {regen_attempt}/{MAX_CRITIC_REGEN}"
-                )
-                self.state_manager.clear_intermediate_state(
-                    request_id, "skeleton_result"
-                )
-                self.state_manager.clear_intermediate_state(
-                    request_id, "expansion_result"
-                )
-
-            skeleton_result, generated = self._load_or_generate(
-                request_id, "skeleton_result",
-                lambda: self.scenario_generator.generate_skeleton(case_state),
-                "ScenarioSkeleton", ScenarioSkeleton,
-                generator=self.scenario_generator,
-            )
-            logger.info("Skeleton generated successfully")
-            self._sleep_if_generated(generated)
-
-            # 3. Expansion 생성
-            expansion_result, generated = self._load_or_generate(
-                request_id, "expansion_result",
-                lambda: self.scenario_generator.generate_expansion(skeleton_result),
-                "ScenarioExpansion", ScenarioExpansion,
-                generator=self.scenario_generator,
-            )
-
-            logger.info("Expansion generated successfully")
-
-            # Critic 평가 및 리파인먼트
-            logger.info("Starting critic evaluation on expansion...")
-            result = self.refiner.evaluate_and_refine(expansion_result)
-
-            # Save critic evaluation history
-            self._save_critic_evaluation_history(
-                request_id, regen_attempt, result
-            )
-
-            if result.regen_level == RegenLevel.NONE:
-                # All critics passed — save approved expansion and return
-                logger.info("Expansion passed all critic evaluations.")
-                self.state_manager.save_intermediate_state(
-                    request_id, "expansion_result", result.expansion
-                )
-                return result.expansion
-
-            if result.regen_level == RegenLevel.SKELETON:
-                # Need to regenerate from skeleton
-                logger.warning(
-                    f"Critics require skeleton regen: {result.last_feedback[:200]}..."
-                )
-                if regen_attempt >= MAX_CRITIC_REGEN:
-                    break
-                # Clear skeleton too so it's regenerated on next loop
-                continue
-
-            if result.regen_level == RegenLevel.EXPANSION:
-                # Need to regenerate expansion only
-                logger.warning(
-                    f"Critics require expansion regen: {result.last_feedback[:200]}..."
-                )
-                if regen_attempt >= MAX_CRITIC_REGEN:
-                    break
-                # Clear only expansion
-                self.state_manager.clear_intermediate_state(
-                    request_id, "expansion_result"
-                )
-                continue
-
-        # Exhausted all regen attempts — use last expansion as fallback
-        logger.error(
-            "Critic validation failed after all regen attempts. "
-            "Using last generated expansion as fallback."
-        )
-        return expansion_result
 
     async def save_to_db(self, scenario: ScenarioResult, db=None) -> int:
         """
