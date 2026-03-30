@@ -173,6 +173,7 @@ async def _demo(query: str, top_k: int = 5) -> None:
 
 def _score_to_stars(similarity: float, max_stars: int = 5) -> str:
     """코사인 유사도 값(0~1)을 별(★) 표시로 변환합니다."""
+    similarity = max(0.0, min(similarity, 1.0))
     filled = min(round(similarity * max_stars), max_stars)
     return "★" * filled + "☆" * (max_stars - filled)
 
