@@ -17,7 +17,7 @@ Content pipeline
 
     Suspects and clues are re-run when the clearability check fails.
 """
-from .step import PipelineStep
+from .step import PipelineStep, PipelineKey
 from .runner import (
     PipelineRunner,
     _default_json_retry,
@@ -38,6 +38,7 @@ from .steps import (
 
 __all__ = [
     "PipelineStep",
+    "PipelineKey",
     "PipelineRunner",
     "_default_json_retry",
     "DEFAULT_JSON_RETRY_MAX_ATTEMPTS",
