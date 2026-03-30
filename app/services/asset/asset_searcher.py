@@ -118,7 +118,11 @@ class AssetSearcher:
         if asset.id is not None:
             updated = await self._repository.update_embedding(asset.id, embedding)
             if not updated:
-                raise RuntimeError(f"Failed to update embedding for asset {asset.id}.")
+                prompt_len = len(asset.prompt) if asset.prompt else 0
+                raise RuntimeError(
+                    f"Failed to update embedding for asset {asset.id} "
+                    f"(prompt length={prompt_len})."
+                )
             asset.embedding = embedding
         else:
             asset.embedding = embedding
