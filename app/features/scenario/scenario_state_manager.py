@@ -1,4 +1,4 @@
-# app/services/scenario/scenario_state_manager.py
+# app/features/scenario/scenario_state_manager.py
 import logging
 import os
 import json
