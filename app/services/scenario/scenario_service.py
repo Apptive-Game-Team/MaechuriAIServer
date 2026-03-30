@@ -15,7 +15,6 @@ from app.services.agent.critic import ScenarioRefiner, RegenLevel
 from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.rag import get_rag_service
-from app.core.json_retry import JSONParseRetry
 from app.services.scenario.scenario_state_manager import ScenarioStateManager
 from app.services.scenario.pipeline import (
     PipelineRunner,
@@ -28,6 +27,7 @@ from app.services.scenario.pipeline import (
     FurnitureGenerationStep,
     MapDetailStep,
 )
+from app.services.scenario.pipeline.runner import _default_json_retry
 
 
 logger = logging.getLogger(__name__)
@@ -84,12 +84,9 @@ class ScenarioService:
         self.rag_service = get_rag_service()
         self.state_manager = ScenarioStateManager()
 
-        # Shared JSON retry policy (token escalation on each attempt)
-        json_retry = JSONParseRetry(
-            max_attempts=3,
-            backoff_seconds=2.0,
-            backoff_multiplier=1.5,
-        )
+        # Shared JSON retry policy (token escalation on each attempt).
+        # Policy defaults are defined centrally in pipeline.runner.
+        json_retry = _default_json_retry()
 
         # ── Narrative pipeline ──────────────────────────────────────────
         # theme → case_state → skeleton → expansion

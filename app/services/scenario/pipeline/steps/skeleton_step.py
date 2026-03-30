@@ -1,5 +1,4 @@
 """Step 2: Generate a structured scenario skeleton from the case synopsis."""
-import time
 from typing import Any
 
 from app.models.schemas.scenario import ScenarioSkeleton

@@ -8,6 +8,21 @@ from app.services.scenario.scenario_state_manager import ScenarioStateManager
 
 logger = logging.getLogger(__name__)
 
+# Default JSONParseRetry policy shared by PipelineRunner and ScenarioService.
+# Keep these in one place so that changes apply consistently everywhere.
+DEFAULT_JSON_RETRY_MAX_ATTEMPTS = 3
+DEFAULT_JSON_RETRY_BACKOFF_SECONDS = 2.0
+DEFAULT_JSON_RETRY_BACKOFF_MULTIPLIER = 1.5
+
+
+def _default_json_retry() -> JSONParseRetry:
+    """Return a JSONParseRetry instance with the project-wide default policy."""
+    return JSONParseRetry(
+        max_attempts=DEFAULT_JSON_RETRY_MAX_ATTEMPTS,
+        backoff_seconds=DEFAULT_JSON_RETRY_BACKOFF_SECONDS,
+        backoff_multiplier=DEFAULT_JSON_RETRY_BACKOFF_MULTIPLIER,
+    )
+
 
 class PipelineRunner:
     """Executes :class:`PipelineStep` instances in dependency order.
@@ -46,11 +61,7 @@ class PipelineRunner:
         json_retry: Optional[JSONParseRetry] = None,
     ) -> None:
         self._state_manager = state_manager
-        self._json_retry = json_retry or JSONParseRetry(
-            max_attempts=3,
-            backoff_seconds=2.0,
-            backoff_multiplier=1.5,
-        )
+        self._json_retry = json_retry or _default_json_retry()
         self._ordered_steps = self._topological_sort(steps)
 
     # ------------------------------------------------------------------
