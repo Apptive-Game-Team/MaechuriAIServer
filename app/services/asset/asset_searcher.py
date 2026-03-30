@@ -87,6 +87,8 @@ class AssetSearcher:
         assets = await self._repository.get_unindexed()
         count = 0
         for asset in assets:
+            if not asset.prompt:
+                continue
             await self.index_asset(asset)
             count += 1
         return count
