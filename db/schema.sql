@@ -211,6 +211,21 @@ CREATE TABLE chat_message_embedding (
 );
 
 -- ============================================================
+-- ASSET (이미지/리소스 메타데이터)
+-- ============================================================
+CREATE TABLE asset (
+    id                  BIGSERIAL PRIMARY KEY,
+    final_url           VARCHAR(512),
+    raw_url             VARCHAR(512),
+    resized_url         VARCHAR(512),
+    prompt              TEXT,
+    status              VARCHAR(20) NOT NULL DEFAULT 'COMPLETED',
+    created_at          TIMESTAMP DEFAULT NOW(),
+    updated_at          TIMESTAMP DEFAULT NOW(),
+    embedding           vector(1024)
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 
@@ -239,6 +254,9 @@ CREATE INDEX idx_chat_message_embedding ON chat_message_embedding USING hnsw (em
 CREATE INDEX idx_chat_message_scenario_session ON chat_message_embedding(scenario_id, session_id);
 CREATE INDEX idx_chat_message_suspect ON chat_message_embedding(scenario_id, suspect_id) WHERE suspect_id IS NOT NULL;
 CREATE INDEX idx_chat_message_clue ON chat_message_embedding(scenario_id, clue_id) WHERE clue_id IS NOT NULL;
+
+-- Asset indexes
+CREATE INDEX idx_asset_embedding ON asset USING hnsw (embedding vector_cosine_ops);
 
 -- ============================================================
 -- COMMENTS
