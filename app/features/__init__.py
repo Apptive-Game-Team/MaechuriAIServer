@@ -16,10 +16,8 @@ The application is divided into three domains:
     **Shared infrastructure** used by both features: LLM client, embedding
     model, RAG pipeline, database sessions, and repositories.
 
-The existing service-layer packages (``app.services.*``, ``app.models.*``,
-``app.db.*``) are still the canonical source; the ``app.features.*`` packages
-re-export from them and provide a clean, feature-oriented public API.
+ The ``app.features.*`` packages are the canonical feature-oriented API.
+ Legacy service-layer imports under ``app.services.*`` remain as compatibility
+ wrappers that forward to the feature packages.
 """
-from app.features import scenario, chat, global_
-
 __all__ = ["scenario", "chat", "global_"]

@@ -15,6 +15,8 @@ embedding
 rag
     Retrieval-Augmented Generation pipeline: :class:`RAGService`,
     :class:`RAGRetriever`, :class:`RAGIndexer`, :class:`ContextBuilder`.
+agent
+    Shared LLM agents used by scenario generation and chat flows.
 db
     SQLAlchemy async session factory, ORM entity models, and repository
     classes (:class:`ScenarioRepository`, :class:`GameSessionRepository`).
@@ -25,22 +27,20 @@ Typical import paths
 >>> from app.features.global_ import get_rag_service
 >>> from app.features.global_.db import ScenarioRepository
 """
-# LLM
-from app.services.llm.llm_client import LLMClient
-from app.services.llm.gemini_client import GeminiClient
+__all__ = ["LLMClient", "GeminiClient", "get_embedding_model", "get_rag_service"]
 
-# Embedding
-from app.services.embedding import get_embedding_model
 
-# RAG
-from app.services.rag import get_rag_service
-
-__all__ = [
-    # LLM
-    "LLMClient",
-    "GeminiClient",
-    # Embedding
-    "get_embedding_model",
-    # RAG
-    "get_rag_service",
-]
+def __getattr__(name: str):
+    if name == "LLMClient":
+        from app.features.global_.llm.llm_client import LLMClient
+        return LLMClient
+    if name == "GeminiClient":
+        from app.features.global_.llm.gemini_client import GeminiClient
+        return GeminiClient
+    if name == "get_embedding_model":
+        from app.features.global_.embedding import get_embedding_model
+        return get_embedding_model
+    if name == "get_rag_service":
+        from app.features.global_.rag import get_rag_service
+        return get_rag_service
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

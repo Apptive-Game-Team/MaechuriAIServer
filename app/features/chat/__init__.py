@@ -19,28 +19,37 @@ Typical import path
 >>> from app.features.chat import ChatService
 >>> from app.features.chat import PressureJudge, SuspectActor
 """
-# Service
-from app.services.npc.chat_service import ChatService
-
-# Agents
-from app.services.agent.pressure_judge import PressureJudge
-from app.services.agent.suspect_actor import SuspectActor
-from app.services.agent.clue_agent import ClueAgent
-from app.services.agent.detective_agent import DetectiveAgent
-
-# Domain models
-from app.models.domain.suspect import Suspect
-from app.models.domain.suspect_state import SuspectState
-
 __all__ = [
-    # Service
     "ChatService",
-    # Agents
     "PressureJudge",
     "SuspectActor",
     "ClueAgent",
     "DetectiveAgent",
-    # Domain
     "Suspect",
     "SuspectState",
 ]
+
+
+def __getattr__(name: str):
+    if name == "ChatService":
+        from app.features.chat.chat_service import ChatService
+        return ChatService
+    if name == "PressureJudge":
+        from app.features.global_.agent.pressure_judge import PressureJudge
+        return PressureJudge
+    if name == "SuspectActor":
+        from app.features.global_.agent.suspect_actor import SuspectActor
+        return SuspectActor
+    if name == "ClueAgent":
+        from app.features.global_.agent.clue_agent import ClueAgent
+        return ClueAgent
+    if name == "DetectiveAgent":
+        from app.features.global_.agent.detective_agent import DetectiveAgent
+        return DetectiveAgent
+    if name == "Suspect":
+        from app.models.domain.suspect import Suspect
+        return Suspect
+    if name == "SuspectState":
+        from app.models.domain.suspect_state import SuspectState
+        return SuspectState
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -19,40 +19,10 @@ Typical import path
 >>> from app.features.scenario import ScenarioService, SolveService
 >>> from app.features.scenario.pipeline import PipelineRunner, PipelineStep
 """
-# Services
-from app.services.scenario.scenario_service import ScenarioService
-from app.services.scenario.solve_service import SolveService
-from app.services.scenario.scenario_state_manager import ScenarioStateManager
-
-# Agents
-from app.services.agent.scenario_generator import ScenarioGenerator
-from app.services.agent.clue_generator import ClueGenerator
-from app.services.agent.map_generator import MapGenerator
-from app.services.agent.suspect_generator import SuspectGenerator
-from app.services.agent.clearability_evaluator import ClearabilityEvaluator
-from app.services.agent.consistency_validator import ConsistencyValidator
-from app.services.agent.critic import ScenarioRefiner, RefinementResult, RegenLevel
-
-# Declarative pipeline
-from app.services.scenario.pipeline import (
-    PipelineStep,
-    PipelineRunner,
-    CaseGenerationStep,
-    SkeletonGenerationStep,
-    ExpansionGenerationStep,
-    MapSkeletonStep,
-    SuspectGenerationStep,
-    ClueGenerationStep,
-    FurnitureGenerationStep,
-    MapDetailStep,
-)
-
 __all__ = [
-    # Services
     "ScenarioService",
     "SolveService",
     "ScenarioStateManager",
-    # Agents
     "ScenarioGenerator",
     "ClueGenerator",
     "MapGenerator",
@@ -62,7 +32,6 @@ __all__ = [
     "ScenarioRefiner",
     "RefinementResult",
     "RegenLevel",
-    # Pipeline
     "PipelineStep",
     "PipelineRunner",
     "CaseGenerationStep",
@@ -74,3 +43,57 @@ __all__ = [
     "FurnitureGenerationStep",
     "MapDetailStep",
 ]
+
+
+def __getattr__(name: str):
+    if name == "ScenarioService":
+        from app.features.scenario.scenario_service import ScenarioService
+        return ScenarioService
+    if name == "SolveService":
+        from app.features.scenario.solve_service import SolveService
+        return SolveService
+    if name == "ScenarioStateManager":
+        from app.features.scenario.scenario_state_manager import ScenarioStateManager
+        return ScenarioStateManager
+    if name == "ScenarioGenerator":
+        from app.features.global_.agent.scenario_generator import ScenarioGenerator
+        return ScenarioGenerator
+    if name == "ClueGenerator":
+        from app.features.global_.agent.clue_generator import ClueGenerator
+        return ClueGenerator
+    if name == "MapGenerator":
+        from app.features.global_.agent.map_generator import MapGenerator
+        return MapGenerator
+    if name == "SuspectGenerator":
+        from app.features.global_.agent.suspect_generator import SuspectGenerator
+        return SuspectGenerator
+    if name == "ClearabilityEvaluator":
+        from app.features.global_.agent.clearability_evaluator import ClearabilityEvaluator
+        return ClearabilityEvaluator
+    if name == "ConsistencyValidator":
+        from app.features.global_.agent.consistency_validator import ConsistencyValidator
+        return ConsistencyValidator
+    if name == "ScenarioRefiner":
+        from app.features.global_.agent.critic import ScenarioRefiner
+        return ScenarioRefiner
+    if name == "RefinementResult":
+        from app.features.global_.agent.critic import RefinementResult
+        return RefinementResult
+    if name == "RegenLevel":
+        from app.features.global_.agent.critic import RegenLevel
+        return RegenLevel
+    if name in {
+        "PipelineStep",
+        "PipelineRunner",
+        "CaseGenerationStep",
+        "SkeletonGenerationStep",
+        "ExpansionGenerationStep",
+        "MapSkeletonStep",
+        "SuspectGenerationStep",
+        "ClueGenerationStep",
+        "FurnitureGenerationStep",
+        "MapDetailStep",
+    }:
+        from app.features.scenario import pipeline
+        return getattr(pipeline, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
