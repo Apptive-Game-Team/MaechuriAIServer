@@ -2,7 +2,7 @@
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import async_session_factory
@@ -129,6 +129,7 @@ class AssetRepository:
                 select(Asset)
                 .where(Asset.embedding.is_(None))
                 .where(Asset.prompt.isnot(None))
+                .where(func.length(func.trim(Asset.prompt)) > 0)
             )
             result = await session.execute(stmt)
             return list(result.scalars().all())
@@ -141,8 +142,8 @@ class AssetRepository:
     ) -> List[tuple]:
         """Search assets and return (Asset, similarity_score) tuples.
 
-        Similarity is computed as ``1 - cosine_distance`` so that a value of
-        1.0 means identical and 0.0 means completely dissimilar.
+        Similarity is computed as ``1 - cosine_distance`` which is the
+        cosine similarity score. Values typically fall between -1.0 and 1.0.
 
         Parameters
         ----------

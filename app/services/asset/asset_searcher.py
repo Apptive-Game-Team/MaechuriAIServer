@@ -64,7 +64,7 @@ class AssetSearcher:
         -------
         List[AssetSearchResult]
             Search results ordered from most similar to least similar,
-            each containing a ``similarity`` score between 0.0 and 1.0.
+            each containing a cosine similarity score (typically -1.0 to 1.0).
         """
         query_embedding = self._embedding_service.embed_query(query)
         pairs = await self._repository.search_with_scores(
