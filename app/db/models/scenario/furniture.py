@@ -24,11 +24,11 @@ class Furniture(Base):
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
 
-    assets_id: Mapped[Optional[int]] = mapped_column(
+    asset_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("asset.id"), nullable=True
     )
 
-    asset: Mapped[Optional["Asset"]] = relationship(foreign_keys=[assets_id], viewonly=True)
+    asset: Mapped[Optional["Asset"]] = relationship(foreign_keys=[asset_id], viewonly=True)
 
     location: Mapped["Location"] = relationship(
         foreign_keys=[scenario_id, location_id],

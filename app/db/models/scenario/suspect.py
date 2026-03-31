@@ -2,7 +2,7 @@
 from typing import List, Optional, Any, TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BigInteger, String, Text, Boolean, Integer, SmallInteger, ForeignKey, ForeignKeyConstraint, CheckConstraint
+from sqlalchemy import BigInteger, String, Text, Boolean, Integer, SmallInteger, ForeignKey, ForeignKeyConstraint, CheckConstraint  # noqa: E501
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,10 +43,16 @@ class Suspect(Base):
     x: Mapped[int] = mapped_column(SmallInteger)
     y: Mapped[int] = mapped_column(SmallInteger)
 
+    # Asset FK
+    asset_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("asset.id"), nullable=True
+    )
+
     # Embedding for RAG (name + role + description)
     profile_embedding = mapped_column(Vector(1024), nullable=True)
 
     # Relationships
+    asset: Mapped[Optional["Asset"]] = relationship(foreign_keys=[asset_id], viewonly=True)
     scenario: Mapped["Scenario"] = relationship(back_populates="suspects")
     location: Mapped["Location"] = relationship(
         primaryjoin="and_(Suspect.scenario_id==Location.scenario_id, Suspect.location_id==Location.location_id)",

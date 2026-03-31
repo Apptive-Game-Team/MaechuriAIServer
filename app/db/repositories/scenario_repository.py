@@ -15,6 +15,7 @@ from app.db.models import (
     Clue,
     Furniture,
 )
+from app.db.models.asset import Asset, AssetType
 from app.db.mappers import ScenarioMapper
 from app.models.schemas.scenario import ScenarioResult
 from app.core.map_position import calculate_map_positions
@@ -23,7 +24,7 @@ from app.models.schemas.clue import ClueItemSchema
 
 logger = logging.getLogger(__name__)
 
-ASSET_SIMILARITY_THRESHOLD = 0.
+ASSET_SIMILARITY_THRESHOLD = 0.85
 
 
 class ScenarioRepository:
@@ -308,8 +309,18 @@ class ScenarioRepository:
                     elif obj.type == "clue":
                         clue_positions[obj.id] = (obj.position.x, obj.position.y)
 
-            # 3. Create Suspects with Facts
+            # 3. Create Suspects with Facts (with asset matching)
             culprit_ids = scenario_result.ground_truth_detail.culprit_ids
+
+            suspect_asset_map = await self._resolve_assets(
+                session=session,
+                descriptions=[
+                    (s.suspect_id, s.visual_description)
+                    for s in scenario_result.suspects
+                ],
+                scenario_id=scenario_id,
+                entity_type=AssetType.SUSPECT,
+            )
 
             for suspect_schema in scenario_result.suspects:
                 is_culprit = suspect_schema.suspect_id in culprit_ids or suspect_schema.is_culprit
@@ -332,7 +343,8 @@ class ScenarioRepository:
                     visual_description=suspect_schema.visual_description,
                     location_id=suspect_pos[2] if suspect_pos else None,
                     x=suspect_pos[0] if suspect_pos else 0,
-                    y=suspect_pos[1] if suspect_pos else 0
+                    y=suspect_pos[1] if suspect_pos else 0,
+                    asset_id=suspect_asset_map.get(suspect_schema.suspect_id),
                 )
                 session.add(suspect)
 
@@ -347,7 +359,17 @@ class ScenarioRepository:
                     )
                     session.add(fact_entry)
 
-            # 4. Create Clues
+            # 4. Create Clues (with asset matching)
+            clue_asset_map = await self._resolve_assets(
+                session=session,
+                descriptions=[
+                    (c.id, c.visual_description)
+                    for c in scenario_result.clues
+                ],
+                scenario_id=scenario_id,
+                entity_type=AssetType.CLUE,
+            )
+
             for clue_schema in scenario_result.clues:
                 loc_id = get_mapped_loc_id(clue_schema.found_at)
                 clue_pos = clue_positions.get(clue_schema.id)
@@ -364,7 +386,8 @@ class ScenarioRepository:
                     is_red_herring=clue_schema.is_red_herring,
                     visual_description=clue_schema.visual_description,
                     x=clue_pos[0] if clue_pos else 0,
-                    y=clue_pos[1] if clue_pos else 0
+                    y=clue_pos[1] if clue_pos else 0,
+                    asset_id=clue_asset_map.get(clue_schema.id),
                 )
                 session.add(clue)
 
@@ -419,7 +442,15 @@ class ScenarioRepository:
             session.add(world_fact)
 
             # 6. Create Furniture (with asset matching)
-            asset_id_map = await self._match_furniture_assets(scenario_result.furniture)
+            furniture_asset_map = await self._resolve_assets(
+                session=session,
+                descriptions=[
+                    (idx, item.description)
+                    for idx, item in enumerate(scenario_result.furniture)
+                ],
+                scenario_id=scenario_id,
+                entity_type=AssetType.FURNITURE,
+            )
             for idx, item in enumerate(scenario_result.furniture):
                 entry = Furniture(
                     scenario_id=scenario_id,
@@ -430,65 +461,120 @@ class ScenarioRepository:
                     origin_y=item.origin_y,
                     width=item.width,
                     height=item.height,
-                    assets_id=asset_id_map.get(idx),
+                    asset_id=furniture_asset_map.get(idx),
                 )
                 session.add(entry)
 
             await session.commit()
             return scenario_id
 
-    async def _match_furniture_assets(self, furniture_items) -> Dict[int, int]:
-        """Match furniture descriptions to assets by embedding similarity.
+    async def _resolve_assets(
+        self,
+        session: AsyncSession,
+        descriptions: List[Tuple[int, Optional[str]]],
+        scenario_id: int,
+        entity_type: str,
+    ) -> Dict[int, int]:
+        """Match descriptions to existing assets or create PENDING ones.
 
-        For each furniture item, embeds its description and searches the asset
-        table for the closest match. If the best match exceeds
-        ``ASSET_SIMILARITY_THRESHOLD``, its asset ID is recorded.
+        For each (entity_id, description_text) pair:
+        - Embed the description and search for a matching COMPLETED asset.
+        - If similarity >= threshold → use that asset's ID.
+        - Otherwise → create a new PENDING asset and use its ID.
+
+        Parameters
+        ----------
+        session : AsyncSession
+            The active DB session (for creating PENDING assets).
+        descriptions : List[Tuple[int, Optional[str]]]
+            Pairs of (entity_id, description_text).
+        scenario_id : int
+            The scenario being saved.
+        entity_type : str
+            One of AssetType values ('furniture', 'suspect', 'clue').
 
         Returns
         -------
         Dict[int, int]
-            Mapping of furniture list index → asset ID (only entries above threshold).
+            Mapping of entity_id → asset ID.
         """
         if not self._embedding_service or not self._asset_repository:
             return {}
 
+        # Filter out items without descriptions
+        valid = [(eid, desc) for eid, desc in descriptions if desc]
+        if not valid:
+            return {}
+
+        # Batch-embed all descriptions at once
+        texts = [desc for _, desc in valid]
+        embeddings = self._embedding_service.embed_batch_texts(texts)
+
         result_map: Dict[int, int] = {}
-        descriptions = [item.description for item in furniture_items if item.description]
 
-        if not descriptions:
-            return result_map
-
-        # Batch-embed all furniture descriptions at once
-        embeddings = self._embedding_service.embed_batch_texts(descriptions)
-
-        desc_idx = 0
-        for idx, item in enumerate(furniture_items):
-            if not item.description:
-                continue
-
-            embedding = embeddings[desc_idx]
-            desc_idx += 1
-
-            pairs = await self._asset_repository.search_with_scores(
-                query_embedding=embedding,
-                top_k=1,
-                status="COMPLETED",
+        for (entity_id, desc_text), embedding in zip(valid, embeddings):
+            asset_id = await self._find_or_create_asset(
+                session=session,
+                embedding=embedding,
+                description=desc_text,
+                scenario_id=scenario_id,
+                entity_id=entity_id,
+                entity_type=entity_type,
             )
-            if pairs:
-                asset, similarity = pairs[0]
-                if similarity >= ASSET_SIMILARITY_THRESHOLD:
-                    result_map[idx] = asset.id
-                    logger.info(
-                        "Furniture '%s' matched asset %d (similarity=%.3f)",
-                        item.name, asset.id, similarity,
-                    )
-                else:
-                    logger.debug(
-                        "Furniture '%s' best match %.3f < threshold %.2f",
-                        item.name, similarity, ASSET_SIMILARITY_THRESHOLD,
-                    )
+            result_map[entity_id] = asset_id
 
         return result_map
+
+    async def _find_or_create_asset(
+        self,
+        session: AsyncSession,
+        embedding: List[float],
+        description: str,
+        scenario_id: int,
+        entity_id: int,
+        entity_type: str,
+    ) -> int:
+        """Find a matching COMPLETED asset or create a PENDING one.
+
+        Returns
+        -------
+        int
+            The asset ID (existing or newly created).
+        """
+        pairs = await self._asset_repository.search_with_scores(
+            query_embedding=embedding,
+            top_k=1,
+            status="COMPLETED",
+        )
+
+        if pairs:
+            asset, similarity = pairs[0]
+            if similarity >= ASSET_SIMILARITY_THRESHOLD:
+                type_str = entity_type.value if hasattr(entity_type, 'value') else str(entity_type)
+                logger.info(
+                    "%s-%d-%d matched asset %d (similarity=%.3f)",
+                    type_str, scenario_id, entity_id, asset.id, similarity,
+                )
+                return asset.id
+
+        # No match — create a PENDING asset
+        type_str = entity_type.value if hasattr(entity_type, 'value') else str(entity_type)
+        tag = f"{type_str}-{scenario_id}-{entity_id}"
+        pending = Asset(
+            name=tag,
+            type=type_str,
+            description=description,
+            status="PENDING",
+            embedding=embedding,
+        )
+        session.add(pending)
+        await session.flush()  # get the generated ID
+
+        logger.info(
+            "Created PENDING asset %d for %s (prompt=%.60s...)",
+            pending.id, tag, description,
+        )
+        return pending.id
 
     async def get_suspect_names(self, scenario_id: int) -> Dict[int, str]:
         """Lightweight query: only suspect IDs and names, no facts loaded."""
