@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List, Dict, Tuple
 from contextlib import asynccontextmanager
 
@@ -20,14 +21,26 @@ from app.core.map_position import calculate_map_positions
 from app.models.schemas.suspect import SuspectSchema
 from app.models.schemas.clue import ClueItemSchema
 
+logger = logging.getLogger(__name__)
+
+ASSET_SIMILARITY_THRESHOLD = 0.
+
+
 class ScenarioRepository:
     """
     SQLAlchemy implementation for scenario-related data access.
     Manages its own session lifecycle for compatibility with existing services.
     """
 
-    def __init__(self, session: Optional[AsyncSession] = None):
+    def __init__(
+        self,
+        session: Optional[AsyncSession] = None,
+        asset_repository=None,
+        embedding_service=None,
+    ):
         self._external_session = session
+        self._asset_repository = asset_repository
+        self._embedding_service = embedding_service
 
     @asynccontextmanager
     async def _get_session(self):
@@ -405,8 +418,9 @@ class ScenarioRepository:
             )
             session.add(world_fact)
 
-            # 6. Create Furniture
-            for item in scenario_result.furniture:
+            # 6. Create Furniture (with asset matching)
+            asset_id_map = await self._match_furniture_assets(scenario_result.furniture)
+            for idx, item in enumerate(scenario_result.furniture):
                 entry = Furniture(
                     scenario_id=scenario_id,
                     location_id=item.room_id,
@@ -416,11 +430,65 @@ class ScenarioRepository:
                     origin_y=item.origin_y,
                     width=item.width,
                     height=item.height,
+                    assets_id=asset_id_map.get(idx),
                 )
                 session.add(entry)
 
             await session.commit()
             return scenario_id
+
+    async def _match_furniture_assets(self, furniture_items) -> Dict[int, int]:
+        """Match furniture descriptions to assets by embedding similarity.
+
+        For each furniture item, embeds its description and searches the asset
+        table for the closest match. If the best match exceeds
+        ``ASSET_SIMILARITY_THRESHOLD``, its asset ID is recorded.
+
+        Returns
+        -------
+        Dict[int, int]
+            Mapping of furniture list index → asset ID (only entries above threshold).
+        """
+        if not self._embedding_service or not self._asset_repository:
+            return {}
+
+        result_map: Dict[int, int] = {}
+        descriptions = [item.description for item in furniture_items if item.description]
+
+        if not descriptions:
+            return result_map
+
+        # Batch-embed all furniture descriptions at once
+        embeddings = self._embedding_service.embed_batch_texts(descriptions)
+
+        desc_idx = 0
+        for idx, item in enumerate(furniture_items):
+            if not item.description:
+                continue
+
+            embedding = embeddings[desc_idx]
+            desc_idx += 1
+
+            pairs = await self._asset_repository.search_with_scores(
+                query_embedding=embedding,
+                top_k=1,
+                status="COMPLETED",
+            )
+            if pairs:
+                asset, similarity = pairs[0]
+                if similarity >= ASSET_SIMILARITY_THRESHOLD:
+                    result_map[idx] = asset.id
+                    logger.info(
+                        "Furniture '%s' matched asset %d (similarity=%.3f)",
+                        item.name, asset.id, similarity,
+                    )
+                else:
+                    logger.debug(
+                        "Furniture '%s' best match %.3f < threshold %.2f",
+                        item.name, similarity, ASSET_SIMILARITY_THRESHOLD,
+                    )
+
+        return result_map
 
     async def get_suspect_names(self, scenario_id: int) -> Dict[int, str]:
         """Lightweight query: only suspect IDs and names, no facts loaded."""
