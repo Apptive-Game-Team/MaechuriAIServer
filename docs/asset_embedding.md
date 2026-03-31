@@ -127,6 +127,12 @@ for result in results:
     print(result.status)
 ```
 
+### 데모 스크립트 실행
+
+```bash
+python -m app.test.asset_searcher_demo "고풍스러운 서재 배경" 5
+```
+
 ---
 
 ## 임베딩 모델
