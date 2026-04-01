@@ -1,7 +1,7 @@
 """Furniture database model."""
 from typing import Optional
 
-from sqlalchemy import BigInteger, Integer, String, ForeignKeyConstraint
+from sqlalchemy import BigInteger, Integer, String, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -24,7 +24,11 @@ class Furniture(Base):
     width: Mapped[int] = mapped_column(Integer)
     height: Mapped[int] = mapped_column(Integer)
 
-    assets_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    asset_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("asset.id"), nullable=True
+    )
+
+    asset: Mapped[Optional["Asset"]] = relationship(foreign_keys=[asset_id], viewonly=True)
 
     location: Mapped["Location"] = relationship(
         foreign_keys=[scenario_id, location_id],
