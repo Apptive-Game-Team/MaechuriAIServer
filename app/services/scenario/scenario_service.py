@@ -14,6 +14,8 @@ from app.services.agent.suspect_generator import SuspectGenerator
 from app.services.agent.critic import ScenarioRefiner, RegenLevel
 from app.services.llm.llm_client import LLMClient
 from app.db.repositories.scenario_repository import ScenarioRepository
+from app.db.repositories.asset_repository import AssetRepository
+from app.services.embedding.embedding_service import get_embedding_service
 from app.services.rag import get_rag_service
 from app.services.scenario.scenario_state_manager import ScenarioStateManager
 from app.services.scenario.pipeline import (
@@ -80,7 +82,10 @@ class ScenarioService:
         self.validator = ConsistencyValidator()
         self.refiner = ScenarioRefiner(llm_client)
         self.clearability_evaluator = ClearabilityEvaluator(llm_client)
-        self.repository = ScenarioRepository()
+        self.repository = ScenarioRepository(
+            asset_repository=AssetRepository(),
+            embedding_service=get_embedding_service(),
+        )
         self.rag_service = get_rag_service()
         self.state_manager = ScenarioStateManager()
 

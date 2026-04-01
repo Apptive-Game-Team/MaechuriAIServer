@@ -210,6 +210,21 @@ class EmbeddingService:
             text = f"{role_label}: {content}"
         return self.model.embed(text)
 
+    def embed_asset_prompt(self, prompt: str) -> List[float]:
+        """Generate embedding for an asset prompt.
+
+        Parameters
+        ----------
+        prompt : str
+            The image generation prompt text for the asset.
+
+        Returns
+        -------
+        List[float]
+            The embedding vector.
+        """
+        return self.model.embed(prompt)
+
     def embed_batch_texts(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """Generate embeddings for multiple texts.
 

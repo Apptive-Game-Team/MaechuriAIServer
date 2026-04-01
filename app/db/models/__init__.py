@@ -30,6 +30,7 @@ from app.db.models.scenario import (
 )
 from app.db.models.embedding import ChatMessageEmbedding
 from app.db.models.game_session import GameSession
+from app.db.models.asset import Asset
 
 __all__ = [
     "Scenario",
@@ -40,4 +41,5 @@ __all__ = [
     "Furniture",
     "ChatMessageEmbedding",
     "GameSession",
+    "Asset",
 ]
