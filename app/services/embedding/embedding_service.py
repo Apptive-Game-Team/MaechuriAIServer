@@ -95,7 +95,7 @@ class EmbeddingService:
                     fact.content,
                     fact.suspect.name)
             case "timeline":
-                text = self._serialize_timeline(
+                text = self.serialize_timeline(
                     fact.content["time"],
                     fact.content["location"],
                     fact.content["activity"],
@@ -105,7 +105,7 @@ class EmbeddingService:
 
         return self.model.embed(text)
 
-    def _serialize_timeline(
+    def serialize_timeline(
         self,
         time: str,
         location: str,
