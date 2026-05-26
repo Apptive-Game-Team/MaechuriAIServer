@@ -245,6 +245,48 @@ class RAGIndexer:
         logger.info(f"Indexed scenario {scenario_id}: {stats}")
         return stats
 
+    async def index_fact(self, db: AsyncSession, fact: Fact) -> None:
+        """Generate and store an embedding for a single fact."""
+        if fact.suspect_id == 0:
+            content_text = (
+                fact.content.get("text", str(fact.content))
+                if isinstance(fact.content, dict)
+                else str(fact.content)
+            )
+            embedding = self.embedding_service.embed_text(content_text)
+        else:
+            embedding = await self._embed_suspect_fact(db, fact)
+
+        fact.embedding = embedding
+        await db.flush()
+
+    async def _embed_suspect_fact(
+        self,
+        db: AsyncSession,
+        fact: Fact,
+    ) -> list[float]:
+        suspect_result = await db.execute(
+            select(Suspect.name).where(
+                Suspect.scenario_id == fact.scenario_id,
+                Suspect.suspect_id == fact.suspect_id,
+            )
+        )
+        suspect_name = suspect_result.scalar_one_or_none() or ""
+        if fact.type == "timeline" and isinstance(fact.content, dict):
+            text = self.embedding_service.serialize_timeline(
+                fact.content.get("time", ""),
+                fact.content.get("location", ""),
+                fact.content.get("activity", ""),
+                suspect_name,
+            )
+        elif fact.type in {"secret", "hidden", "heard"} and isinstance(fact.content, dict):
+            text = fact.content.get("content", str(fact.content))
+            if suspect_name:
+                text = f"{suspect_name}의 사실: {text}"
+        else:
+            text = fact.to_string(suspect_name=suspect_name)
+        return self.embedding_service.embed_text(text)
+
     async def index_chat_message(
         self,
         db: AsyncSession,

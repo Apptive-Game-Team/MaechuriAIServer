@@ -216,6 +216,52 @@ class RAGRetriever:
             threshold=threshold
         )
 
+    async def search_self_info_facts(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        suspect_id: int,
+        query: str,
+        top_k: int = 3,
+        threshold: float = 0.35,
+    ) -> List[RetrievedFact]:
+        """Search canonical facts for suspect self-info resolution.
+
+        This intentionally searches both the suspect's private facts and global
+        scenario facts, without pressure filtering. The caller decides how the
+        resolved fact can be used in an in-character response.
+        """
+        suspect_result = await db.execute(
+            select(Suspect.suspect_id, Suspect.name).where(
+                Suspect.scenario_id == scenario_id
+            )
+        )
+        suspect_names = {row[0]: row[1] for row in suspect_result.all()}
+
+        def mapper(fact: Fact, similarity: float) -> RetrievedFact:
+            return RetrievedFact(
+                suspect_id=fact.suspect_id,
+                suspect_name=suspect_names.get(fact.suspect_id, "global"),
+                fact_id=fact.fact_id,
+                threshold=fact.threshold,
+                content=fact.content,
+                type=fact.type,
+                similarity=similarity,
+            )
+
+        return await self._search(
+            db=db,
+            query=query,
+            model=Fact,
+            embedding_col=Fact.embedding,
+            mapper=mapper,
+            base_filters=[
+                Fact.scenario_id == scenario_id,
+                Fact.suspect_id.in_([0, suspect_id]),
+            ],
+            top_k=top_k,
+            threshold=threshold,
+        )
 
     async def get_all_accessible_facts(
         self,

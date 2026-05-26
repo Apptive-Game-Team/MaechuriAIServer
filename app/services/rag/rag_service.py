@@ -5,6 +5,7 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import Fact
 from app.services.rag.retriever import RAGRetriever, get_rag_retriever, RetrievedChatMessage, RetrievedFact
 from app.services.rag.context_builder import ContextBuilder, get_context_builder
 from app.services.rag.indexer import RAGIndexer, get_rag_indexer
@@ -362,6 +363,29 @@ class RAGService:
             Indexing statistics.
         """
         return await self.indexer.index_scenario(db, scenario_id)
+
+    async def find_self_info_facts(
+        self,
+        db: AsyncSession,
+        scenario_id: int,
+        suspect_id: int,
+        query: str,
+        top_k: int = 3,
+        similarity_threshold: float = 0.35,
+    ) -> list[RetrievedFact]:
+        """RAG tool for finding canonical facts about a suspect's self-info."""
+        return await self.retriever.search_self_info_facts(
+            db=db,
+            scenario_id=scenario_id,
+            suspect_id=suspect_id,
+            query=query,
+            top_k=top_k,
+            threshold=similarity_threshold,
+        )
+
+    async def index_fact(self, db: AsyncSession, fact: Fact) -> None:
+        """RAG tool for updating retrieval state after a fact changes."""
+        await self.indexer.index_fact(db, fact)
 
     async def index_chat_message(
         self,

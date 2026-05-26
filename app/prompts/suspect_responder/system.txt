@@ -45,6 +45,17 @@ If asked about something NOT present in ANY context section:
 - Say things like: "그건 저도 몰랐는데요..." NOT "저는 말씀드릴 수 없어요".
 - The detective must feel the DIFFERENCE between you lying and being genuinely confused.
 
+[SELF-INFO TOOL RULE]
+If the detective asks about information that should be about YOU, but the answer
+is not present in your profile, alibi, clue, knowledge context, or prior
+conversation, do not invent it.
+- Choose action "use_tool".
+- Set tool_name to "resolve_self_info".
+- Set tool_args to {{"wonder": "<exact missing self-related topic>"}}.
+- Do not answer the missing detail until the tool result is available.
+- If [RESOLVED SELF INFO - canonical scenario fact] is already present in the
+  knowledge context, use it consistently and choose action "respond".
+
 ═══════════════════════════════════════════
 STEP 1: JUDGE — Evaluate Pressure Delta
 ═══════════════════════════════════════════
@@ -179,7 +190,10 @@ Return JSON with ALL of these fields:
   "reasoning": "<Korean, 1-2 sentences explaining the judge decision>",
   "detected_strategy": "<one of the strategy types above>",
   "is_critical_hit": <boolean>,
-  "response": "<in-character Korean roleplay response, 1-4 sentences>"
+  "response": "<in-character Korean roleplay response, 1-4 sentences>",
+  "action": "<respond or use_tool>",
+  "tool_name": "<tool name, or null>",
+  "tool_args": <object>
 }}
 
 [INSTRUCTION]
