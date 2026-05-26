@@ -26,6 +26,7 @@ from app.services.embedding.embedding_service import get_embedding_service
 from app.services.rag import get_rag_service
 from app.core.json_retry import JSONParseRetry
 from app.services.scenario.scenario_generate_helper import inject_sequential_id
+from app.services.scenario.scenario_generation_graph import ScenarioGenerationGraph
 from app.services.scenario.scenario_state_manager import ScenarioStateManager
 
 
@@ -69,6 +70,7 @@ class ScenarioService:
         )
 
         self.state_manager = ScenarioStateManager()
+        self.generation_graph = ScenarioGenerationGraph(self)
 
     def _load_or_generate(
         self,
@@ -136,27 +138,7 @@ class ScenarioService:
         if request_id is None:
             request_id = str(uuid.uuid4())
 
-        # 생성 시작
-        # 1. 평서문 생성
-        case_state, generated = self._load_or_generate(
-            request_id, "case_state",
-            lambda: self.scenario_generator.generate_case(pre_input),
-            "CaseState", use_retry=False,
-        )
-
-        self._sleep_if_generated(generated)
-
-        # 2-3. Skeleton → Expansion → Critic 평가 루프
-        expansion_result = self._generate_and_validate_expansion(
-            case_state, request_id
-        )
-
-        # 4-9. Generate content and validate clearability
-        final_scenario = self._generate_content_with_clearability_check(
-            expansion_result, request_id
-        )
-
-        return final_scenario
+        return self.generation_graph.invoke(pre_input, request_id)
 
     def _generate_content_with_clearability_check(
         self,
