@@ -15,7 +15,13 @@ from app.services.agent.suspect_actor import SuspectActor
 from app.services.agent.clue_agent import ClueAgent
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.rag import get_rag_service
+from app.services.npc.suspect_self_info_tool import SuspectSelfInfoTool
 from app.services.npc.formatters import ChatFormatter
+from app.services.agent.suspect_actor_tools import (
+    SuspectActorTool,
+    SuspectActorToolSet,
+    SuspectToolResult,
+)
 from app.utils import MessageParser
 from app.models.domain.suspect_state import SuspectState
 from app.models.schemas.chat import (
@@ -42,6 +48,7 @@ class ChatService:
         clue_agent: ClueAgent,
         detective_agent: Optional[DetectiveAgent] = None,
         rag_service: Optional["RAGService"] = None,
+        suspect_self_info_tool: Optional[SuspectSelfInfoTool] = None,
     ):
         self.scenario_repository = scenario_repository
         self.judge = pressure_judge
@@ -49,6 +56,11 @@ class ChatService:
         self.clue_agent = clue_agent
         self.detective_agent = detective_agent
         self.rag_service = rag_service or get_rag_service()
+        self.suspect_self_info_tool = suspect_self_info_tool or SuspectSelfInfoTool(
+            scenario_repository=scenario_repository,
+            rag_service=self.rag_service,
+            llm_client=self.actor.llm,
+        )
 
     async def general_chat(
         self,
@@ -261,12 +273,47 @@ class ChatService:
             logger.warning(f"RAG context retrieval failed: {e}")
 
         # 6. 단일 LLM 호출: Judge + Actor 통합
+        async def resolve_self_info(args: dict) -> SuspectToolResult:
+            resolved = await self.suspect_self_info_tool.aresolve(
+                db=db,
+                scenario_id=scenario_id,
+                suspect_id=suspect_id,
+                suspect=suspect,
+                wonder=str(args.get("wonder", user_message)),
+            )
+            return SuspectToolResult(
+                name="resolve_self_info",
+                content=resolved.text,
+                metadata={
+                    "fact_id": resolved.fact_id,
+                    "source": resolved.source,
+                    "created": resolved.created,
+                },
+            )
+
+        actor_tools = SuspectActorToolSet(
+            [
+                SuspectActorTool(
+                    name="resolve_self_info",
+                    description=(
+                        "Find or create a canonical fact about the suspect's "
+                        "own missing self-related information. Args: wonder."
+                    ),
+                    handler=resolve_self_info,
+                    format_context=lambda result: (
+                        "[RESOLVED SELF INFO - canonical scenario fact]\n"
+                        f"- {result.content}"
+                    ),
+                )
+            ]
+        )
         responder_result = await self.actor.arespond(
             user_message=user_message,
             suspect=suspect,
             state=state,
             clue_presented=clue,
             knowledge_context=rag_context,
+            tools=actor_tools,
         )
 
         # 7. Pressure 업데이트
