@@ -36,6 +36,7 @@ env/
 *.swp
 *.swo
 *~
+*.iml
 
 # OS
 .DS_Store

@@ -4,6 +4,7 @@ import logging
 
 from app.core.utils import extract_json, safe_json_load
 from app.models.schemas.scenario.clearability import ClearabilityEvaluation
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
 
@@ -14,7 +15,7 @@ class ClearabilityEvaluator:
     """Calls the LLM to judge if a scenario can be solved in 10 turns."""
 
     def __init__(self, llm_client: LLMClient):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.system_prompt = PromptLoader.load(
             "app/prompts/scenario/clearability.txt"
         )

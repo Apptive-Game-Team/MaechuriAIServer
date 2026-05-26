@@ -4,6 +4,7 @@ import time
 from typing import Type, TypeVar, Optional
 from pydantic import BaseModel
 from app.core.utils import extract_json, safe_json_load
+from app.services.llm import ensure_langgraph_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ T = TypeVar("T", bound=BaseModel)
 
 class BaseGenerator:
     def __init__(self, llm_client, system_prompt: str):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.system_prompt = system_prompt
         self._max_output_tokens: int | None = None
 

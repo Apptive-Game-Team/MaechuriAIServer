@@ -1,5 +1,6 @@
 """Detective agent for general chat - answers questions about the case."""
 from typing import Optional, List
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.prompt.prompt_loader import PromptLoader
 from app.services.rag.context_builder import get_context_builder, ContextBuilder
 
@@ -14,7 +15,7 @@ class DetectiveAgent:
     """
 
     def __init__(self, llm_client, context_builder: Optional[ContextBuilder] = None):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.context_builder = context_builder or get_context_builder()
         self.prompt_template = PromptLoader.load(
             "app/prompts/detective/chat_system.txt"
