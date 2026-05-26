@@ -1,5 +1,6 @@
 import time
 from app.core.utils import extract_json, safe_json_load
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.prompt.prompt_loader import PromptLoader
 from app.models.schemas.scenario import (
     ScenarioSkeleton, 
@@ -11,7 +12,7 @@ from app.models.schemas.scenario import (
 
 class ScenarioGenerator:
     def __init__(self, llm_client):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.case_prompt = PromptLoader.load(
             "app/prompts/scenario/case.txt"
         )

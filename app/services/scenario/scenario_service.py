@@ -20,6 +20,7 @@ from app.services.agent.scenario_generator import ScenarioGenerator
 from app.services.agent.suspect_generator import SuspectGenerator
 from app.services.agent.critic import ScenarioRefiner, RegenLevel
 from app.services.llm.llm_client import LLMClient
+from app.services.llm import ensure_langgraph_llm_client
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.db.repositories.asset_repository import AssetRepository
 from app.services.embedding.embedding_service import get_embedding_service
@@ -49,6 +50,7 @@ class ScenarioService:
         llm_client : LLMClient
             LLM client instance (e.g., GeminiClient)
         """
+        llm_client = ensure_langgraph_llm_client(llm_client)
         self.scenario_generator = ScenarioGenerator(llm_client)
         self.clue_generator = ClueGenerator(llm_client)
         self.map_generator = MapGenerator(llm_client)

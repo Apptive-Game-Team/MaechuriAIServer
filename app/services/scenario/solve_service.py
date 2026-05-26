@@ -4,6 +4,7 @@ import numpy as np
 from typing import List
 
 from app.services.llm.llm_client import LLMClient
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.embedding.embedding_service import get_embedding_service
 from app.services.agent.solve_validator import SolveValidator
 from app.services.scenario.formatters import SolveFormatter
@@ -38,9 +39,9 @@ class SolveService:
         llm_client : LLMClient
             LLM client for validation
         """
-        self.llm_client = llm_client
+        self.llm_client = ensure_langgraph_llm_client(llm_client)
         self.embedding_service = get_embedding_service()
-        self.solve_validator = SolveValidator(llm_client)
+        self.solve_validator = SolveValidator(self.llm_client)
         self.repository = ScenarioRepository()
 
     async def solve(

@@ -16,6 +16,7 @@ from app.models.schemas.critic import (
     AggregatedCriticResult,
 )
 from app.models.schemas.scenario import ScenarioExpansion
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
 from .critic_evaluator import UnifiedCritic
@@ -53,7 +54,7 @@ class ScenarioRefiner:
     """
 
     def __init__(self, llm_client: LLMClient):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.critic = UnifiedCritic(llm_client)
         self.refinement_prompt = PromptLoader.load(
             "app/prompts/critic/refinement.txt"

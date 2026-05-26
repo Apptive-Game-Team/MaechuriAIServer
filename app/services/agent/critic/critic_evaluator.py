@@ -9,6 +9,7 @@ from app.models.schemas.critic import (
     UnifiedCriticOutput,
     AggregatedCriticResult,
 )
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
 
@@ -24,7 +25,7 @@ class UnifiedCritic:
     """
 
     def __init__(self, llm_client: LLMClient):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.system_prompt = PromptLoader.load("app/prompts/critic/unified.txt")
 
     def evaluate(self, scenario_json: dict, iteration: int = 1) -> AggregatedCriticResult:
@@ -77,7 +78,7 @@ class CriticEvaluator:
     prompt_path: str
 
     def __init__(self, llm_client: LLMClient):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
 
 
 class LogicianCritic(CriticEvaluator):

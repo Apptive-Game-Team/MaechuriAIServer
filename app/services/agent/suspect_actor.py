@@ -1,6 +1,7 @@
 from typing import Optional
 
 from app.core.utils import extract_json, safe_json_load
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.llm.llm_client import LLMClient
 from app.services.prompt.prompt_loader import PromptLoader
 from app.services.npc.formatters import ChatFormatter
@@ -16,7 +17,7 @@ class SuspectActor:
     """
 
     def __init__(self, llm_client: LLMClient):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.system_prompt_template = PromptLoader.load("app/prompts/suspect_responder/system.txt")
 
     async def arespond(

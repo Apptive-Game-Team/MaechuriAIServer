@@ -1,9 +1,10 @@
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.prompt.prompt_loader import PromptLoader
 
 
 class ClueAgent:
     def __init__(self, llm_client):
-        self.llm = llm_client
+        self.llm = ensure_langgraph_llm_client(llm_client)
         self.system_prompt_template = PromptLoader.load("app/prompts/clue/chat_system.txt")
 
     async def chat_generate(

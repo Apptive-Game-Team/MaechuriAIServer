@@ -5,14 +5,16 @@ from fastapi import Depends
 from app.db.repositories.scenario_repository import ScenarioRepository
 from app.services.agent.detective_agent import DetectiveAgent
 from app.services.llm.gemini_client import GeminiClient
+from app.services.llm.llm_client import LLMClient
+from app.services.llm import ensure_langgraph_llm_client
 from app.services.npc.chat_service import ChatService
 from app.services.agent.pressure_judge import PressureJudge
 from app.services.agent.suspect_actor import SuspectActor
 from app.services.agent.clue_agent import ClueAgent
 
 
-def get_gemini() -> GeminiClient:
-    return GeminiClient()
+def get_gemini() -> LLMClient:
+    return ensure_langgraph_llm_client(GeminiClient())
 
 
 def get_scenario_repository() -> ScenarioRepository:
@@ -20,24 +22,24 @@ def get_scenario_repository() -> ScenarioRepository:
 
 
 def get_pressure_judge(
-    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+    llm_client: Annotated[LLMClient, Depends(get_gemini)],
 ) -> PressureJudge:
     return PressureJudge(llm_client)
 
 
 def get_suspect_actor(
-    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+    llm_client: Annotated[LLMClient, Depends(get_gemini)],
 ) -> SuspectActor:
     return SuspectActor(llm_client)
 
 
 def get_clue_agent(
-    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+    llm_client: Annotated[LLMClient, Depends(get_gemini)],
 ) -> ClueAgent:
     return ClueAgent(llm_client)
 
 def get_detective_agent(
-    llm_client: Annotated[GeminiClient, Depends(get_gemini)],
+    llm_client: Annotated[LLMClient, Depends(get_gemini)],
 ) -> DetectiveAgent:
     return DetectiveAgent(llm_client)
 
