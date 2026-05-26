@@ -55,7 +55,7 @@ class ScenarioRefiner:
 
     def __init__(self, llm_client: LLMClient):
         self.llm = ensure_langgraph_llm_client(llm_client)
-        self.critic = UnifiedCritic(llm_client)
+        self.critic = UnifiedCritic(self.llm)
         self.refinement_prompt = PromptLoader.load(
             "app/prompts/critic/refinement.txt"
         )
